@@ -36,7 +36,7 @@ python native-edge/tests/integration.py --prefix /tmp/scdn-plugin-openresty \
 
 构建脚本从 OpenResty 官方地址下载固定归档并校验 SHA-256。`nginx` 模式仅解包其中的 Nginx 核心，不编入 Lua；`openresty` 模式构建完整 OpenResty。两种模式都启用 `--with-compat --with-http_ssl_module --with-http_v2_module --with-pcre-jit --with-threads`，并将这两个插件作为动态模块构建。
 
-| 模式 | Nginx 可执行文件 | 两个 `.so` 的目录 |
+| 模式 | Nginx 可执行文件 | 动态模块目录 |
 | --- | --- | --- |
 | nginx | `/tmp/scdn-plugin-nginx/sbin/nginx` | `/tmp/scdn-plugin-nginx/modules/` |
 | openresty | `/tmp/scdn-plugin-openresty/nginx/sbin/nginx` | `/tmp/scdn-plugin-openresty/nginx/modules/` |

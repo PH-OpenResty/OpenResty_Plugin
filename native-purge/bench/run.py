@@ -43,6 +43,7 @@ def main():
     parser.add_argument('--threads',type=int,default=2)
     parser.add_argument('--purges-per-second',type=int,default=20)
     parser.add_argument('--body-bytes',type=int,default=16384)
+    parser.add_argument('--loader-timeout',type=int,default=75)
     args=parser.parse_args()
     prefix=args.prefix/'nginx' if (args.prefix/'nginx/sbin/nginx').exists() else args.prefix
     with tempfile.TemporaryDirectory(prefix='scdn-purge-bench-') as directory:
@@ -63,6 +64,20 @@ def main():
             runtime=subprocess.run([str(review.nginx),'-V'],capture_output=True,text=True,check=True).stderr
             if '-fsanitize' in runtime:raise AssertionError('benchmark requires an optimized build without sanitizers')
             for path in ('/baseline/hit','/bench/hit'):review.fill(path)
+            # Stock nginx delays its file-cache loader by 60 seconds. Until
+            # cold clears, each HIT may take an additional core cache mutex.
+            # Wait for that process to exit rather than call early HITs steady.
+            loader_started=time.monotonic()
+            while True:
+                children=Path(f'/proc/{review.process.pid}/task/{review.process.pid}/children').read_text().split()
+                loading=any(Path(f'/proc/{pid}/cmdline').exists()
+                            and b'nginx: cache loader process' in Path(f'/proc/{pid}/cmdline').read_bytes()
+                            for pid in children)
+                if not loading:break
+                if time.monotonic()-loader_started>args.loader_timeout:raise AssertionError('cache loader did not finish')
+                time.sleep(0.5)
+            loader_wait=time.monotonic()-loader_started
+            print(json.dumps(dict(cache_loader_wait_seconds=loader_wait)),flush=True)
             measurements=[]
             for run in range(args.runs):
                 scenarios=[('baseline','/baseline/hit',False),('versioned','/bench/hit',False),
@@ -118,6 +133,7 @@ def main():
                 summary=summary,measurements=measurements,api=api,
                 background_purges=len(mutations),background_failures=sum(status!=200 for status in mutations),
                 limitations='Same-host loopback, warm single-key HIT, client/server share CPU; not a production capacity or universal minimum-overhead proof.')
+            data['environment']['cache_loader_wait_seconds']=loader_wait
             args.output.parent.mkdir(parents=True,exist_ok=True)
             args.output.write_text(json.dumps(data,indent=2)+'\n')
             print(json.dumps(dict(summary=summary,api=api),indent=2),flush=True)

@@ -1,0 +1,134 @@
+{
+  "environment": {
+    "os": "Linux",
+    "machine": "x86_64",
+    "runtime": [
+      "nginx version: openresty/1.31.8.1",
+      "built by gcc 14.2.0 (Alpine 14.2.0) ",
+      "built with OpenSSL 3.5.9 29 Sep 2026"
+    ],
+    "workers": 2,
+    "body_bytes": 16387,
+    "connections": 128,
+    "client_threads": 2,
+    "seconds": 5,
+    "runs": 3,
+    "purges_per_second": 20,
+    "cache_loader_wait_seconds": 60.08172443101648
+  },
+  "summary": {
+    "baseline": {
+      "median_qps": 22170.47,
+      "median_p99_ms": 10.46,
+      "median_server_cpu_us": 88.83023947853195
+    },
+    "versioned": {
+      "median_qps": 21196.68,
+      "median_p99_ms": 10.48,
+      "median_server_cpu_us": 92.27926968357353
+    },
+    "versioned_with_purges": {
+      "median_qps": 19173.53,
+      "median_p99_ms": 13.86,
+      "median_server_cpu_us": 103.17200114749396
+    },
+    "versioned_qps_ratio": 0.9560771602947524
+  },
+  "measurements": [
+    {
+      "scenario": "baseline",
+      "run": 1,
+      "qps": 22473.55,
+      "p99_ms": 10.46,
+      "server_cpu_us_per_request": 87.92909397861564
+    },
+    {
+      "scenario": "versioned",
+      "run": 1,
+      "qps": 21553.05,
+      "p99_ms": 10.48,
+      "server_cpu_us_per_request": 91.5129285961935
+    },
+    {
+      "scenario": "versioned_with_purges",
+      "run": 1,
+      "qps": 19173.53,
+      "p99_ms": 14.32,
+      "server_cpu_us_per_request": 103.17200114749396
+    },
+    {
+      "scenario": "versioned",
+      "run": 2,
+      "qps": 19727.04,
+      "p99_ms": 13.12,
+      "server_cpu_us_per_request": 100.09271536383304
+    },
+    {
+      "scenario": "baseline",
+      "run": 2,
+      "qps": 20736.56,
+      "p99_ms": 11.08,
+      "server_cpu_us_per_request": 95.50908142457438
+    },
+    {
+      "scenario": "versioned_with_purges",
+      "run": 2,
+      "qps": 18414.19,
+      "p99_ms": 13.86,
+      "server_cpu_us_per_request": 107.52226633758987
+    },
+    {
+      "scenario": "baseline",
+      "run": 3,
+      "qps": 22170.47,
+      "p99_ms": 9.01,
+      "server_cpu_us_per_request": 88.83023947853195
+    },
+    {
+      "scenario": "versioned",
+      "run": 3,
+      "qps": 21196.68,
+      "p99_ms": 9.27,
+      "server_cpu_us_per_request": 92.27926968357353
+    },
+    {
+      "scenario": "versioned_with_purges",
+      "run": 3,
+      "qps": 19269.21,
+      "p99_ms": 11.3,
+      "server_cpu_us_per_request": 102.79601065730239
+    }
+  ],
+  "api": [
+    {
+      "batch": 1,
+      "clients": 16,
+      "requests": 48,
+      "requests_per_second": 187.61580952261463,
+      "keys_per_second": 187.61580952261463,
+      "median_ms": 65.13729502330534,
+      "max_ms": 170.02058698562905
+    },
+    {
+      "batch": 32,
+      "clients": 16,
+      "requests": 48,
+      "requests_per_second": 194.79019030795018,
+      "keys_per_second": 6233.286089854406,
+      "median_ms": 69.27594452281483,
+      "max_ms": 154.20628699939698
+    },
+    {
+      "batch": 256,
+      "clients": 16,
+      "requests": 48,
+      "requests_per_second": 183.02958881872712,
+      "keys_per_second": 46855.57473759414,
+      "median_ms": 72.39499397110194,
+      "max_ms": 165.97878700122237
+    }
+  ],
+  "background_purges": 305,
+  "background_failures": 0,
+  "limitations": "Same-host loopback, warm single-key HIT, client/server share CPU; not a production capacity or universal minimum-overhead proof."
+}

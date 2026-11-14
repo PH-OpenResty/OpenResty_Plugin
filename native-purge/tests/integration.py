@@ -360,6 +360,11 @@ http {{
                  f'Content-Length: {len(body)}\r\n\r\n').encode()+body
         connection.sendall(message);connection.close();time.sleep(0.1)
         self.check('client disconnect cannot invalidate the job lifetime',self.control('exact',keys=['/after-disconnect'])[0]==200)
+        stable=self.status()['sequence'];saved=self.root/'epochs.saved';self.journal.rename(saved)
+        try:
+            code,_=self.control('exact',keys=['/unavailable'])
+            self.check('unavailable journal cannot acknowledge a purge',code==503 and self.status()['sequence']==stable)
+        finally:saved.rename(self.journal)
         self.check('old inaccessible cache files are left to nginx storage management',bool(list((self.root/'cache1').rglob('*'))))
         self.stop();good=self.journal.read_bytes();damaged=bytearray(good);damaged[-1]^=1;self.journal.write_bytes(damaged)
         failed=subprocess.run([str(self.nginx),'-t','-p',str(self.root)+'/', '-c',str(self.path)],capture_output=True,text=True)

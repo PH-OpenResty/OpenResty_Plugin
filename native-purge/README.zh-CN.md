@@ -65,7 +65,7 @@ sudo -u scdn sh -eu -c 'umask 077; set -C
 : > /var/lib/scdn-purge/epochs.log.owner'
 ```
 
-token 用密码学随机源生成，放在仓库之外，权限 0600 或适当的受限所有者配置。模块不打印 token，也不接受查询串凭据。示例 curl 配置文件应填写实际 token 并设为 0600，避免把 token 放进命令行参数。
+token 用密码学随机源生成，放在仓库之外，仅所有者有权限，例如 0600/0400；不接受组或其他用户权限。模块不打印 token，也不接受查询串凭据。示例 curl 配置文件应填写实际 token 并设为 0600，避免把 token 放进命令行参数。
 
 `nginx -t` 会验证或初始化日志，并可能修复不完整的末尾记录；它不是完全无状态的磁盘只读动作。Nginx 手工 reload 必须保留 zone 名称/大小和日志身份，变更这些项目要完全停止旧实例后再启动。不要删除 owner/lock 文件来绕过活跃实例。
 
@@ -119,21 +119,25 @@ curl --config /etc/scdn-purge/control.curl.conf \
 
 每个成功批次先 append 日志并 fsync，之后发布共享序号。一次最多 256 项，fsync 成本按批次摊销。检查点只保留有效的最新版本，用临时文件、fsync、rename 和目录同步替换；稳定 `.lock` 文件负责跨 Worker/线程串行化写入。
 
-日志的完整记录有 CRC 校验；不完整末尾可截断，完整记录损坏会拒绝启动/提交，不静默清空。重启重放版本，手工 reload 复用同一共享状态。在线恢复较旧日志会被拒绝；完全停止后的恢复仍需一致备份策略，不能把旧日志配上任意新缓存数据就声称无回滚风险。
+日志的完整记录有 CRC 校验；启动核对整个日志，在线恢复核对尚未读入的新增记录。不完整末尾可截断，已扫描完整记录损坏时拒绝继续，不静默清空；每次提交不会重扫全部历史，禁止外部就地改写日志。重启重放版本，手工 reload 复用同一共享状态。在线恢复较旧日志会被拒绝；完全停止后的恢复仍需一致备份策略，不能把旧日志配上任意新缓存数据就声称无回滚风险。
 
 I/O 持久化会等待磁盘，管理队列与文件锁可能产生延迟。它不阻塞业务线程的文件操作，但仍与业务共享 CPU/存储资源。队列和 metadata 需要监控；没有无限容量或任意磁盘故障下的可用性保证。
+
+日志保存原始资源标识，可能含业务查询参数，必须按私有业务元数据保护。token 更新需 reload；旧 Worker 在退出前仍可能使用旧配置。一个 master/共享区对应一份日志，不提供跨主机或多实例全局清理。
 
 ## 7. 与 Edge 集成
 
 在 Edge 的命名代理 location 中保留原配置版本隔离，同时按稳定 URL 清理：
 
 ```nginx
-scdn_purge_key "$scheme|$host" "$scdn_edge_revision|$request_uri" "$request_uri";
+scdn_purge_key "$scdn_edge_site" "$scdn_edge_revision|$scheme|$host|$request_uri" "$scheme://$host$request_uri";
 proxy_cache_key $scdn_purge_key;
 proxy_cache $scdn_edge_cache;
 ```
 
-这样 URL 清理覆盖该 scope 中各配置版本，回到旧配置也不会因此命中清理前的版本。l1/l2 使用相同 scope/resource 时同时失效；需要单独隔离某层时，在 scope 中显式加入层名，并由管理端使用同一规则。
+此例 scope 是稳定站点 ID，例如 demo；精确/前缀目标是完整 URL，例如 `https://www.example.com/assets/a.css` 或 `https://www.example.com/assets/`。这样精确 URL 不会误清理其他别名，而 scope 整站操作可以同时覆盖该站点所有别名、scheme、缓存层和配置版本；回到旧配置也不会因此命中清理前的版本。
+
+l1/l2 使用相同 scope/resource 时同时失效；需要单独隔离某层时，在 scope 中显式加入层名，并由管理端使用同一规则。独立模板使用 scheme/Host 作为 scope，它不会自动发现 DNS 别名或控制面站点归属；管理端和业务端必须采用同一命名规则。
 
 首次启用版本化键会形成新缓存空间，原键下的文件不会自动迁移。修改 scope/resource 映射属于缓存语义变更，需计划相应的 scope/all 失效；不要让部分请求绕过 `$scdn_purge_key`。
 
@@ -141,4 +145,6 @@ proxy_cache $scdn_edge_cache;
 
 GET/HEAD status 返回 sequence、metadata_nodes、journal_bytes、批次数、检查点数和回答该请求 Worker 的 LRU hits/misses。LRU 指标是每 Worker 的局部计数，不能把一次响应当作全实例汇总。状态接口也需本机传输和 token。
 
-真实进程用例见 [integration.py](tests/integration.py)，对照压测方法和测量边界见 [bench](bench/README.zh-CN.md)。目标是低开销、无目录扫描和精确并发语义；不宣称在所有负载下绝对最低开销，也不把回环压测结果当作生产公网容量。
+当前主要验证 HTTP/1.1 的 proxy_cache。FastCGI/SCGI/uWSGI、slice/range、background_update、HTTP/2/3 和磁盘真实掉电等组合需要另外验收；不能把本机键解析边界扩展为所有协议及子请求的全局快照保证。
+
+真实进程用例见 [integration.py](tests/integration.py)和[验证记录](tests/VALIDATION.zh-CN.md)，对照压测方法与原始结果见 [bench](bench/README.zh-CN.md)。目标是低开销、无目录扫描和精确并发语义；不宣称在所有负载下绝对最低开销，也不把回环压测结果当作生产公网容量。
