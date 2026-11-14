@@ -1,6 +1,6 @@
 # 安装、构建和首次运行
 
-本仓库只构建 Config 和 Edge 两个插件；Edge 通过 Config 的 C 接口读取活动版本，二者需同版本编译并按顺序加载。插件运行时不需要 Lua、Python、独立 Agent 或生成配置的脚本。Python 仅用于测试。
+统一构建现在生成 Config、Edge、Purge 三个插件；Edge 通过 Config 的 C 接口读取活动版本，二者需同版本编译并按顺序加载。Purge 独立使用，私有日志和 token 的初始化见 [专门手册](../native-purge/README.zh-CN.md)。插件运行时不需要 Lua、Python、独立 Agent 或生成配置的脚本。Python 仅用于测试。
 
 ## 1. 构建要求
 
@@ -36,7 +36,7 @@ python native-edge/tests/integration.py --prefix /tmp/scdn-plugin-openresty \
 
 构建脚本从 OpenResty 官方地址下载固定归档并校验 SHA-256。`nginx` 模式仅解包其中的 Nginx 核心，不编入 Lua；`openresty` 模式构建完整 OpenResty。两种模式都启用 `--with-compat --with-http_ssl_module --with-http_v2_module --with-pcre-jit --with-threads`，并将这两个插件作为动态模块构建。
 
-| 模式 | Nginx 可执行文件 | 两个 `.so` 的目录 |
+| 模式 | Nginx 可执行文件 | 动态模块目录 |
 | --- | --- | --- |
 | nginx | `/tmp/scdn-plugin-nginx/sbin/nginx` | `/tmp/scdn-plugin-nginx/modules/` |
 | openresty | `/tmp/scdn-plugin-openresty/nginx/sbin/nginx` | `/tmp/scdn-plugin-openresty/nginx/modules/` |
