@@ -1,0 +1,6 @@
+# Nginx intentionally exports these dlsym tables from both its executable and
+# each separately loaded module. Suppress only those generated registration
+# tables, not diagnostics from module data, buffers, lifetimes or other globals.
+odr_violation:ngx_module_names
+odr_violation:ngx_modules
+odr_violation:ngx_module_order

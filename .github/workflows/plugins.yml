@@ -1,0 +1,48 @@
+name: Native Config and Edge
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [nginx, openresty]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install build and test dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential perl libpcre2-dev libssl-dev zlib1g-dev curl
+          python -m pip install -r tests/requirements.txt
+      - name: Verify imported implementation
+        run: sha256sum -c SOURCE-SHA256SUMS
+      - name: Build isolated runtime and both plugins
+        env:
+          PLUGIN_RUNTIME: ${{ matrix.runtime }}
+        run: |
+          if [ "$PLUGIN_RUNTIME" = nginx ]; then
+            export SCDN_NATIVE_CFLAGS='-Werror -fsanitize=address,undefined -fno-omit-frame-pointer'
+            export SCDN_NATIVE_LDFLAGS='-fsanitize=address,undefined'
+          fi
+          sh tools/build-runtime.sh "$RUNNER_TEMP/scdn-plugin" "$PLUGIN_RUNTIME"
+      - name: Configuration, TLS and updates without worker reloads
+        env:
+          ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: python native-edge/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" --report "$RUNNER_TEMP/plugin-results.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: config-edge-${{ matrix.runtime }}-results
+          path: ${{ runner.temp }}/plugin-results.json
