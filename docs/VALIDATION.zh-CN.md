@@ -1,5 +1,7 @@
 # 验证记录与复现
 
+本页主要记录导入的 Config/Edge；新增 Purge 的一致性、恢复与性能结果见 [清理模块验证](../native-purge/tests/VALIDATION.zh-CN.md)和[基准报告](../native-purge/bench/README.zh-CN.md)。统一构建和 CI 现在同时包含三个插件。
+
 日期：2026-11-14。这份记录区分导入前已有结果和新仓库的独立验证；远程 CI 结果以当前提交的 Actions 记录为准。
 
 ## 已有实现基线

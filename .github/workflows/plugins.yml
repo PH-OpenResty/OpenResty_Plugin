@@ -1,4 +1,4 @@
-name: Native Config and Edge
+name: Native Config Edge and Purge
 
 on:
   push:
@@ -28,7 +28,7 @@ jobs:
           python -m pip install -r tests/requirements.txt
       - name: Verify imported implementation
         run: sha256sum -c SOURCE-SHA256SUMS
-      - name: Build isolated runtime and both plugins
+      - name: Build isolated runtime and native plugins
         env:
           PLUGIN_RUNTIME: ${{ matrix.runtime }}
         run: |
@@ -42,7 +42,14 @@ jobs:
           ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
         run: python native-edge/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" --report "$RUNNER_TEMP/plugin-results.json"
+      - name: Exact batch prefix site purge, concurrent writers and recovery
+        env:
+          ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: python native-purge/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" --report "$RUNNER_TEMP/purge-results.json"
       - uses: actions/upload-artifact@v4
         with:
           name: config-edge-${{ matrix.runtime }}-results
-          path: ${{ runner.temp }}/plugin-results.json
+          path: |
+            ${{ runner.temp }}/plugin-results.json
+            ${{ runner.temp }}/purge-results.json

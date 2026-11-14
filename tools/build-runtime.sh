@@ -34,6 +34,7 @@ esac
   --with-cc-opt="${SCDN_NATIVE_CFLAGS:--Werror}" \
   --with-ld-opt="${SCDN_NATIVE_LDFLAGS:-}" \
   --add-dynamic-module="$native_root/native-config" \
-  --add-dynamic-module="$native_root/native-edge"
+  --add-dynamic-module="$native_root/native-edge" \
+  --add-dynamic-module="$native_root/native-purge"
 make -j"${SCDN_NATIVE_BUILD_JOBS:-2}"
 make install
