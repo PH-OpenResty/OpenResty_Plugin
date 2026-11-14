@@ -1,0 +1,3 @@
+# Store the filled configuration outside the repository with mode 0600.
+# curl --config avoids putting the token in command-line arguments.
+header = "Authorization: Bearer REPLACE_WITH_LOCAL_TOKEN"

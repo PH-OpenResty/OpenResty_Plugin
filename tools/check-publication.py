@@ -21,6 +21,7 @@ PRIVATE_SUFFIXES = {
     '.pem', '.key', '.crt', '.cer', '.p12', '.pfx', '.jks', '.token',
     '.ljbc', '.luac', '.pyc', '.log', '.bak', '.dump', '.sql',
     '.zip', '.gz', '.tar', '.tgz', '.exe', '.dll', '.so', '.o',
+    '.journal', '.checkpoint', '.owner',
 }
 PRIVATE_NAMES = {
     '.admin_token', 'id_rsa', 'id_ed25519', 'runtime.json', 'applied.json',
@@ -51,6 +52,8 @@ def blocked_path(name):
     if basename == '.env' or (basename.startswith('.env.') and basename != '.env.example'):
         return True
     if basename.endswith('-token') or '.local.' in basename:
+        return True
+    if basename.endswith('.log.lock') or '.journal.' in basename:
         return True
     return False
 

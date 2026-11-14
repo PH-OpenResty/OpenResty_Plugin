@@ -1,6 +1,6 @@
 # 安装、构建和首次运行
 
-本仓库只构建 Config 和 Edge 两个插件；Edge 通过 Config 的 C 接口读取活动版本，二者需同版本编译并按顺序加载。插件运行时不需要 Lua、Python、独立 Agent 或生成配置的脚本。Python 仅用于测试。
+统一构建现在生成 Config、Edge、Purge 三个插件；Edge 通过 Config 的 C 接口读取活动版本，二者需同版本编译并按顺序加载。Purge 独立使用，私有日志和 token 的初始化见 [专门手册](../native-purge/README.zh-CN.md)。插件运行时不需要 Lua、Python、独立 Agent 或生成配置的脚本。Python 仅用于测试。
 
 ## 1. 构建要求
 
