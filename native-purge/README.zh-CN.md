@@ -111,7 +111,9 @@ curl --config /etc/scdn-purge/control.curl.conf \
   -H 'X-SCDN-Purge-Scope: http|www.example.com' --data-binary ''
 ```
 
-成功响应为 `ok=true`、sequence、operations、`durable=true`、`physical_deleted=false`。operations 是输入操作数量，不是删除文件数量。失败时保持已提交版本，队列不可用或 I/O 错误返回 503，元数据/前缀容量不足返回 507；错误响应不会包含原始资源和 token。
+成功响应为 `ok=true`、sequence、operations、`durable=true`、`physical_deleted=false`。operations 是输入操作数量，不是删除文件数量。队列不可用或 I/O 错误返回 503，元数据/前缀容量不足返回 507；错误响应不会包含原始资源和 token。
+
+503、连接断开或超时属于未确认结果：记录可能已经可恢复，不能假定操作一定未发生。恢复会先同步可见尾部，再发布版本；重试相同失效是安全的，但可能推进额外版本。输入错误或容量预检失败不会部分提交当前批次。
 
 ## 6. 持久化与资源边界
 

@@ -276,6 +276,9 @@ static int recover(scdn_purge_main_t *main,int fd,int fresh)
     previous_sequence=(uint64_t)main->shared->sequence;
     if(start<32) start=32;
     if(st.st_size<start || st.st_size>SCDN_PURGE_JOURNAL*2) return 0;
+    /* A complete record can be visible after a previous fsync failure. Make
+     * every newly recovered tail durable before publishing any of its epochs. */
+    if(st.st_size>start && fsync(fd)!=0)return 0;
     offset=start;
     while(offset<st.st_size) {
         if(st.st_size-offset<32) {
@@ -348,6 +351,20 @@ static int lock_file(scdn_purge_main_t *main)
     if(fstat(fd,&st)!=0 || !S_ISREG(st.st_mode) || (st.st_mode&077)!=0
        || flock(fd,LOCK_EX)!=0) { close(fd);return -1; }
     return fd;
+}
+
+static int sync_parent(const ngx_str_t *name)
+{
+    char *path;
+    size_t length=name->len;
+    int fd,ok;
+    path=ngx_alloc(length+1,ngx_cycle->log);if(path==NULL)return 0;
+    ngx_memcpy(path,name->data,length);path[length]=0;
+    while(length>0 && path[length-1]!='/')length--;
+    path[length==1?1:length-1]=0;
+    fd=open(path,O_RDONLY|O_DIRECTORY|O_CLOEXEC|O_NOFOLLOW);
+    ngx_free(path);if(fd<0)return 0;
+    ok=fsync(fd)==0;close(fd);return ok;
 }
 
 static int compact(scdn_purge_main_t *main,int *fd)
@@ -433,7 +450,7 @@ scdn_purge_zone_init(ngx_shm_zone_t *zone,void *previous)
     main->shared->format=1;
     lock=lock_file(main);if(lock<0) return NGX_ERROR;
     fd=open((char *)main->journal.data,O_RDWR|O_CREAT|O_CLOEXEC|O_NOFOLLOW,0600);
-    ok=fd>=0 && recover(main,fd,1);
+    ok=fd>=0 && recover(main,fd,1) && sync_parent(&main->journal);
     if(fd>=0) close(fd);
     close(lock);
     if(!ok) ngx_log_error(NGX_LOG_EMERG,zone->shm.log,0,"scdn_purge journal validation failed");

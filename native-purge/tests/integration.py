@@ -57,7 +57,7 @@ class OriginServer(http.server.ThreadingHTTPServer):
 
 
 class Review:
-    def __init__(self,root,prefix):
+    def __init__(self,root,prefix,faults=True):
         self.root,self.prefix=root,prefix
         self.nginx=prefix/'sbin/nginx'
         self.http,self.second=port(),port()
@@ -66,6 +66,21 @@ class Review:
         self.token=secrets.token_urlsafe(32)
         token=root/'control.token';token.write_text(self.token+'\n');token.chmod(0o600)
         self.process,self.log=None,None
+        self.fault_marker=root/'fsync-fault'
+        self.env=dict(os.environ)
+        if faults:
+            helper=root/'fault-fsync.so'
+            compiled=subprocess.run(['cc','-shared','-fPIC','-std=c99','-Wall','-Wextra','-Werror',
+                str(Path(__file__).with_name('fault-fsync.c')),'-ldl','-o',str(helper)],capture_output=True,text=True)
+            if compiled.returncode:raise AssertionError(compiled.stderr)
+            runtime=subprocess.run([str(self.nginx),'-V'],capture_output=True,text=True).stderr
+            preload=str(helper)
+            if '-fsanitize=address' in runtime:
+                asan=subprocess.check_output(['cc','-print-file-name=libasan.so'],text=True).strip()
+                preload=asan+':'+preload
+            self.env['LD_PRELOAD']=preload
+            self.env['SCDN_TEST_FSYNC_FAULT']=str(self.fault_marker)
+            self.env['SCDN_TEST_FSYNC_JOURNAL']=str(self.journal)
         self.checks=[]
         self.origin=OriginServer(('127.0.0.1',0),Origin)
         self.origin.guard=threading.Lock();self.origin.version=1;self.origin.calls=0
@@ -145,7 +160,7 @@ http {{
         checked=subprocess.run([str(self.nginx),'-t','-p',str(self.root)+'/', '-c',str(self.path)],capture_output=True,text=True)
         if checked.returncode:raise AssertionError(checked.stderr)
         self.log=(self.root/'stdout.log').open('ab')
-        self.process=subprocess.Popen([str(self.nginx),'-p',str(self.root)+'/', '-c',str(self.path),'-g','daemon off;'],stdout=self.log,stderr=self.log)
+        self.process=subprocess.Popen([str(self.nginx),'-p',str(self.root)+'/', '-c',str(self.path),'-g','daemon off;'],stdout=self.log,stderr=self.log,env=self.env)
         self.until(lambda:self.status()['ok'],'startup')
 
     def stop(self):
@@ -353,6 +368,13 @@ http {{
         self.check('live journal rollback is refused',self.control('exact',keys=['/rollback'])[0]==503)
         replacement.write_bytes(latest);replacement.chmod(0o600);replacement.replace(self.journal)
         self.check('valid journal restoration permits new commits',self.control('exact',keys=['/repaired'])[0]==200)
+        stable=self.status()['sequence'];self.fault_marker.touch()
+        try:
+            self.check('fsync failure never acknowledges a purge',self.control('exact',keys=['/fsync-fault'])[0]==503)
+            self.check('visible undurable tail is not published while fsync still fails',
+                       self.control('exact',keys=['/fsync-still-fails'])[0]==503 and self.status()['sequence']==stable)
+        finally:self.fault_marker.unlink()
+        self.check('durability recovery resumes after fsync is restored',self.control('exact',keys=['/fsync-recovered'])[0]==200)
         connection=socket.socket(socket.AF_UNIX);connection.connect(str(self.control_socket))
         body=b'/disconnect\n'
         message=(f'POST /purge HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {self.token}\r\n'

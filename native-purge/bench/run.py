@@ -47,7 +47,7 @@ def main():
     args=parser.parse_args()
     prefix=args.prefix/'nginx' if (args.prefix/'nginx/sbin/nginx').exists() else args.prefix
     with tempfile.TemporaryDirectory(prefix='scdn-purge-bench-') as directory:
-        review=fixture.Review(Path(directory),prefix.resolve())
+        review=fixture.Review(Path(directory),prefix.resolve(),faults=False)
         review.origin.bench_bytes=args.body_bytes
         config=review.config
         review.config=lambda allow_all=True:config(allow_all).replace('scdn_purge_checkpoint 64k;','scdn_purge_checkpoint 64m;')

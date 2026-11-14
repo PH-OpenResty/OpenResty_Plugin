@@ -11,10 +11,11 @@
 - 批量同一次提交、前缀边界、整站及显式全局模式；前缀和元数据容量限制。
 - 在途旧回源返回旧响应，但不能污染清理后的新请求；多轮并发 post-ack 请求检查。
 - 日志重放、graceful reload、半写尾部、检查点、完整记录损坏、在线旧日志恢复拒绝，以及日志不可用时不确认清理。
+- 注入持续 fsync 失败，验证失败不确认、可见但未持久的完整尾部不提前发布，存储恢复后继续提交。
 - 单 master 所有权、本机与 token 边界、请求大小/类型/方法、客户端断开时任务生命周期。
 - 失败批次预留撤销、整站/全局覆盖元数据回收，旧文件保持由原生 cache manager 管理。
 
-本地 Nginx 严格编译与 UBSan trap 已通过，完整 OpenResty 也完成真实进程验证。此前发布代码的 CI 在 Nginx、OpenResty 两种运行时各通过 63 项 Purge 检查与 47 项 Config/Edge 回归；当前新增日志不可用场景，共 64 项。Nginx 分支对完整运行时和模块启用 ASan/UBSan，最终提交结果以 Actions 记录为准。
+当前包含 67 项 Purge 检查；本地 Nginx 严格编译与 UBSan trap 已通过，完整 OpenResty 也完成真实进程验证。CI 在两种运行时执行 Purge 与原 47 项 Config/Edge 回归；Nginx 分支对完整运行时和模块启用 ASan/UBSan，最终结果以对应提交的 Actions 记录为准。
 
 ## 复现
 
@@ -24,7 +25,7 @@ python native-purge/tests/integration.py --prefix /tmp/scdn-purge-validation \
   --report /tmp/scdn-purge-validation-results.json
 ```
 
-也可选择 openresty 并使用新前缀。所有报告只包含检查名称和数量；私有日志、token 和缓存对象不上传为 artifact。ASan 对 Nginx 自动生成的三个模块注册表采用仓库既有的 ODR 排除规则，其余内存检查仍有效。
+也可选择 openresty 并使用新前缀。测试需要 C 编译器，会在临时目录构建仅用于 fsync 故障注入的 LD_PRELOAD 辅助库；性能脚本显式关闭此辅助库。所有报告只包含检查名称和数量；私有日志、token 和缓存对象不上传为 artifact。ASan 对 Nginx 自动生成的三个模块注册表采用仓库既有的 ODR 排除规则，其余内存检查仍有效。
 
 ## 性能验证
 
