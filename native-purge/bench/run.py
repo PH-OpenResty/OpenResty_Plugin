@@ -70,9 +70,11 @@ def main():
             loader_started=time.monotonic()
             while True:
                 children=Path(f'/proc/{review.process.pid}/task/{review.process.pid}/children').read_text().split()
-                loading=any(Path(f'/proc/{pid}/cmdline').exists()
-                            and b'nginx: cache loader process' in Path(f'/proc/{pid}/cmdline').read_bytes()
-                            for pid in children)
+                loading=False
+                for pid in children:
+                    try:command=Path(f'/proc/{pid}/cmdline').read_bytes()
+                    except FileNotFoundError:continue
+                    if b'nginx: cache loader process' in command:loading=True
                 if not loading:break
                 if time.monotonic()-loader_started>args.loader_timeout:raise AssertionError('cache loader did not finish')
                 time.sleep(0.5)
