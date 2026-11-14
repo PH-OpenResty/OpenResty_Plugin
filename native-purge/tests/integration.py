@@ -67,10 +67,11 @@ class Review:
         token=root/'control.token';token.write_text(self.token+'\n');token.chmod(0o600)
         self.process,self.log=None,None
         self.fault_marker=root/'fsync-fault'
+        self.crash_marker=root/'crash-in-mutation'
         self.env=dict(os.environ)
         if faults:
             helper=root/'fault-fsync.so'
-            compiled=subprocess.run(['cc','-shared','-fPIC','-std=c99','-Wall','-Wextra','-Werror',
+            compiled=subprocess.run(['cc','-shared','-fPIC','-fno-builtin','-std=c99','-Wall','-Wextra','-Werror',
                 str(Path(__file__).with_name('fault-fsync.c')),'-ldl','-o',str(helper)],capture_output=True,text=True)
             if compiled.returncode:raise AssertionError(compiled.stderr)
             runtime=subprocess.run([str(self.nginx),'-V'],capture_output=True,text=True).stderr
@@ -81,6 +82,7 @@ class Review:
             self.env['LD_PRELOAD']=preload
             self.env['SCDN_TEST_FSYNC_FAULT']=str(self.fault_marker)
             self.env['SCDN_TEST_FSYNC_JOURNAL']=str(self.journal)
+            self.env['SCDN_TEST_CRASH_MARKER']=str(self.crash_marker)
         self.checks=[]
         self.origin=OriginServer(('127.0.0.1',0),Origin)
         self.origin.guard=threading.Lock();self.origin.version=1;self.origin.calls=0
@@ -387,6 +389,19 @@ http {{
             code,_=self.control('exact',keys=['/unavailable'])
             self.check('unavailable journal cannot acknowledge a purge',code==503 and self.status()['sequence']==stable)
         finally:saved.rename(self.journal)
+        self.crash_marker.touch()
+        try:
+            key='/kill-in-mutation/'+('x'*(4096-len('/kill-in-mutation/')))
+            try:self.control('exact',scope='crash-test',keys=[key])
+            except (OSError,http.client.HTTPException):pass
+        finally:self.crash_marker.unlink()
+        self.until(lambda:self.status().get('state_recovery_required'),'critical crash fencing')
+        self.check('worker death in a metadata critical section fails closed',self.request('/persistent')[0]==503)
+        code,error=self.control('exact',keys=['/after-critical-crash'])
+        self.check('critical corruption cannot acknowledge another purge',code==503 and error['error']=='state_recovery_required')
+        self.stop();self.start()
+        self.check('full restart rebuilds a critically interrupted index from the journal',
+                   not self.status()['state_recovery_required'] and self.control('exact',keys=['/after-index-recovery'])[0]==200)
         self.check('old inaccessible cache files are left to nginx storage management',bool(list((self.root/'cache1').rglob('*'))))
         self.stop();good=self.journal.read_bytes();damaged=bytearray(good);damaged[-1]^=1;self.journal.write_bytes(damaged)
         failed=subprocess.run([str(self.nginx),'-t','-p',str(self.root)+'/', '-c',str(self.path)],capture_output=True,text=True)

@@ -34,6 +34,7 @@ typedef struct {
     ngx_atomic_t sequence;
     uint64_t all_epoch, journal_offset, journal_inode;
     ngx_atomic_t batches, compacted;
+    ngx_atomic_t mutating;
     u_char identity[16], identity_hex[33];
     scdn_purge_node_t *buckets[SCDN_PURGE_BUCKETS];
 } scdn_purge_shared_t;

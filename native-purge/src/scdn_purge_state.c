@@ -3,6 +3,11 @@
 
 static __thread scdn_purge_job_t *allocating_job;
 
+static void mutation_begin(scdn_purge_main_t *main)
+{ main->shared->mutating=(ngx_atomic_t)ngx_pid;ngx_memory_barrier(); }
+static void mutation_end(scdn_purge_main_t *main)
+{ ngx_memory_barrier();main->shared->mutating=0; }
+
 /* The journal is private data. No key bytes are logged. All filesystem work
  * below happens at startup or in the dedicated purge thread pool. */
 static void put32(u_char *p, uint32_t v)
@@ -90,6 +95,7 @@ static void rollback_reservations(scdn_purge_job_t *job)
     scdn_purge_node_t *node,*scope,**cursor;
     ngx_str_t name,empty=ngx_string("");
     ngx_shmtx_lock(&main->slab->mutex);
+    mutation_begin(main);
     while(job->created_count) {
         node=job->created[--job->created_count];
         if(node->mode=='P') {
@@ -106,6 +112,7 @@ static void rollback_reservations(scdn_purge_job_t *job)
         }
         ngx_slab_free_locked(main->slab,node);main->shared->nodes--;
     }
+    mutation_end(main);
     ngx_shmtx_unlock(&main->slab->mutex);
 }
 
@@ -163,15 +170,18 @@ static void reclaim_scope(scdn_purge_main_t *main,scdn_purge_operation_t *op,uin
     /* The durable scope epoch dominates the retired exact/prefix epochs.
      * Keep the scope node itself so no old cache namespace can reappear. */
     ngx_shmtx_lock(&main->slab->mutex);
+    mutation_begin(main);
     for(prefix=&scope->prefixes;*prefix;) {
         if((*prefix)->epoch<=seq) { *prefix=(*prefix)->prefix_next;scope->prefix_count--; }
         else prefix=&(*prefix)->prefix_next;
     }
+    mutation_end(main);
     ngx_shmtx_unlock(&main->slab->mutex);
     for(bucket=0;bucket<SCDN_PURGE_BUCKETS;bucket++) {
         cursor=&main->shared->buckets[bucket];
         while(*cursor) {
             ngx_shmtx_lock(&main->slab->mutex);
+            mutation_begin(main);
             for(steps=0;steps<64 && *cursor;steps++) {
                 node=*cursor;
                 if(node->mode!='S' && node->epoch<=seq && node->scope_length==op->scope.len
@@ -179,6 +189,7 @@ static void reclaim_scope(scdn_purge_main_t *main,scdn_purge_operation_t *op,uin
                     *cursor=node->next;ngx_slab_free_locked(main->slab,node);main->shared->nodes--;
                 } else cursor=&node->next;
             }
+            mutation_end(main);
             ngx_shmtx_unlock(&main->slab->mutex);
         }
     }
@@ -192,6 +203,7 @@ scdn_purge_epoch(scdn_purge_main_t *main,const ngx_str_t *scope,
     ngx_str_t empty=ngx_string("");
     uint64_t epoch;
     ngx_shmtx_lock(&main->slab->mutex);
+    if(main->shared->mutating) { ngx_shmtx_unlock(&main->slab->mutex);return UINT64_MAX; }
     epoch=main->shared->all_epoch;
     node=lookup(main,'S',scope,&empty,0);
     if(node!=NULL) {
@@ -317,6 +329,7 @@ static int recover(scdn_purge_main_t *main,int fd,int fresh)
         for(i=1;i<count;i++)if(ops[i].mode!=ops[0].mode)break;
         if(i!=count) { ngx_free(body);return 0; }
         ngx_shmtx_lock(&main->slab->mutex);
+        mutation_begin(main);
         for(i=0;i<count;i++) {
             if(!prepare(main,&ops[i])) break;
             apply(main,&ops[i],seq);
@@ -324,6 +337,7 @@ static int recover(scdn_purge_main_t *main,int fd,int fresh)
         if(i==count && (uint64_t)main->shared->sequence<seq) {
             ngx_memory_barrier();main->shared->sequence=(ngx_atomic_t)seq;
         }
+        if(i==count)mutation_end(main);
         ngx_shmtx_unlock(&main->slab->mutex);
         if(i==count)for(j=0;j<count;j++)if(ops[j].mode=='S')reclaim_scope(main,&ops[j],seq);
         ngx_free(body);
@@ -388,6 +402,9 @@ static int compact(scdn_purge_main_t *main,int *fd)
     all=main->shared->all_epoch;
     for(i=0;i<SCDN_PURGE_BUCKETS;i++) for(node=main->shared->buckets[i];node;node=node->next) {
         if(node->epoch<=all) continue;
+        if(count>=main->shared->nodes) {
+            ngx_shmtx_unlock(&main->slab->mutex);ngx_free(ops);ngx_free(epochs);return 0;
+        }
         ops[count].mode=node->mode;
         ops[count].scope.data=node->bytes;ops[count].scope.len=node->scope_length;
         ops[count].key.data=node->bytes+node->scope_length;ops[count].key.len=node->key_length;
@@ -443,11 +460,11 @@ scdn_purge_zone_init(ngx_shm_zone_t *zone,void *previous)
         if(old->journal.len!=main->journal.len
            || ngx_memcmp(old->journal.data,main->journal.data,main->journal.len)!=0) return NGX_ERROR;
         main->shared=old->shared;
-        return main->shared->format==1?NGX_OK:NGX_ERROR;
+        return main->shared->format==2?NGX_OK:NGX_ERROR;
     }
     main->shared=ngx_slab_calloc(main->slab,sizeof(*main->shared));
     if(main->shared==NULL) return NGX_ERROR;
-    main->shared->format=1;
+    main->shared->format=2;
     lock=lock_file(main);if(lock<0) return NGX_ERROR;
     fd=open((char *)main->journal.data,O_RDWR|O_CREAT|O_CLOEXEC|O_NOFOLLOW,0600);
     ok=fd>=0 && recover(main,fd,1) && sync_parent(&main->journal);
@@ -471,6 +488,10 @@ scdn_purge_commit(void *data,ngx_log_t *log)
     (void)log;
     job->status=503;job->error="journal_unavailable";
     lock=lock_file(main);if(lock<0) return;
+    ngx_shmtx_lock(&main->slab->mutex);
+    i=main->shared->mutating!=0;
+    ngx_shmtx_unlock(&main->slab->mutex);
+    if(i) { job->error="state_recovery_required";goto done; }
     fd=open((char *)main->journal.data,O_RDWR|O_CLOEXEC|O_NOFOLLOW);
     if(fd<0 || !recover(main,fd,0)) { job->error="journal_recovery_failed";goto done; }
     if(fstat(fd,&st)!=0) goto done;
@@ -478,10 +499,12 @@ scdn_purge_commit(void *data,ngx_log_t *log)
         job->error="checkpoint_failed";goto done;
     }
     ngx_shmtx_lock(&main->slab->mutex);
+    mutation_begin(main);
     allocating_job=job;
     for(i=0;i<job->count;i++) if(!prepare(main,&job->operations[i])) break;
     allocating_job=NULL;
     job->sequence=(uint64_t)main->shared->sequence+1;
+    mutation_end(main);
     ngx_shmtx_unlock(&main->slab->mutex);
     if(i!=job->count || job->sequence>INT64_MAX) {
         job->status=507;job->error="metadata_capacity";goto done;
@@ -496,6 +519,7 @@ scdn_purge_commit(void *data,ngx_log_t *log)
         job->error="journal_commit_failed";goto done;
     }
     ngx_shmtx_lock(&main->slab->mutex);
+    mutation_begin(main);
     if(retired!=NULL) {
         ngx_memcpy(retired,main->shared->buckets,sizeof(*retired)*SCDN_PURGE_BUCKETS);
         ngx_memzero(main->shared->buckets,sizeof(main->shared->buckets));
@@ -506,6 +530,7 @@ scdn_purge_commit(void *data,ngx_log_t *log)
     main->shared->batches++;
     ngx_memory_barrier();
     main->shared->sequence=(ngx_atomic_t)job->sequence;
+    mutation_end(main);
     ngx_shmtx_unlock(&main->slab->mutex);
     ngx_shmtx_lock(&main->slab->mutex);
     main->shared->journal_offset=(uint64_t)lseek(fd,0,SEEK_CUR);
@@ -519,9 +544,11 @@ scdn_purge_commit(void *data,ngx_log_t *log)
             node=retired[bucket];
             while(node!=NULL) {
                 ngx_shmtx_lock(&main->slab->mutex);
+                mutation_begin(main);
                 for(i=0;i<64 && node!=NULL;i++) {
                     next=node->next;ngx_slab_free_locked(main->slab,node);node=next;
                 }
+                mutation_end(main);
                 ngx_shmtx_unlock(&main->slab->mutex);
                 if(++freed%16==0) sched_yield();
             }

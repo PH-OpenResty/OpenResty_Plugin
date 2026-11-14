@@ -12,10 +12,11 @@
 - 在途旧回源返回旧响应，但不能污染清理后的新请求；多轮并发 post-ack 请求检查。
 - 日志重放、graceful reload、半写尾部、检查点、完整记录损坏、在线旧日志恢复拒绝，以及日志不可用时不确认清理。
 - 注入持续 fsync 失败，验证失败不确认、可见但未持久的完整尾部不提前发布，存储恢复后继续提交。
+- 定点 SIGKILL 正在共享索引临界区复制键的 Worker，验证数据请求和后续清理失败关闭，整实例重启后从日志重建。
 - 单 master 所有权、本机与 token 边界、请求大小/类型/方法、客户端断开时任务生命周期。
 - 失败批次预留撤销、整站/全局覆盖元数据回收，旧文件保持由原生 cache manager 管理。
 
-当前包含 67 项 Purge 检查；本地 Nginx 严格编译与 UBSan trap 已通过，完整 OpenResty 也完成真实进程验证。CI 在两种运行时执行 Purge 与原 47 项 Config/Edge 回归；Nginx 分支对完整运行时和模块启用 ASan/UBSan，最终结果以对应提交的 Actions 记录为准。
+当前包含 70 项 Purge 检查；本地 Nginx 严格编译与 UBSan trap 已通过，完整 OpenResty 也完成真实进程验证。CI 在两种运行时执行 Purge 与原 47 项 Config/Edge 回归；Nginx 分支对完整运行时和模块启用 ASan/UBSan，最终结果以对应提交的 Actions 记录为准。
 
 ## 复现
 

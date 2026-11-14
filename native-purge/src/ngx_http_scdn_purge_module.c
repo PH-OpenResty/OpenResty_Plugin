@@ -28,6 +28,7 @@ static ngx_int_t purge_postconfiguration(ngx_conf_t *cf);
 static ngx_int_t purge_worker(ngx_cycle_t *cycle);
 static void purge_exit(ngx_cycle_t *cycle);
 static ngx_int_t purge_handler(ngx_http_request_t *r);
+static ngx_int_t purge_guard(ngx_http_request_t *r);
 static ngx_int_t purge_variable(ngx_http_request_t *r,ngx_http_variable_value_t *v,uintptr_t data);
 
 static ngx_command_t purge_commands[]={
@@ -234,6 +235,8 @@ static ngx_int_t purge_postconfiguration(ngx_conf_t *cf)
     ngx_str_t pool=ngx_string("scdn_cache_purge");
     ngx_uint_t i;
     ngx_flag_t api=0;
+    ngx_http_core_main_conf_t *core;
+    ngx_http_handler_pt *handler;
     if(main->locations.nelts==0 && main->zone==NULL && main->journal.len==0) return NGX_OK;
     if(main->zone==NULL || main->journal.len<2 || main->journal.data[0]!='/') {
         ngx_conf_log_error(NGX_LOG_EMERG,cf,0,"scdn_purge requires a shared zone and absolute journal path");return NGX_ERROR;
@@ -252,7 +255,12 @@ static ngx_int_t purge_postconfiguration(ngx_conf_t *cf)
         main->threads=ngx_thread_pool_add(cf,&pool);
         if(main->threads==NULL) return NGX_ERROR;
     }
-    return own_journal(cf,main);
+    if(own_journal(cf,main)!=NGX_OK)return NGX_ERROR;
+    core=ngx_http_conf_get_module_main_conf(cf,ngx_http_core_module);
+    handler=ngx_array_push(&core->phases[NGX_HTTP_PREACCESS_PHASE].handlers);
+    if(handler==NULL)return NGX_ERROR;
+    *handler=purge_guard;
+    return NGX_OK;
 }
 
 static ngx_int_t purge_preconfiguration(ngx_conf_t *cf)
@@ -298,6 +306,24 @@ static int valid_scope(ngx_str_t *value)
            && value->data[0]!=' ' && value->data[value->len-1]!=' ';
 }
 
+static ngx_flag_t state_ready(scdn_purge_main_t *main)
+{
+    ngx_flag_t ready;
+    if(main->shared->mutating==0)return 1;
+    ngx_shmtx_lock(&main->slab->mutex);
+    ready=main->shared->mutating==0;
+    ngx_shmtx_unlock(&main->slab->mutex);
+    return ready;
+}
+
+static ngx_int_t purge_guard(ngx_http_request_t *r)
+{
+    scdn_purge_main_t *main=ngx_http_get_module_main_conf(r,ngx_http_scdn_purge_module);
+    scdn_purge_location_t *location=ngx_http_get_module_loc_conf(r,ngx_http_scdn_purge_module);
+    if(location->configured && !location->api && main->shared && !state_ready(main))return NGX_HTTP_SERVICE_UNAVAILABLE;
+    return NGX_DECLINED;
+}
+
 static ngx_int_t purge_variable(ngx_http_request_t *r,ngx_http_variable_value_t *v,uintptr_t data)
 {
     scdn_purge_main_t *main;
@@ -316,6 +342,7 @@ static ngx_int_t purge_variable(ngx_http_request_t *r,ngx_http_variable_value_t 
     main=ngx_http_get_module_main_conf(r,ngx_http_scdn_purge_module);
     location=ngx_http_get_module_loc_conf(r,ngx_http_scdn_purge_module);
     if(!location->configured || main->shared==NULL || purge_lru==NULL) return NGX_ERROR;
+    if(!state_ready(main))return NGX_ERROR;
     for(cleanup=r->pool->cleanup;cleanup;cleanup=cleanup->next) {
         if(cleanup->handler==request_key_cleanup) {
             context=cleanup->data;
@@ -346,6 +373,7 @@ static ngx_int_t purge_variable(ngx_http_request_t *r,ngx_http_variable_value_t 
     }
     purge_misses++;
     epoch=scdn_purge_epoch(main,&scope,&resource,&sequence);
+    if(epoch==UINT64_MAX)return NGX_ERROR;
     if(selected->allocation)ngx_free(selected->allocation);
     ngx_memzero(selected,sizeof(*selected));
     length=scope.len+key.len+(distinct?resource.len:0)+128;
@@ -527,18 +555,20 @@ static ngx_int_t status(ngx_http_request_t *r,scdn_purge_main_t *main)
     ngx_chain_t chain;
     ngx_uint_t nodes;
     uint64_t sequence,offset,batches,compacted;
+    ngx_flag_t recovery;
     ngx_int_t rc;
     ngx_table_elt_t *header;
     if(buffer==NULL)return NGX_HTTP_INTERNAL_SERVER_ERROR;
     ngx_shmtx_lock(&main->slab->mutex);
     nodes=main->shared->nodes;sequence=(uint64_t)main->shared->sequence;
     offset=main->shared->journal_offset;batches=(uint64_t)main->shared->batches;compacted=(uint64_t)main->shared->compacted;
+    recovery=main->shared->mutating!=0;
     ngx_shmtx_unlock(&main->slab->mutex);
     buffer->last=ngx_snprintf(buffer->last,1024,
         "{\"ok\":true,\"version\":\"" SCDN_PURGE_VERSION "\",\"sequence\":%uL,\"metadata_nodes\":%ui,\"journal_bytes\":%uL,"
         "\"batches\":%uL,\"checkpoints\":%uL,\"worker_pid\":%P,\"worker_lru_hits\":%uL,"
-        "\"worker_lru_misses\":%uL,\"physical_deleted\":false}\n",
-        sequence,nodes,offset,batches,compacted,ngx_pid,purge_hits,purge_misses);
+        "\"worker_lru_misses\":%uL,\"state_recovery_required\":%s,\"physical_deleted\":false}\n",
+        sequence,nodes,offset,batches,compacted,ngx_pid,purge_hits,purge_misses,recovery?"true":"false");
     ngx_str_set(&r->headers_out.content_type,"application/json");r->headers_out.status=200;
     header=ngx_list_push(&r->headers_out.headers);if(header==NULL)return NGX_HTTP_INTERNAL_SERVER_ERROR;
     header->hash=1;ngx_str_set(&header->key,"Cache-Control");ngx_str_set(&header->value,"no-store");
