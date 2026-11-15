@@ -58,7 +58,7 @@ python native-purge/bench/origin.py --prefix /tmp/scdn-purge-bench \
   --output /tmp/scdn-origin-benchmark.json
 ```
 
-2026-11-14，隔离 WSL2/Alpine x86_64 环境，三轮中位数：
+2026-11-14，隔离 WSL2/Alpine x86_64 环境，测量实现提交 `8eaceac`，三轮中位数（后续修正了空 ETag/撤回响应边界，此表不作为后续提交的重新测量）：
 
 | 场景 | QPS | p99 | Worker CPU/请求 |
 | --- | ---: | ---: | ---: |

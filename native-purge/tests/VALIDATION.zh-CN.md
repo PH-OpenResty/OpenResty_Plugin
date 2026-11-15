@@ -40,6 +40,7 @@ python native-purge/tests/integration.py --prefix /tmp/scdn-purge-validation \
 - [revalidate.py](revalidate.py)：45 项，覆盖 ETag/Last-Modified/完整 GET、相同 Last-Modified 下的等长正文变化、304 连续续期及缺失新鲜度头、长 Cache-Control/X-Accel-Expires 上限、HEAD/Vary、后台并发合并、失败重试、有限 stale、显式清理隔离、301/403/404/410/private/Set-Cookie、部分正文、分段响应头、无重启更新、状态指标和配置校验。
 - 源站返回不可缓存的 304 时，临时移走测试 journal，确认失效提交失败也不会把旧长 TTL 再次续期，恢复 journal 后可重新提交失效。
 - 原有 70 项 Purge 和 47 项 Config/Edge 回归继续保留；导入的八个 Config/Edge 实现文件 SHA-256 不变。
+- Nginx 原生缓存写入对空 ETag 的零长度拷贝会触发 UBSan；成功响应缺少 ETag 时只在回源路径分配内部空值存储，重定向/错误状态不写成成功缓存。本地完整 Nginx 的 UBSan trap 构建完成 45 项源站/stale 检查；远程 CI 再验证 ASan/UBSan，保持诊断启用。
 
 ```sh
 python native-purge/tests/patterns.py --prefix /tmp/scdn-purge-validation
