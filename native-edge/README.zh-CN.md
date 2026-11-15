@@ -6,7 +6,7 @@
 
 ## 1. 依赖与指令
 
-必须先加载 Config，再加载 Edge；两者使用同一源码与目标 ABI 构建。运行时需要 HTTP SSL，Config 还需要线程池支持。Edge 用到 Nginx 代理/静态文件/缓存功能时，这些原生模块也必须存在。
+默认构建包含 Config、API、Edge，动态加载顺序为 Config → API → Edge，三者使用同一源码与目标 ABI 构建。运行时需要 HTTP SSL，Config 还需要线程池支持。Edge 用到 Nginx 代理/静态文件/缓存功能时，这些原生模块也必须存在。API 默认关闭，启用方式见 [API 手册](../native-api/README.zh-CN.md)。
 
 | 指令 | 上下文 | 默认/参数 | 作用 |
 | --- | --- | --- | --- |
@@ -27,7 +27,10 @@ Nginx 先按自己的监听地址/server_name/location 选择静态配置，Edge
 | 变量 | 值与用途 |
 | --- | --- |
 | `$scdn_edge_site` | 当前站点 ID，用作日志、指标、缓存隔离标签 |
-| `$scdn_edge_upstream` | 当前选中的 `http://host:port`，用于 proxy_pass |
+| `$scdn_edge_upstream` | 当前选中的 HTTP/HTTPS URL 或命名池，用于 proxy_pass |
+| `$scdn_edge_origin_host` | 当前 origin_host 策略选择的回源 Host |
+| `$scdn_edge_origin_sni` | 明确指定的 origin_host 或从源站推导的无端口 SNI |
+| `$scdn_edge_grpc_upstream` | 将回源 scheme 转换为 grpc/grpcs，供原生 grpc_pass 使用 |
 | `$scdn_edge_root` | 当前站点的绝对静态目录，用于 root |
 | `$scdn_edge_cache` | 当前最终选择的 l1/l2/off；auto 根据热度求值 |
 | `$scdn_edge_revision` | 请求持有的快照摘要，供缓存键和排障使用 |
@@ -64,7 +67,7 @@ server {
 
 缓存键应包含版本和 Host，防止回源或策略变更后返回旧源站内容。当前 revision 对完整源文件及有效 TLS 材料计算，因此注释、空白或证书变动也可能使整个快照换摘要；版本化缓存键会相应降低旧缓存复用。按实际需求制定容量与保留策略。
 
-本模块选择 cache zone，不实现多级缓存读取链、L1 miss 后查询 L2、缓存文件复制或自动晋升/下沉。写入、锁、过期与清理由 Nginx 管理。HTTPS/IPv6 源站、多源站负载均衡、回源 TLS/SNI 等尚不在动态字段模型中。
+本模块选择 cache zone，不实现多级缓存读取链、L1 miss 后查询 L2、缓存文件复制或自动晋升/下沉。写入、锁、过期与清理由 Nginx 管理。支持 HTTP/HTTPS、括号 IPv6、命名 upstream 及 origin_host 字段；TLS 验证与连接池定义由原生代理配置实施。命名池成员不通过站点文件热更新。
 
 变量 proxy_pass 的域名解析需要配置 resolver。上游连接池和 DNS 行为仍按 Nginx 变量代理语义执行，不能假定它和静态命名 upstream 的 keepalive 行为完全相同。默认保留原 URI 和查询串，匹配 prefix 不剥离路径。
 

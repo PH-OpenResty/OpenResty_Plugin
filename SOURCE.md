@@ -2,7 +2,9 @@
 
 Config 与 Edge 插件提取自 [PH-OpenResty/OpenResty_Lua](https://github.com/PH-OpenResty/OpenResty_Lua) 的提交 [62fb61947f4c6d10eca468b7b66979009957de55](https://github.com/PH-OpenResty/OpenResty_Lua/commit/62fb61947f4c6d10eca468b7b66979009957de55)。本仓库补全了两个插件的使用文档，并把构建、测试依赖和 CI 整理为独立入口。
 
-导入时的 `.c`、`.h` 和模块 `config` 文件原样保留；其 SHA-256 清单见 [SOURCE-SHA256SUMS](SOURCE-SHA256SUMS)。文档、示例和构建工具可以针对独立仓库更新，清单只用于核对本次导入的实现来源；未来修改实现时需要同步更新来源记录。
+最初导入时的 `.c`、`.h` 和模块 `config` 文件原样保留。2026-11-14 新增 native-api，并扩展 Config 的 HTTPS/IPv6/命名池/origin_host 字段与 Edge 的自动 profile 接入；当前工作区已经包含这些后续实现改动，不再与导入时的源码摘要逐字节相同。
+
+[SOURCE-SHA256SUMS](SOURCE-SHA256SUMS) 现记录本次交付实现文件的摘要，用于校验当前源码。最初来源仍可通过上述历史提交复核，不能把新的清单当作原提交未变的证明。
 
 在仓库根目录可核对：
 

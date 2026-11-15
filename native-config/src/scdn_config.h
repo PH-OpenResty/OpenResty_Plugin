@@ -13,11 +13,11 @@
 #define SCDN_CONFIG_BYTES (4 * 1024 * 1024)
 
 typedef struct {
-    ngx_str_t prefix, upstream, cache;
+    ngx_str_t prefix, upstream, cache, origin_host;
 } scdn_config_route_t;
 
 typedef struct {
-    ngx_str_t id, hosts[SCDN_CONFIG_HOSTS], upstream, root, cache;
+    ngx_str_t id, hosts[SCDN_CONFIG_HOSTS], upstream, root, cache, origin_host;
     ngx_str_t certificate, certificate_key;
     ngx_uint_t host_count, route_count;
     scdn_config_route_t routes[SCDN_CONFIG_ROUTES];

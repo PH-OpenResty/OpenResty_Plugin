@@ -71,8 +71,9 @@ class OriginServer(http.server.ThreadingHTTPServer):
 
 
 class Review:
-    def __init__(self,root,prefix):
+    def __init__(self,root,prefix,static=False):
         self.root,self.prefix=root,prefix
+        self.static=static
         self.nginx=prefix/'sbin/nginx'
         self.http,self.tls=port(),port()
         self.socket=root/'control.sock'
@@ -118,8 +119,10 @@ site static {{ host static.example.com; root {self.root}/html; cache off; }}
 
     def config(self):
         user='user root root;' if os.geteuid()==0 else ''
-        return f'''load_module {self.prefix}/modules/ngx_http_scdn_config_module.so;
-load_module {self.prefix}/modules/ngx_http_scdn_edge_module.so;
+        modules='' if self.static else '\n'.join(
+            f'load_module {self.prefix}/modules/ngx_http_scdn_{name}_module.so;'
+            for name in ('config','api','edge'))
+        return f'''{modules}
 {user}
 worker_processes 2;
 thread_pool scdn_config_reader threads=1 max_queue=2;
@@ -218,7 +221,7 @@ http {{
             'missing outer commit boundary':valid.rsplit('}',1)[0],
             'unknown site field':valid.replace('cache off;', 'waf on;',1),
             'duplicate host':valid.replace('host alias.example.com;', 'host www.example.com;'),
-            'invalid upstream':valid.replace('http://127.0.0.1:', 'https://127.0.0.1:'),
+            'invalid upstream':valid.replace('http://127.0.0.1:', 'ftp://127.0.0.1:'),
             'invalid private key path':valid.replace('/site.key;', '/missing.key;'),
             'duplicate site ID':valid.replace('site static {','site alpha {'),
             'empty initial configuration':'sites { }',
@@ -359,10 +362,11 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--prefix',required=True,type=Path)
     parser.add_argument('--report',type=Path)
+    parser.add_argument('--static',action='store_true')
     args=parser.parse_args()
     prefix=args.prefix/'nginx' if (args.prefix/'nginx/sbin/nginx').exists() else args.prefix
     with tempfile.TemporaryDirectory(prefix='scdn-hot-test-') as directory:
-        review=Review(Path(directory),prefix.resolve())
+        review=Review(Path(directory),prefix.resolve(),args.static)
         try:
             checks=review.run()
             if args.report:

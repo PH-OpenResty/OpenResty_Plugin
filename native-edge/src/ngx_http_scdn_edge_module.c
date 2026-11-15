@@ -1,5 +1,8 @@
 #include "scdn_edge.h"
 #include <ngx_http_ssl_module.h>
+#if (NGX_SCDN_API)
+#include "scdn_api.h"
+#endif
 
 static void *edge_main(ngx_conf_t *cf);
 static void *edge_server(ngx_conf_t *cf);
@@ -156,13 +159,17 @@ scdn_edge_request(ngx_http_request_t *r)
     request->counter = scdn_edge_counter(r, &request->site->id);
     request->upstream = request->site->upstream;
     request->cache = request->site->cache;
+    request->origin_host = request->site->origin_host;
     for (i = 0; i < request->site->route_count; i++) {
         scdn_config_route_t *route = &request->site->routes[i];
         if (r->uri.len >= route->prefix.len
             && ngx_memcmp(r->uri.data, route->prefix.data, route->prefix.len) == 0
             && (best == NULL || best->prefix.len < route->prefix.len)) { best = route; }
     }
-    if (best != NULL) { request->upstream = best->upstream; request->cache = best->cache; }
+    if (best != NULL) {
+        request->upstream = best->upstream; request->cache = best->cache;
+        if (best->origin_host.len) { request->origin_host = best->origin_host; }
+    }
     return request;
 }
 
@@ -171,14 +178,24 @@ edge_access(ngx_http_request_t *r)
 {
     scdn_edge_server_t *server;
     scdn_edge_request_t *request;
+    ngx_str_t *location;
+#if (NGX_SCDN_API)
+    ngx_int_t rc;
+#endif
     server = ngx_http_get_module_srv_conf(r, ngx_http_scdn_edge_module);
     if (!server->enabled) { return NGX_DECLINED; }
     request = scdn_edge_request(r);
     if (request == NULL || request->snapshot == NULL) { return NGX_HTTP_SERVICE_UNAVAILABLE; }
     if (request->site == NULL || !request->site->enabled) { return NGX_HTTP_FORBIDDEN; }
     if (!request->routed && request->upstream.len != 0) {
+        location = &server->proxy_location;
+#if (NGX_SCDN_API)
+        rc = ngx_http_scdn_api_prepare(r);
+        if (rc != NGX_DECLINED) { return rc; }
+        location = ngx_http_scdn_api_location(r, location);
+#endif
         request->routed = 1;
-        (void) ngx_http_named_location(r, &server->proxy_location);
+        (void) ngx_http_named_location(r, location);
         /* Named redirects take a request reference, as in try_files. */
         ngx_http_finalize_request(r, NGX_DONE);
         return NGX_DONE;
@@ -192,7 +209,8 @@ edge_preconfiguration(ngx_conf_t *cf)
     static ngx_str_t names[] = {
         ngx_string("scdn_edge_site"), ngx_string("scdn_edge_upstream"),
         ngx_string("scdn_edge_root"), ngx_string("scdn_edge_cache"),
-        ngx_string("scdn_edge_revision")
+        ngx_string("scdn_edge_revision"), ngx_string("scdn_edge_origin_host"),
+        ngx_string("scdn_edge_origin_sni"), ngx_string("scdn_edge_grpc_upstream")
     };
     ngx_http_variable_t *variable;
     ngx_uint_t i;
@@ -209,11 +227,46 @@ edge_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t dat
 {
     scdn_edge_request_t *request = scdn_edge_request(r);
     ngx_str_t value = ngx_null_string;
+    size_t start, end;
+    u_char *out;
     if (request == NULL || request->site == NULL) { v->not_found = 1; return NGX_OK; }
     if (data == 0) { value = request->site->id; }
     else if (data == 1) { value = request->upstream; }
     else if (data == 2) { value = request->site->root; }
     else if (data == 4) { value.data = request->snapshot->revision; value.len = 64; }
+    else if (data == 5 || data == 6) {
+        if (request->origin_host.len
+            && !(request->origin_host.len == 4
+                && ngx_memcmp(request->origin_host.data, "auto", 4) == 0)) {
+            value = request->origin_host;
+        } else if (data == 5 && request->origin_host.len == 0) {
+            /* Preserve the existing CDN Host policy unless explicitly changed. */
+            value = r->headers_in.server;
+        } else if (request->upstream.len > 7) {
+            start = request->upstream.data[4] == 's' ? 8 : 7;
+            end = request->upstream.len;
+            if (data == 6) {
+                if (request->upstream.data[start] == '[') {
+                    start++;
+                    for (end = start; end < request->upstream.len
+                         && request->upstream.data[end] != ']'; end++) { }
+                } else {
+                    for (end = start; end < request->upstream.len
+                         && request->upstream.data[end] != ':'; end++) { }
+                }
+            }
+            value.data = request->upstream.data + start; value.len = end - start;
+        }
+    } else if (data == 7) {
+        if (request->upstream.len > 7) {
+            value.len = request->upstream.len;
+            value.data = ngx_pnalloc(r->pool, value.len);
+            if (value.data == NULL) { return NGX_ERROR; }
+            start = request->upstream.data[4] == 's' ? 8 : 7;
+            out = ngx_cpymem(value.data, start == 8 ? "grpcs://" : "grpc://", start);
+            ngx_memcpy(out, request->upstream.data + start, request->upstream.len - start);
+        }
+    }
     else {
         value = request->cache;
         if (value.len == 4 && ngx_memcmp(value.data, "auto", 4) == 0) {

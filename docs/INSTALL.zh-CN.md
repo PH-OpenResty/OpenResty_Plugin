@@ -1,6 +1,6 @@
 # 安装、构建和首次运行
 
-本仓库只构建 Config 和 Edge 两个插件；Edge 通过 Config 的 C 接口读取活动版本，二者需同版本编译并按顺序加载。插件运行时不需要 Lua、Python、独立 Agent 或生成配置的脚本。Python 仅用于测试。
+本仓库构建 Config、API、Edge 三个插件；Edge 通过 Config 的 C 接口读取活动版本，并在启用 API 时调用自动判定接口。三个插件需同版本编译，动态加载顺序为 Config → API → Edge。插件运行时不需要 Lua、Python、独立 Agent 或生成配置的脚本。Python 仅用于测试。
 
 ## 1. 构建要求
 
@@ -28,15 +28,21 @@ python -m pip install -r tests/requirements.txt
 sh tools/build-runtime.sh /tmp/scdn-plugin-nginx nginx
 python native-edge/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
   --report /tmp/scdn-plugin-nginx-results.json
+python native-api/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
+  --report /tmp/scdn-api-nginx-results.json
 
 sh tools/build-runtime.sh /tmp/scdn-plugin-openresty openresty
 python native-edge/tests/integration.py --prefix /tmp/scdn-plugin-openresty \
   --report /tmp/scdn-plugin-openresty-results.json
+python native-api/tests/integration.py --prefix /tmp/scdn-plugin-openresty \
+  --report /tmp/scdn-api-openresty-results.json
 ```
 
-构建脚本从 OpenResty 官方地址下载固定归档并校验 SHA-256。`nginx` 模式仅解包其中的 Nginx 核心，不编入 Lua；`openresty` 模式构建完整 OpenResty。两种模式都启用 `--with-compat --with-http_ssl_module --with-http_v2_module --with-pcre-jit --with-threads`，并将这两个插件作为动态模块构建。
+构建脚本从 OpenResty 官方地址下载固定归档并校验 SHA-256。`nginx` 模式仅解包其中的 Nginx 核心，不编入 Lua；`openresty` 模式构建完整 OpenResty。两种模式都启用 `--with-compat --with-http_ssl_module --with-http_v2_module --with-pcre-jit --with-threads`，默认将三个插件作为动态模块构建。
 
-| 模式 | Nginx 可执行文件 | 两个 `.so` 的目录 |
+第三参数设置为 `static` 可静态编入，例如 `sh tools/build-runtime.sh /tmp/scdn-static openresty static`。测试相应增加 `--static`；配置中删除三条 load_module。该脚本生成隔离验证运行时，已有生产 Node 仍需保留其原有构建参数、模块及库。
+
+| 模式 | Nginx 可执行文件 | 动态 `.so` 的目录 |
 | --- | --- | --- |
 | nginx | `/tmp/scdn-plugin-nginx/sbin/nginx` | `/tmp/scdn-plugin-nginx/modules/` |
 | openresty | `/tmp/scdn-plugin-openresty/nginx/sbin/nginx` | `/tmp/scdn-plugin-openresty/nginx/modules/` |
@@ -57,12 +63,13 @@ python native-edge/tests/integration.py --prefix /tmp/scdn-plugin-openresty \
 
 先保存现有二进制、模块、配置、站点源文件及证书，并确认可恢复的版本。通过目标二进制的 `-V` 核对 Nginx/OpenResty 版本、补丁、构建选项、TLS 库和架构。
 
-使用目标的匹配源码和原构建参数构建两个动态模块，增加 `--with-threads` 和 HTTP SSL 支持，并分别指定本仓库的 `native-config`、`native-edge` 目录。原有模块、路径和编译参数需保留。`--with-compat` 不等于跨任意版本或构建的通用 ABI；如果目标二进制没有需要的功能，需按其原安装流程升级运行时，不能只复制 `.so`。
+使用目标的匹配源码和原构建参数构建三个模块，增加 `--with-threads` 和 HTTP SSL 支持，并分别指定本仓库的 `native-config`、`native-api`、`native-edge` 目录。原有模块、路径和编译参数需保留。`--with-compat` 不等于跨任意版本或构建的通用 ABI；如果目标二进制没有需要的功能，需按其原安装流程升级运行时，不能只复制 `.so`。
 
-确认兼容后将两个 `.so` 安装到目标模块目录，在主配置最前面依次加入：
+确认兼容后将三个 `.so` 安装到目标模块目录，在主配置最前面依次加入：
 
 ```nginx
 load_module modules/ngx_http_scdn_config_module.so;
+load_module modules/ngx_http_scdn_api_module.so;
 load_module modules/ngx_http_scdn_edge_module.so;
 ```
 

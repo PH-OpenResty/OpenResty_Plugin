@@ -76,7 +76,8 @@ sites {
 | `site ID { ... }` | 必填 | 全局唯一，1～96 字节；首字符 ASCII 字母/数字，其余可含 `_`、`-` |
 | `host NAME;` | 至少一个 | 小写 ASCII 精确 Host；可多次指定别名，全局不得重复 |
 | `enabled on\|off;` | 默认 on | off 拒绝新 HTTP 请求和新 TLS 握手；保留其配置定义 |
-| `upstream http://host:port;` | 与 root 至少有一个 | HTTP 回源，显式端口 1～65535；只支持这一结构 |
+| `upstream http[s]://host[:port];` | 与 root 至少有一个 | HTTP/HTTPS、默认端口、括号 IPv6 或已声明的命名 upstream；不接受 URI、userinfo 或变量 |
+| `origin_host auto\|NAME;` | 可选 | auto 使用源站 authority；明确 Host 同时用于 SNI；省略保留旧客户端 Host，SNI 使用源站名 |
 | `root /absolute/directory;` | 与 upstream 至少有一个 | 启用站点时目录需存在，路径不得含符号链接 |
 | `cache l1\|l2\|off\|auto;` | 默认 off | 选择 Nginx 已声明的 cache zone；auto 需 tier |
 | `tier HITS WINDOW_MS;` | auto 时必填 | HITS 为 1～1000000，窗口为 100～86400000 毫秒 |
@@ -84,9 +85,9 @@ sites {
 | `certificate_key /absolute/private.key;` | 可选，与 certificate 成对 | 无交互口令的 PEM 私钥，必须匹配叶证书 |
 | `prefix /path/ { ... }` | 可选，可多个 | 最长字节前缀选择回源和缓存 |
 
-除 host 与 prefix 外，重复同一字段会拒绝候选版本。upstream 与 root 可以同时出现，此时 upstream 优先；prefix 只能覆盖回源与缓存，不能用它切到静态 root。停用站点仍需结构正确、Host 和路由定义有效，但不要求旧静态目录和证书文件继续可读。
+除 host 与 prefix 外，重复同一字段会拒绝候选版本。upstream 与 root 可以同时出现，此时 upstream 优先；prefix 可覆盖回源、缓存和 origin_host，不能用它切到静态 root。停用站点仍需结构正确、Host 和路由定义有效，但不要求旧静态目录和证书文件继续可读。
 
-Host 最长 253 字节、每个 DNS 标签最多 63 字节，不接受 Unicode 原文、泛域名 `*`、端口或 scheme。需要国际化域名时由发布者先转换为小写 ASCII 表示。回源域名也使用受限小写格式，不能附 URI、查询、userinfo 或变量；域名解析依赖业务 Nginx 中的 resolver，IP 回源无需 DNS resolver。HTTPS、IPv6 和命名 upstream 池尚未进入该数据模型。
+Host 最长 253 字节、每个 DNS 标签最多 63 字节，不接受 Unicode 原文、泛域名 `*`、端口或 scheme。需要国际化域名时由发布者先转换为小写 ASCII 表示。回源域名也使用受限小写格式，不能附 URI、查询、userinfo 或变量；域名解析依赖业务 Nginx 中的 resolver，IP 回源无需 DNS resolver。命名 upstream 必须在 Nginx 中预先声明；HTTPS 验证、SNI 与池复用配置见 [API 手册](../native-api/README.zh-CN.md)。
 
 root/证书/私钥要求绝对路径，不接受 `$`、反斜线和控制字符。路径每个分量按文件系统约束校验，拒绝 `.`、`..`、空分量及符号链接。根目录 `/` 不是可用的站点 root。
 

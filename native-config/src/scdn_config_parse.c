@@ -195,26 +195,37 @@ scdn_cache(ngx_str_t *value)
 static int
 scdn_upstream(ngx_str_t *value)
 {
-    size_t i, colon, start;
+    size_t i, colon, start, end;
     ngx_int_t port;
-    if (value->len <= 7 || memcmp(value->data, "http://", 7) != 0) { return 0; }
-    start = 7;
-    colon = value->len;
-    for (i = start; i < value->len; i++) {
-        if (value->data[i] == ':') {
-            if (colon != value->len) { return 0; }
-            colon = i;
+    if (value->len > 7 && memcmp(value->data, "http://", 7) == 0) { start = 7; }
+    else if (value->len > 8 && memcmp(value->data, "https://", 8) == 0) { start = 8; }
+    else { return 0; }
+    end = colon = value->len;
+    if (value->data[start] == '[') {
+#if (NGX_HAVE_INET6)
+        char address[INET6_ADDRSTRLEN];
+        struct in6_addr parsed;
+        for (end = start + 1; end < value->len && value->data[end] != ']'; end++) { }
+        if (end == value->len || end - start - 1 >= sizeof(address)) { return 0; }
+        memcpy(address, value->data + start + 1, end - start - 1);
+        address[end - start - 1] = 0;
+        if (inet_pton(AF_INET6, address, &parsed) != 1) { return 0; }
+        if (end + 1 < value->len) {
+            if (value->data[end + 1] != ':') { return 0; }
+            colon = end + 1;
         }
-        else if (!((value->data[i] >= 'a' && value->data[i] <= 'z')
-                   || (value->data[i] >= '0' && value->data[i] <= '9')
-                   || strchr(".-_", value->data[i]) != NULL)) { return 0; }
-    }
-    if (colon == start || colon == value->len) { return 0; }
-    {
+#else
+        return 0;
+#endif
+    } else {
         ngx_str_t host;
+        for (i = start; i < value->len; i++) {
+            if (value->data[i] == ':') { colon = i; break; }
+        }
         host.data = value->data + start; host.len = colon - start;
         if (!scdn_host(&host)) { return 0; }
     }
+    if (colon == value->len) { return 1; }
     port = ngx_atoi(value->data + colon + 1, value->len - colon - 1);
     return port > 0 && port <= 65535;
 }
@@ -266,6 +277,9 @@ scdn_site(scdn_parser_t *p, scdn_config_site_t *site)
                     route->upstream = value; flag |= 1;
                 } else if (scdn_is(&field, "cache") && !(flag & 2) && scdn_cache(&value)) {
                     route->cache = value; flag |= 2;
+                } else if (scdn_is(&field, "origin_host") && !(flag & 4)
+                    && (scdn_is(&value, "auto") || scdn_host(&value))) {
+                    route->origin_host = value; flag |= 4;
                 } else { return 0; }
             }
             if (p->symbol != '}' || !(flag & 1)) { return 0; }
@@ -285,6 +299,9 @@ scdn_site(scdn_parser_t *p, scdn_config_site_t *site)
             site->root = value; flag = 4;
         } else if (scdn_is(&field, "cache") && scdn_cache(&value)) {
             site->cache = value; flag = 8;
+        } else if (scdn_is(&field, "origin_host")
+            && (scdn_is(&value, "auto") || scdn_host(&value))) {
+            site->origin_host = value; flag = 128;
         } else if (scdn_is(&field, "certificate") && scdn_path(&value)) {
             site->certificate = value; flag = 16;
         } else if (scdn_is(&field, "certificate_key") && scdn_path(&value)) {

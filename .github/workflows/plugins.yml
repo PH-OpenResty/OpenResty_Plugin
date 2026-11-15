@@ -1,4 +1,4 @@
-name: Native Config and Edge
+name: Native Config API and Edge
 
 on:
   push:
@@ -15,7 +15,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runtime: [nginx, openresty]
+        include:
+          - runtime: nginx
+            linkage: dynamic
+          - runtime: openresty
+            linkage: dynamic
+          - runtime: openresty
+            linkage: static
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -26,23 +32,40 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential perl libpcre2-dev libssl-dev zlib1g-dev curl
           python -m pip install -r tests/requirements.txt
-      - name: Verify imported implementation
+      - name: Verify implementation checksums
         run: sha256sum -c SOURCE-SHA256SUMS
-      - name: Build isolated runtime and both plugins
+      - name: Build isolated runtime and all three plugins
         env:
           PLUGIN_RUNTIME: ${{ matrix.runtime }}
+          PLUGIN_LINKAGE: ${{ matrix.linkage }}
         run: |
           if [ "$PLUGIN_RUNTIME" = nginx ]; then
             export SCDN_NATIVE_CFLAGS='-Werror -fsanitize=address,undefined -fno-omit-frame-pointer'
             export SCDN_NATIVE_LDFLAGS='-fsanitize=address,undefined'
+            export SCDN_NATIVE_CC="sh $GITHUB_WORKSPACE/tools/sanitizer-cc.sh"
           fi
-          sh tools/build-runtime.sh "$RUNNER_TEMP/scdn-plugin" "$PLUGIN_RUNTIME"
+          sh tools/build-runtime.sh "$RUNNER_TEMP/scdn-plugin" "$PLUGIN_RUNTIME" "$PLUGIN_LINKAGE"
       - name: Configuration, TLS and updates without worker reloads
         env:
           ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
           UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
-        run: python native-edge/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" --report "$RUNNER_TEMP/plugin-results.json"
+          PLUGIN_LINKAGE: ${{ matrix.linkage }}
+        run: |
+          extra=()
+          if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
+          python native-edge/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/plugin-results.json"
+      - name: Automatic API detection and real streaming proxy integration
+        env:
+          ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+          PLUGIN_LINKAGE: ${{ matrix.linkage }}
+        run: |
+          extra=()
+          if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
+          python native-api/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/api-results.json"
       - uses: actions/upload-artifact@v4
         with:
-          name: config-edge-${{ matrix.runtime }}-results
-          path: ${{ runner.temp }}/plugin-results.json
+          name: config-api-edge-${{ matrix.runtime }}-${{ matrix.linkage }}-results
+          path: |
+            ${{ runner.temp }}/plugin-results.json
+            ${{ runner.temp }}/api-results.json
