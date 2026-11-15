@@ -6,7 +6,9 @@
 
 ## 1. 依赖与指令
 
-默认构建包含 Config、API、Edge，动态加载顺序为 Config → API → Edge，三者使用同一源码与目标 ABI 构建。运行时需要 HTTP SSL，Config 还需要线程池支持。Edge 用到 Nginx 代理/静态文件/缓存功能时，这些原生模块也必须存在。API 默认关闭，启用方式见 [API 手册](../native-api/README.zh-CN.md)。
+业务链由 Config、API、Edge 构成，动态加载顺序为 Config → API → Edge，三者使用同一源码与目标 ABI 构建。统一构建还提供独立的 Sync、Purge，共五个模块。运行时需要 HTTP SSL，Config 还需要线程池支持。Edge 用到 Nginx 代理/静态文件/缓存功能时，这些原生模块也必须存在。API 默认关闭，启用方式见 [API 手册](../native-api/README.zh-CN.md)。
+
+[Sync](../native-sync/README.zh-CN.md) 的角色/身份接口不改变 Edge 站点版本，0.1.0 也不会替 Edge 写入同步配置。五模块共存、独立控制 token 与流式代理的验证入口是 `native-api/tests/integration.py --purge --sync`，静态构建增加 `--static`。
 
 | 指令 | 上下文 | 默认/参数 | 作用 |
 | --- | --- | --- | --- |

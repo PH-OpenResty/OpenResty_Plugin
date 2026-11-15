@@ -1,6 +1,6 @@
 # 安装、构建和首次运行
 
-统一构建生成 Config、API、Edge、Purge 四个插件。Config/API/Edge 需同版本编译，动态加载顺序为 Config → API → Edge。Purge 可独立使用，私有日志和 token 初始化见 [专门手册](../native-purge/README.zh-CN.md)。插件运行时不需要 Lua、Python、独立 Agent 或生成配置的脚本，Python 仅用于测试。
+统一构建生成 Sync、Config、API、Edge、Purge 五个插件。Config/API/Edge 需同版本编译，动态加载顺序为 Config → API → Edge；Sync 和 Purge 可独立使用。Purge 的私有日志/token 见 [手册](../native-purge/README.zh-CN.md)，Sync 的独立身份/token/mTLS 接入见 [迁移说明](SYNC-MIGRATION.zh-CN.md)。当前原生模块不依赖 Lua 或 Python；完整远程同步尚由原 Lua Sync 服务承担，不能把安装 Sync 0.1.0 当作替换该服务。
 
 ## 1. 构建要求
 
@@ -24,8 +24,11 @@ Alpine 的对应构建包为 `build-base perl pcre2-dev openssl-dev zlib-dev cur
 python3 -m venv .venv
 . .venv/bin/activate
 python -m pip install -r tests/requirements.txt
+sh native-sync/tests/check-core.sh
 
 sh tools/build-runtime.sh /tmp/scdn-plugin-nginx nginx
+python native-sync/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
+  --report /tmp/scdn-sync-nginx-results.json
 python native-edge/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
   --report /tmp/scdn-plugin-nginx-results.json
 python native-api/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
@@ -36,9 +39,13 @@ python native-edge/tests/integration.py --prefix /tmp/scdn-plugin-openresty \
   --report /tmp/scdn-plugin-openresty-results.json
 python native-api/tests/integration.py --prefix /tmp/scdn-plugin-openresty \
   --report /tmp/scdn-api-openresty-results.json
+python native-sync/tests/integration.py --prefix /tmp/scdn-plugin-openresty \
+  --report /tmp/scdn-sync-openresty-results.json
+python native-api/tests/integration.py --prefix /tmp/scdn-plugin-openresty --purge --sync \
+  --report /tmp/scdn-five-modules-results.json
 ```
 
-构建脚本从 OpenResty 官方地址下载固定归档并校验 SHA-256。`nginx` 模式仅解包其中的 Nginx 核心，不编入 Lua；`openresty` 模式构建完整 OpenResty。两种模式都启用 `--with-compat --with-http_ssl_module --with-http_v2_module --with-pcre-jit --with-threads`，默认将四个插件作为动态模块构建。Purge 正则匹配需要 PCRE2，不能使用旧 PCRE1 构建。
+构建脚本从 OpenResty 官方地址下载固定归档并校验 SHA-256。`nginx` 模式仅解包其中的 Nginx 核心，不编入 Lua；`openresty` 模式构建完整 OpenResty。两种模式都启用 `--with-compat --with-http_ssl_module --with-http_v2_module --with-pcre-jit --with-threads`，默认将五个插件作为动态模块构建。Purge 正则匹配需要 PCRE2，不能使用旧 PCRE1 构建。
 
 第三参数设置为 `static` 可静态编入，例如 `sh tools/build-runtime.sh /tmp/scdn-static openresty static`。测试相应增加 `--static`；配置中删除已静态编入模块对应的 load_module。该脚本生成隔离验证运行时，已有生产 Node 仍需保留其原有构建参数、模块及库。
 
@@ -64,7 +71,7 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-openresty \
 
 先保存现有二进制、模块、配置、站点源文件及证书，并确认可恢复的版本。通过目标二进制的 `-V` 核对 Nginx/OpenResty 版本、补丁、构建选项、TLS 库和架构。
 
-使用目标的匹配源码和原构建参数构建三个模块，增加 `--with-threads` 和 HTTP SSL 支持，并分别指定本仓库的 `native-config`、`native-api`、`native-edge` 目录。原有模块、路径和编译参数需保留。`--with-compat` 不等于跨任意版本或构建的通用 ABI；如果目标二进制没有需要的功能，需按其原安装流程升级运行时，不能只复制 `.so`。
+使用目标的匹配源码和原构建参数，按需指定 `native-sync`、`native-config`、`native-api`、`native-edge`、`native-purge`；统一构建包含全部五个目录。保留目标已有模块、路径和编译参数，并满足 HTTP SSL、线程池、PCRE2 条件。`--with-compat` 不等于跨任意版本或构建的通用 ABI；不能只复制不兼容的 `.so`。
 
 确认兼容后将三个 `.so` 安装到目标模块目录，在主配置最前面依次加入：
 
@@ -74,9 +81,13 @@ load_module modules/ngx_http_scdn_api_module.so;
 load_module modules/ngx_http_scdn_edge_module.so;
 # 如需 Purge，同时加载并按专门手册配置 zone、journal 和 token：
 # load_module modules/ngx_http_scdn_purge_module.so;
+# 如需 Sync 角色/身份接口，独立加载并按 Sync 示例配置：
+# load_module modules/ngx_http_scdn_sync_module.so;
 ```
 
 相对 `modules/` 路径按 Nginx 的运行前缀解析；系统发行包的模块目录可能不同，可以改用绝对路径。出现 `module is not binary compatible`、`module version ... instead of ...` 时重新按目标构建，不应忽略检查。配置/模块程序更新仍遵循 Nginx 的重载或重启流程；只有站点数据在加载后支持无 Worker 重建更新。
+
+Sync 仅加载但不设置 role 时保持 off。启用它应使用独立路径、控制 token、Socket 和明确的 mTLS 节点登记；其默认关闭与只读能力不改变站点文件的权威发布者。静态构建的 Sync 测试同样增加 `--static`，完整接入步骤见 [Sync 迁移](SYNC-MIGRATION.zh-CN.md)。
 
 ## 4. 创建数据目录与服务账户
 

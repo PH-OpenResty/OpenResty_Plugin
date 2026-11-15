@@ -186,8 +186,13 @@ class GrpcServer(socketserver.ThreadingTCPServer):
 
 
 class Review:
-    def __init__(self, root, prefix, static, templates=False, purge=False):
+    def __init__(self, root, prefix, static, templates=False, purge=False, sync=False):
         self.root, self.static, self.templates, self.purge = root, static, templates, purge
+        self.sync=sync
+        self.sync_token=base64.urlsafe_b64encode(os.urandom(32)).decode().rstrip('=')
+        if sync:
+            token=root/'sync.token'
+            token.write_text(self.sync_token+'\n');token.chmod(0o600)
         self.purge_token = base64.urlsafe_b64encode(os.urandom(32)).decode().rstrip('=')
         if purge:
             token = root / 'purge.token'
@@ -257,12 +262,19 @@ site prefix {{ host prefix.example.test; upstream http://pooled-origin; cache of
 }}'''
 
     def config(self):
+        names=('config','api','edge')+ (('purge',) if self.purge else ()) + (('sync',) if self.sync else ())
         modules = '' if self.static else '\n'.join(
             f'load_module {self.prefix}/modules/ngx_http_scdn_{name}_module.so;'
-            for name in (('config', 'api', 'edge', 'purge') if self.purge else ('config', 'api', 'edge')))
+            for name in names)
         user = 'user root root;' if os.geteuid() == 0 else ''
         purge = ''
         purge_control = ''
+        sync=''
+        sync_control=''
+        if self.sync:
+            sync=f'''scdn_sync_role node; scdn_sync_id integration-node;
+ scdn_sync_scope edge; scdn_sync_control_token_file {self.root}/sync.token;'''
+            sync_control='location /__scdn_sync/v1/ { scdn_sync_api control; }'
         if self.purge:
             purge = f'''scdn_purge_zone epochs 8m;
  scdn_purge_journal {self.root}/epochs.log;
@@ -312,6 +324,7 @@ http {{
  scdn_edge_zone counters 2m;
  scdn_api_zone api_counters 64k;
  {purge}
+ {sync}
  proxy_cache_path {self.root}/cache keys_zone=l1:1m;
  upstream pooled-origin {{ server 127.0.0.1:{self.origins[0].server_port}; keepalive 16; }}
  upstream tls-origin {{ server 127.0.0.1:{self.origins[1].server_port}; keepalive 16; }}
@@ -320,6 +333,7 @@ http {{
   location = /status {{ scdn_config_status; }}
   location = /metrics {{ scdn_api_metrics; }}
   {purge_control}
+  {sync_control}
  }}
  server {{
   listen 127.0.0.1:{self.http};
@@ -354,6 +368,17 @@ http {{
         connection.close()
         assert response.status == 200
         return json.loads(data) if path == '/status' else data.decode()
+
+    def sync_control(self,path,credential):
+        connection=http.client.HTTPConnection('localhost',timeout=3)
+        connection.sock=socket.socket(socket.AF_UNIX);connection.sock.settimeout(3)
+        connection.sock.connect(str(self.socket))
+        try:
+            headers={'Authorization':'Bearer '+credential} if credential is not None else {}
+            connection.request('GET',path,headers=headers)
+            response=connection.getresponse()
+            return response.status,json.loads(response.read())
+        finally:connection.close()
 
     def start(self):
         (self.root / 'logs').mkdir()
@@ -431,6 +456,19 @@ http {{
 
     def run(self):
         self.start()
+        if self.sync:
+            code,status=self.sync_control('/__scdn_sync/v1/status',self.sync_token)
+            self.check('Sync role and identity coexist with active Config/API/Edge/Purge',
+                code==200 and status['role']=='node' and status['instance_id']=='integration-node')
+            self.check('Sync status does not claim the watched business configuration was synchronized',
+                status['sync_state']=='not_started' and status['applied_revision'] is None and status['business_health']=='unknown')
+            code,capabilities=self.sync_control('/__scdn_sync/v1/capabilities',self.sync_token)
+            self.check('Sync capabilities remain accurate in the five-module runtime',code==200
+                and not capabilities['features']['encrypted_distribution'] and not capabilities['features']['node_pull'])
+            self.check('Sync control requires its own token in the shared control server',
+                self.sync_control('/__scdn_sync/v1/status',None)[0]==401
+                and self.sync_control('/__scdn_sync/v1/status',self.purge_token)[0]==401)
+            self.check('Config status remains available beside authenticated Sync control',self.control()['ready'])
         status, headers, data = self.request('/asset?a=1')
         self.check('ordinary content stays in the web profile', status == 200 and headers['x-kind'] == 'web'
             and json.loads(data)['profile'] == 'web')
@@ -638,12 +676,15 @@ def main():
     parser.add_argument('--static', action='store_true')
     parser.add_argument('--templates', action='store_true')
     parser.add_argument('--purge', action='store_true')
+    parser.add_argument('--sync', action='store_true')
     args = parser.parse_args()
     if args.templates and args.purge:
         parser.error('--templates and --purge exercise separate configuration modes')
+    if args.sync and not args.purge:
+        parser.error('--sync exercises the full runtime and requires --purge')
     started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix='scdn-api-integration-') as directory:
-        review = Review(Path(directory), args.prefix, args.static, args.templates, args.purge)
+        review = Review(Path(directory), args.prefix, args.static, args.templates, args.purge, args.sync)
         try:
             review.run()
             result = {'passed': True, 'checks': review.checks, 'check_count': len(review.checks),
@@ -653,6 +694,7 @@ def main():
             result['published_templates'] = args.templates
             result['linkage'] = 'static' if args.static else 'dynamic'
             result['purge_integration'] = args.purge
+            result['sync_integration'] = args.sync
             args.report.parent.mkdir(parents=True, exist_ok=True)
             args.report.write_text(json.dumps(result, indent=2) + '\n')
             print(json.dumps(result))
@@ -660,7 +702,7 @@ def main():
             for name in ('error.log', 'process.log'):
                 path = Path(directory) / name
                 if path.exists():
-                    print(name + ':\n' + path.read_text(errors='replace')[-16000:], flush=True)
+                    print(name + ':\n' + path.read_text(errors='replace')[-16000:].replace(review.purge_token,'[redacted]').replace(review.sync_token,'[redacted]'), flush=True)
             raise
         finally:
             review.close()

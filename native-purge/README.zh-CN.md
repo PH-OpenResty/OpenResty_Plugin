@@ -8,7 +8,7 @@
 
 ## 1. 构建与接入
 
-统一构建脚本现在同时编译三个插件，也可以只使用本模块目录构建动态模块。需要 Linux 64 位、PCRE2 开发库、HTTP SSL/OpenSSL 和线程池支持，并与目标 Nginx/OpenResty ABI 匹配。新增正则不支持使用旧 PCRE1 构建。
+统一构建脚本编译 Sync、Config、API、Edge、Purge 五个插件，也可以只使用本模块目录构建动态模块。Purge 不依赖其他模块加载；需要 Linux 64 位、PCRE2 开发库、HTTP SSL/OpenSSL 和线程池支持，并与目标 Nginx/OpenResty ABI 匹配。新增正则不支持使用旧 PCRE1 构建。
 
 ```sh
 sh tools/build-runtime.sh /tmp/scdn-purge nginx
@@ -142,6 +142,8 @@ I/O 持久化会等待磁盘，管理队列与文件锁可能产生延迟。它�
 共享索引变更带有临界区故障标记。Worker 若在其中异常退出，数据请求和新的清理会失败关闭，状态报告 `state_recovery_required=true`；此时应保留日志、完全停止旧实例，再启动重放恢复，不能只通过 reload 清掉标记。普通磁盘提交等待不会设置该标记，也不会因此封锁数据请求。
 
 ## 7. 与 Edge 集成
+
+Sync 的角色控制与 Purge 使用不同凭据/端点；Sync status 不读取此 journal。可用 `native-api/tests/integration.py --purge --sync` 在所有五个模块启用时验证缓存、流式业务与只读角色接口，原生 Sync 传输能力仍按 [Sync 手册](../native-sync/README.zh-CN.md)判读。
 
 在 Edge 的命名代理 location 中保留原配置版本隔离，同时按稳定 URL 清理：
 

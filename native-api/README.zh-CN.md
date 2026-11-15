@@ -6,7 +6,7 @@
 
 ## 接入方式
 
-与同一源码版本的 Config、Edge 一起构建。动态加载顺序为 Config → API → Edge；静态编入时无需 `load_module`。统一构建还包含独立的 Purge 模块，共四个模块，支持纯 Nginx 和完整 OpenResty。
+与同一源码版本的 Config、Edge 一起构建。动态加载顺序为 Config → API → Edge；静态编入时无需 `load_module`。统一构建还包含独立的 Purge 和 [Sync](../native-sync/README.zh-CN.md)，共五个模块，支持纯 Nginx 和完整 OpenResty。Sync 角色与其本机鉴权不参与 API/AI 分类。
 
 ```nginx
 load_module modules/ngx_http_scdn_config_module.so;
@@ -47,6 +47,8 @@ proxy_no_cache $scdn_api_skip_cache;
 ```
 
 可用 `native-api/tests/integration.py --purge` 验证 API、流式与 Purge/回源再验证同时启用；原 Purge 的三套测试继续单独运行。静态构建时两类测试均使用 `--static`。
+
+再增加 `--sync` 可验证五模块同实例启用：独立 Sync token、Node 角色/能力接口与业务代理、缓存、Purge 同时工作；它不把本机 watcher 的成功误报为远程同步 applied。CI 的组合命令为 `--purge --sync`，Sync 的角色/节点 mTLS 另有独立测试。
 
 不使用 Edge 时，可以在入口 location 设置 `scdn_api_dispatch on;`，由 API 模块跳转到配置的命名 profile；各 profile 自行使用固定或其他受信变量指定源站。Edge 管理的入口不需要该指令。
 

@@ -176,3 +176,5 @@ prefix /api/private/ {
 可更新：Host/别名、启停、回源、最长前缀、静态 root、缓存选择、tier 参数和站点 TLS 材料。需要 Nginx reload/重启的项目：监听端口、模块程序、线程池、Worker 数、共享区大小、cache zone 定义、固定 proxy/header/协议指令等启动配置。
 
 插件本身没有远程同步、Master/Node 角色、HTTP 编辑器、WAF、限速、程序升级和持久化发布历史。外部发布者可以交付该文件，但应保证只有一套权威配置来源。
+
+同仓库 [native-sync](../native-sync/README.zh-CN.md)独立提供 Master/Node 角色与身份基础；其 0.1.0 尚不发布/拉取或提交本站点文件。安装、共存与后续切换见 [Sync 迁移说明](../docs/SYNC-MIGRATION.zh-CN.md)，Config 的代际不能替代远程同步序号。

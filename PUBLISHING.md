@@ -4,6 +4,8 @@
 
 `native-config/examples/sites.conf` 是公开示例；实际输入文件应放在部署目录。测试在临时目录中生成 CA、证书和私钥，退出时清理。不要把生成的材料或测试运行目录复制进仓库。
 
+`native-sync` 只提交原生源码、合成角色模板和测试。真实 Master/Node 清单、客户端指纹、控制 token、PKI、证书私钥、发布对象及同步状态不进入 Git。Sync 测试现场生成临时 mTLS 身份和不同的 Sync/Purge token；CI 只上传检查名称/数量与非敏感运行时摘要，不上传运行目录。
+
 提交前检查实际 Git 索引：
 
 ```sh
