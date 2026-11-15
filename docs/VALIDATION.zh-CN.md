@@ -1,5 +1,13 @@
 # 验证记录与复现
 
+本页记录 Config/API/Edge；Purge 的一致性、恢复与性能结果见 [清理模块验证](../native-purge/tests/VALIDATION.zh-CN.md)和[基准报告](../native-purge/bench/README.zh-CN.md)。统一构建和 CI 包含四个插件，下面的三模块结果为合入最新主分支前的记录，整合后的验证单独记录。
+
+## 合入当前 main 后的四模块验证
+
+基于 `64c9d3c`（包含 Purge 与回源再验证）重新构建纯 Nginx 动态模块和完整 OpenResty 静态模块，两种运行时均通过：Config/Edge 47 项、API 43 项、API＋Purge 共用 44 项、Purge 70 项、模式匹配 64 项、回源再验证 45 项、交付模板 43 项。共用测试开启 API 分类、原生失效 key 和源站再验证，并检查缓存命中后的持久化清理及原有流式/协议行为。
+
+结果与每份报告的摘要见 [validation-api-main-integration-20261114.json](validation-api-main-integration-20261114.json)。Purge 三套测试新增 `--static` 入口，检查内容保持；CI 继续执行所有套件，并保留 Nginx ASan/UBSan 与动态/静态 OpenResty 矩阵。以上为本地隔离结果，远端 CI 结果以 PR 检查记录为准。
+
 日期：2026-11-14。这份记录区分导入前已有结果和新仓库的独立验证；远程 CI 结果以当前提交的 Actions 记录为准。
 
 ## API 扩展的当前验证

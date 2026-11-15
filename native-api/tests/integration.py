@@ -186,8 +186,13 @@ class GrpcServer(socketserver.ThreadingTCPServer):
 
 
 class Review:
-    def __init__(self, root, prefix, static, templates=False):
-        self.root, self.static, self.templates = root, static, templates
+    def __init__(self, root, prefix, static, templates=False, purge=False):
+        self.root, self.static, self.templates, self.purge = root, static, templates, purge
+        self.purge_token = base64.urlsafe_b64encode(os.urandom(32)).decode().rstrip('=')
+        if purge:
+            token = root / 'purge.token'
+            token.write_text(self.purge_token + '\n')
+            token.chmod(0o600)
         self.prefix = prefix / 'nginx' if (prefix / 'nginx/sbin/nginx').exists() else prefix
         self.http, self.tls = unused_port(), unused_port()
         self.socket = root / 'control.sock'
@@ -219,7 +224,13 @@ site prefix {{ host prefix.example.test; upstream http://pooled-origin; cache of
 }}'''
 
     def proxy(self, name, profile, cache=False, stream=False):
+        key = '"$scdn_api_cache_namespace|$scdn_edge_revision|$host|$request_uri"'
+        purge = ''
+        if self.purge:
+            purge = 'scdn_purge_key $scdn_edge_site ' + key + ' $request_uri;\n scdn_purge_revalidate 1h;'
+            key = '$scdn_purge_key'
         return f'''location @{name} {{
+ {purge}
  proxy_pass $scdn_edge_upstream;
  proxy_http_version 1.1;
  proxy_set_header Host $scdn_edge_origin_host;
@@ -238,7 +249,7 @@ site prefix {{ host prefix.example.test; upstream http://pooled-origin; cache of
  proxy_send_timeout 8s;
  proxy_next_upstream off;
  proxy_cache {'$scdn_edge_cache' if cache else 'off'};
- proxy_cache_key "$scdn_api_cache_namespace|$scdn_edge_revision|$host|$request_uri";
+ proxy_cache_key {key};
  proxy_cache_bypass $scdn_api_skip_cache;
  proxy_no_cache $scdn_api_skip_cache;
  proxy_cache_valid 200 1m;
@@ -248,8 +259,15 @@ site prefix {{ host prefix.example.test; upstream http://pooled-origin; cache of
     def config(self):
         modules = '' if self.static else '\n'.join(
             f'load_module {self.prefix}/modules/ngx_http_scdn_{name}_module.so;'
-            for name in ('config', 'api', 'edge'))
+            for name in (('config', 'api', 'edge', 'purge') if self.purge else ('config', 'api', 'edge')))
         user = 'user root root;' if os.geteuid() == 0 else ''
+        purge = ''
+        purge_control = ''
+        if self.purge:
+            purge = f'''scdn_purge_zone epochs 8m;
+ scdn_purge_journal {self.root}/epochs.log;
+ scdn_purge_token_file {self.root}/purge.token;'''
+            purge_control = 'location = /purge { scdn_purge_api; }'
         settings = '''scdn_api on;
   scdn_api_inspect_body 16k;
   scdn_api_stream_timeout 8s;
@@ -280,6 +298,7 @@ site prefix {{ host prefix.example.test; upstream http://pooled-origin; cache of
 {user}
 worker_processes 1;
 thread_pool scdn_config_reader threads=1 max_queue=2;
+{'thread_pool scdn_cache_purge threads=2 max_queue=128;' if self.purge else ''}
 pid {self.root}/nginx.pid;
 error_log {self.root}/error.log info;
 events {{ worker_connections 256; }}
@@ -292,6 +311,7 @@ http {{
  scdn_config_settle 200ms;
  scdn_edge_zone counters 2m;
  scdn_api_zone api_counters 64k;
+ {purge}
  proxy_cache_path {self.root}/cache keys_zone=l1:1m;
  upstream pooled-origin {{ server 127.0.0.1:{self.origins[0].server_port}; keepalive 16; }}
  upstream tls-origin {{ server 127.0.0.1:{self.origins[1].server_port}; keepalive 16; }}
@@ -299,6 +319,7 @@ http {{
  server {{ listen unix:{self.socket};
   location = /status {{ scdn_config_status; }}
   location = /metrics {{ scdn_api_metrics; }}
+  {purge_control}
  }}
  server {{
   listen 127.0.0.1:{self.http};
@@ -415,6 +436,20 @@ http {{
             and json.loads(data)['profile'] == 'web')
         _, hit, _ = self.request('/asset?a=1')
         self.check('ordinary public GET retains native nginx caching', hit.get('x-cache') == 'HIT')
+        if self.purge:
+            connection = http.client.HTTPConnection('localhost', timeout=5)
+            connection.sock = socket.socket(socket.AF_UNIX)
+            connection.sock.settimeout(5)
+            connection.sock.connect(str(self.socket))
+            connection.request('POST', '/purge', b'/asset?a=1\n',
+                {'Authorization': 'Bearer ' + self.purge_token, 'Content-Type': 'text/plain',
+                 'X-SCDN-Purge-Mode': 'exact', 'X-SCDN-Purge-Scope': 'plain'})
+            response = connection.getresponse()
+            result = json.loads(response.read())
+            connection.close()
+            _, purged, _ = self.request('/asset?a=1')
+            self.check('Purge and origin revalidation coexist with the API cache namespace',
+                response.status == 200 and result['durable'] and purged.get('x-cache') != 'HIT')
         for name, value in [('Authorization', 'Bearer fixture'), ('Cookie', 'session=fixture'),
                             ('X-API-Key', 'fixture'), ('Cache-Control', 'no-cache')]:
             _, private, _ = self.request('/asset?a=1', headers={name: value})
@@ -602,10 +637,13 @@ def main():
     parser.add_argument('--report', type=Path, required=True)
     parser.add_argument('--static', action='store_true')
     parser.add_argument('--templates', action='store_true')
+    parser.add_argument('--purge', action='store_true')
     args = parser.parse_args()
+    if args.templates and args.purge:
+        parser.error('--templates and --purge exercise separate configuration modes')
     started = time.monotonic()
     with tempfile.TemporaryDirectory(prefix='scdn-api-integration-') as directory:
-        review = Review(Path(directory), args.prefix, args.static, args.templates)
+        review = Review(Path(directory), args.prefix, args.static, args.templates, args.purge)
         try:
             review.run()
             result = {'passed': True, 'checks': review.checks, 'check_count': len(review.checks),
@@ -614,6 +652,7 @@ def main():
                 'production_modified': False, 'real_vendor_api_calls': 0}
             result['published_templates'] = args.templates
             result['linkage'] = 'static' if args.static else 'dynamic'
+            result['purge_integration'] = args.purge
             args.report.parent.mkdir(parents=True, exist_ok=True)
             args.report.write_text(json.dumps(result, indent=2) + '\n')
             print(json.dumps(result))

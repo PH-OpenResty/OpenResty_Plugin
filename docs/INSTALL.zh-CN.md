@@ -1,6 +1,6 @@
 # 安装、构建和首次运行
 
-本仓库构建 Config、API、Edge 三个插件；Edge 通过 Config 的 C 接口读取活动版本，并在启用 API 时调用自动判定接口。三个插件需同版本编译，动态加载顺序为 Config → API → Edge。插件运行时不需要 Lua、Python、独立 Agent 或生成配置的脚本。Python 仅用于测试。
+统一构建生成 Config、API、Edge、Purge 四个插件。Config/API/Edge 需同版本编译，动态加载顺序为 Config → API → Edge。Purge 可独立使用，私有日志和 token 初始化见 [专门手册](../native-purge/README.zh-CN.md)。插件运行时不需要 Lua、Python、独立 Agent 或生成配置的脚本，Python 仅用于测试。
 
 ## 1. 构建要求
 
@@ -38,9 +38,9 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-openresty \
   --report /tmp/scdn-api-openresty-results.json
 ```
 
-构建脚本从 OpenResty 官方地址下载固定归档并校验 SHA-256。`nginx` 模式仅解包其中的 Nginx 核心，不编入 Lua；`openresty` 模式构建完整 OpenResty。两种模式都启用 `--with-compat --with-http_ssl_module --with-http_v2_module --with-pcre-jit --with-threads`，默认将三个插件作为动态模块构建。
+构建脚本从 OpenResty 官方地址下载固定归档并校验 SHA-256。`nginx` 模式仅解包其中的 Nginx 核心，不编入 Lua；`openresty` 模式构建完整 OpenResty。两种模式都启用 `--with-compat --with-http_ssl_module --with-http_v2_module --with-pcre-jit --with-threads`，默认将四个插件作为动态模块构建。Purge 正则匹配需要 PCRE2，不能使用旧 PCRE1 构建。
 
-第三参数设置为 `static` 可静态编入，例如 `sh tools/build-runtime.sh /tmp/scdn-static openresty static`。测试相应增加 `--static`；配置中删除三条 load_module。该脚本生成隔离验证运行时，已有生产 Node 仍需保留其原有构建参数、模块及库。
+第三参数设置为 `static` 可静态编入，例如 `sh tools/build-runtime.sh /tmp/scdn-static openresty static`。测试相应增加 `--static`；配置中删除已静态编入模块对应的 load_module。该脚本生成隔离验证运行时，已有生产 Node 仍需保留其原有构建参数、模块及库。
 
 | 模式 | Nginx 可执行文件 | 动态 `.so` 的目录 |
 | --- | --- | --- |
@@ -54,6 +54,7 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-openresty \
 | 变量 | 默认 | 用途 |
 | --- | --- | --- |
 | `SCDN_NATIVE_BUILD_JOBS` | `2` | make 并行任务数 |
+| `SCDN_NATIVE_CC` | `cc` | 编译器或测试编译器包装器 |
 | `SCDN_NATIVE_CFLAGS` | `-Werror` | 附加编译选项 |
 | `SCDN_NATIVE_LDFLAGS` | 空 | 附加链接选项 |
 
@@ -71,6 +72,8 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-openresty \
 load_module modules/ngx_http_scdn_config_module.so;
 load_module modules/ngx_http_scdn_api_module.so;
 load_module modules/ngx_http_scdn_edge_module.so;
+# 如需 Purge，同时加载并按专门手册配置 zone、journal 和 token：
+# load_module modules/ngx_http_scdn_purge_module.so;
 ```
 
 相对 `modules/` 路径按 Nginx 的运行前缀解析；系统发行包的模块目录可能不同，可以改用绝对路径。出现 `module is not binary compatible`、`module version ... instead of ...` 时重新按目标构建，不应忽略检查。配置/模块程序更新仍遵循 Nginx 的重载或重启流程；只有站点数据在加载后支持无 Worker 重建更新。

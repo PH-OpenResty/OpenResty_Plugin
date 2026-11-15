@@ -26,6 +26,13 @@ secrets/
 id_rsa*
 id_ed25519*
 *.log
+*.log.lock
+*.log.owner
+*.log.checkpoint
+*.journal
+*.journal.*
+*.checkpoint
+*.owner
 *.pid
 *.sock
 *.bak

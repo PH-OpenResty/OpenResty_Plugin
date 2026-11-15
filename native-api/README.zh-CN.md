@@ -6,7 +6,7 @@
 
 ## 接入方式
 
-与同一源码版本的 Config、Edge 一起构建。动态加载顺序为 Config → API → Edge；静态编入时无需 `load_module`。构建入口 `tools/build-runtime.sh` 会构建三个模块，支持纯 Nginx 和完整 OpenResty。
+与同一源码版本的 Config、Edge 一起构建。动态加载顺序为 Config → API → Edge；静态编入时无需 `load_module`。统一构建还包含独立的 Purge 模块，共四个模块，支持纯 Nginx 和完整 OpenResty。
 
 ```nginx
 load_module modules/ngx_http_scdn_config_module.so;
@@ -36,6 +36,17 @@ http {
 ```
 
 如果保留现有自定义代理配置，需要同时接入 `proxy_cache_bypass $scdn_api_skip_cache;`、`proxy_no_cache $scdn_api_skip_cache;`，并在缓存键加入 `$scdn_api_cache_namespace`。命名 profile 负责首包前的超时、取消与重试策略；响应过滤器负责收到上游响应后的补判和流式处理。只启用 C 模块而不接入配置，不能保证首包前就使用 AI 的长等待时间，也不能撤回旧缓存文件已经返回的内容。
+
+已经启用 [Purge](../native-purge/README.zh-CN.md) 的缓存 location 应保留 `$scdn_purge_key`，把 API 命名空间加入它的原始 key，继续以请求 URI 作为规则匹配资源。例如在已有 Purge zone/journal 配置下：
+
+```nginx
+scdn_purge_key $scdn_edge_site "$scdn_api_cache_namespace|$scdn_edge_revision|$host|$request_uri" $request_uri;
+proxy_cache_key $scdn_purge_key;
+proxy_cache_bypass $scdn_api_skip_cache;
+proxy_no_cache $scdn_api_skip_cache;
+```
+
+可用 `native-api/tests/integration.py --purge` 验证 API、流式与 Purge/回源再验证同时启用；原 Purge 的三套测试继续单独运行。静态构建时两类测试均使用 `--static`。
 
 不使用 Edge 时，可以在入口 location 设置 `scdn_api_dispatch on;`，由 API 模块跳转到配置的命名 profile；各 profile 自行使用固定或其他受信变量指定源站。Edge 管理的入口不需要该指令。
 
