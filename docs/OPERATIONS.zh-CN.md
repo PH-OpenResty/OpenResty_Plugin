@@ -137,3 +137,7 @@ Config 的共享活动代际在手工 reload 后属于新配置周期；Edge 指
 ## 缓存任务及 HTTP 头升级
 
 Sync 0.2.0 的持久化缓存任务投递、状态、删除、Node 后台执行及故障恢复见 [缓存任务手册](CACHE-TASKS.zh-CN.md)。刷新成功再提交预热，不能假定队列顺序。配置快照的旧同步流程仍需独立保留。代理头采用 `X-Clinet-IP`，Purge 控制调用方同步切换为 `X-Purge-Mode` / `X-Purge-Scope`，见 [HTTP 头约定](HTTP-HEADERS.zh-CN.md)。
+
+## 规则缓存头与全节点封禁设计
+
+站点/prefix 中的缓存诊断开关和静态回源头可热更新，使用 [缓存头手册](CACHE-HEADERS.zh-CN.md)的字段，并确认缓存 key 保留配置 revision。Ban v2 的 [全节点同步](../native-ban/design/CLUSTER-SYNC.zh-CN.md)规定任意设备上报、完整有效表、固定期限和逐节点内核 ACK，目前仍是待实现合同，不能把缓存任务 ACK 当作封禁全量完成。

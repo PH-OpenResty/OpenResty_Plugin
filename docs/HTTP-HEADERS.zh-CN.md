@@ -21,3 +21,5 @@ proxy_set_header X-Clinet-IP $remote_addr;
 默认 `$remote_addr` 是连接对端。经过管理员明确配置的 `real_ip` 可信代理链后，它可以是验证后的客户端地址。不要直接用 `$http_x_clinet_ip` 或不受信的转发头作为 WAF、封禁或 mTLS 身份；直连节点不根据客户端自行提交的 IP 头改写身份。本机 Sync/Purge 控制检查实际 Socket 对端，不依赖此头。Ban 仍处于设计阶段，L3 使用实际包源地址。
 
 Purge 调用方、测试和示例必须同时改用 `X-Purge-Mode`、`X-Purge-Scope`。旧产品前缀头不作为别名接受，缺少新模式头返回 400；升级时同步切换管理端及节点，避免旧调用失效。凭据继续放在独立的 `Authorization: Bearer ...` 中。
+
+缓存配置还可热更新静态回源元数据，并由 Edge 输出 X-Cache、X-Cache-Layer、X-Cache-Policy、X-Cache-Revision；配置语法和继承见 [缓存头手册](CACHE-HEADERS.zh-CN.md)。Ban 的全节点 IP 同步使用独立 mTLS/签名合同，不能从任何 HTTP 自报 IP/节点头授予封禁发布权限，见 [Ban 集群设计](../native-ban/design/CLUSTER-SYNC.zh-CN.md)。

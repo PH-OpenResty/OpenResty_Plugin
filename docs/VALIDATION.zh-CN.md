@@ -2,6 +2,14 @@
 
 统一构建和 CI 包含 Sync、Config、API、Edge、Purge 五个插件。Sync 角色/身份见 [Sync 验证](../native-sync/tests/VALIDATION.zh-CN.md)，Purge 见 [清理模块验证](../native-purge/tests/VALIDATION.zh-CN.md)和[基准报告](../native-purge/bench/README.zh-CN.md)。本页保留历史基线，并单独记录当前整合结果。
 
+## 缓存规则头及 Ban v2 集群合同
+
+新增 `native-edge/tests/cache_headers.py` 的 32 项真实进程检查，覆盖静态回源元数据、客户端重复头清除、源站伪造诊断覆盖、MISS/HIT/BYPASS/OFF、site/prefix 继承、非法头和字段预算、在途快照版本及不重建 Worker 的热更新。它和原有 475 项组成每种构建 507 项完整矩阵；实际构建结果另见对应提交 CI。
+
+`native-ban/tests/check-design.py` 校验 v2 必需集群字段、禁止局部/增量替代全量、Schema/TOML、容量约束、四个 C11 ABI 头及合成事件/IP 日志关联。Ban 的 18 项集群运行验收仍为待实现，不能将设计校验或缓存头进程测试计为多机封禁/eBPF DROP 已验收。
+
+缓存头语义见 [手册](CACHE-HEADERS.zh-CN.md)，Ban 完整快照、固定期限、离线/撤销/逐节点内核确认合同见 [设计](../native-ban/design/CLUSTER-SYNC.zh-CN.md)。
+
 ## Sync 0.2.0 缓存任务与 HTTP 头更新
 
 本地日期：2026-11-15，隔离 WSL2/Alpine x86_64。Nginx 动态、OpenResty 动态、OpenResty 静态各通过 475 项进程检查：

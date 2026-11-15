@@ -353,7 +353,6 @@ http {{
   add_header X-Reason $scdn_api_reason always;
   add_header X-Stream $scdn_api_stream always;
   add_header X-Skip $scdn_api_skip_cache always;
-  add_header X-Cache $upstream_cache_status always;
   location / {{ root {self.root}; }}
   {profiles}
  }}

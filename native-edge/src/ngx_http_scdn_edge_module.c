@@ -15,6 +15,8 @@ static ngx_int_t edge_preconfiguration(ngx_conf_t *cf);
 static ngx_int_t edge_postconfiguration(ngx_conf_t *cf);
 static ngx_int_t edge_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t edge_access(ngx_http_request_t *r);
+static ngx_int_t edge_header_filter(ngx_http_request_t *r);
+static ngx_http_output_header_filter_pt edge_next_header;
 
 static ngx_command_t edge_commands[] = {
     { ngx_string("scdn_edge"), NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
@@ -160,6 +162,8 @@ scdn_edge_request(ngx_http_request_t *r)
     request->upstream = request->site->upstream;
     request->cache = request->site->cache;
     request->origin_host = request->site->origin_host;
+    request->cache_request_headers = &request->site->cache_request_headers;
+    request->cache_headers = request->site->cache_headers;
     for (i = 0; i < request->site->route_count; i++) {
         scdn_config_route_t *route = &request->site->routes[i];
         if (r->uri.len >= route->prefix.len
@@ -169,8 +173,120 @@ scdn_edge_request(ngx_http_request_t *r)
     if (best != NULL) {
         request->upstream = best->upstream; request->cache = best->cache;
         if (best->origin_host.len) { request->origin_host = best->origin_host; }
+        if (best->cache_request_headers.configured)
+            request->cache_request_headers = &best->cache_request_headers;
+        request->cache_headers = best->cache_headers;
     }
     return request;
+}
+
+static ngx_int_t
+edge_request_headers(ngx_http_request_t *r, scdn_edge_request_t *request)
+{
+    ngx_list_part_t *part;
+    ngx_table_elt_t *headers, *output;
+    ngx_list_t filtered;
+    scdn_config_header_t *field;
+    ngx_uint_t i, j;
+    u_char *p;
+    if (request->headers_applied) return NGX_OK;
+    if (!request->cache_request_headers->count) {
+        request->headers_applied = 1; return NGX_OK;
+    }
+    /* proxy_pass serializes every list entry, even entries with hash=0.
+     * Build a new list so duplicate caller values cannot reach the origin. */
+    if (ngx_list_init(&filtered, r->pool, 20, sizeof(ngx_table_elt_t)) != NGX_OK) return NGX_ERROR;
+    part = &r->headers_in.headers.part; headers = part->elts;
+    for (i = 0; ; i++) {
+        if (i >= part->nelts) {
+            if (!part->next) break;
+            part = part->next; headers = part->elts; i = 0;
+        }
+        for (j = 0; j < request->cache_request_headers->count; j++) {
+            field = &request->cache_request_headers->fields[j];
+            if (headers[i].key.len == field->name.len
+                && !ngx_strncasecmp(headers[i].key.data, field->name.data, field->name.len)) break;
+        }
+        if (j < request->cache_request_headers->count) continue;
+        output = ngx_list_push(&filtered);
+        if (output == NULL) return NGX_ERROR;
+        *output = headers[i];
+    }
+    r->headers_in.headers = filtered;
+    if (filtered.last == &filtered.part) r->headers_in.headers.last = &r->headers_in.headers.part;
+    for (j = 0; j < request->cache_request_headers->count; j++) {
+        field = &request->cache_request_headers->fields[j];
+        output = ngx_list_push(&r->headers_in.headers);
+        if (output == NULL) return NGX_ERROR;
+        ngx_memzero(output, sizeof(*output));
+        output->key = field->name; output->value = field->value;
+        p = ngx_pnalloc(r->pool, field->name.len);
+        if (p == NULL) return NGX_ERROR;
+        output->lowcase_key = p;
+        output->hash = ngx_hash_strlow(p, field->name.data, field->name.len);
+    }
+    request->headers_applied = 1; return NGX_OK;
+}
+
+static ngx_int_t
+edge_response_header(ngx_http_request_t *r, const char *name, ngx_str_t *value)
+{
+    ngx_list_part_t *part = &r->headers_out.headers.part;
+    ngx_table_elt_t *headers = part->elts, *output;
+    ngx_uint_t i;
+    size_t length = ngx_strlen(name);
+    for (i = 0; ; i++) {
+        if (i >= part->nelts) {
+            if (!part->next) break;
+            part = part->next; headers = part->elts; i = 0;
+        }
+        if (headers[i].hash && headers[i].key.len == length
+            && !ngx_strncasecmp(headers[i].key.data, (u_char *) name, length)) headers[i].hash = 0;
+    }
+    output = ngx_list_push(&r->headers_out.headers);
+    if (output == NULL) return NGX_ERROR;
+    ngx_memzero(output, sizeof(*output)); output->hash = 1;
+    output->key.data = (u_char *) name; output->key.len = length;
+    output->value = *value; return NGX_OK;
+}
+
+static ngx_int_t
+edge_header_filter(ngx_http_request_t *r)
+{
+    static const char *statuses[] = {
+        "OFF", "MISS", "BYPASS", "EXPIRED", "STALE", "UPDATING", "REVALIDATED", "HIT"
+    };
+    scdn_edge_request_t *request;
+    ngx_str_t status, layer, revision;
+    ngx_uint_t code = 0;
+#if (NGX_SCDN_API)
+    ngx_str_t skip = ngx_string("scdn_api_skip_cache");
+    ngx_http_variable_value_t *value;
+#endif
+    request = scdn_edge_request(r);
+    if (r != r->main || request == NULL || request->site == NULL
+        || !request->site->enabled || !request->cache_headers) return edge_next_header(r);
+#if (NGX_HTTP_CACHE)
+    if (r->upstream != NULL) code = r->upstream->cache_status;
+#endif
+    if (code > 7) code = 0;
+#if (NGX_SCDN_API)
+    value = ngx_http_get_variable(r, &skip, ngx_hash_key(skip.data, skip.len));
+    if (value != NULL && !value->not_found && value->len == 1 && value->data[0] == '1') code = 2;
+#endif
+    status.data = (u_char *) statuses[code]; status.len = ngx_strlen(status.data);
+    layer = request->cache;
+    if (layer.len == 4 && !ngx_memcmp(layer.data, "auto", 4)) {
+        if (scdn_edge_tier(r, request)) { ngx_str_set(&layer, "l1"); }
+        else { ngx_str_set(&layer, "l2"); }
+    }
+    if (!code || code == 2) { ngx_str_set(&layer, "off"); }
+    revision.data = request->snapshot->revision; revision.len = 64;
+    if (edge_response_header(r, "X-Cache", &status) != NGX_OK
+        || edge_response_header(r, "X-Cache-Layer", &layer) != NGX_OK
+        || edge_response_header(r, "X-Cache-Policy", &request->cache) != NGX_OK
+        || edge_response_header(r, "X-Cache-Revision", &revision) != NGX_OK) return NGX_ERROR;
+    return edge_next_header(r);
 }
 
 static ngx_int_t
@@ -194,6 +310,7 @@ edge_access(ngx_http_request_t *r)
         if (rc != NGX_DECLINED) { return rc; }
         location = ngx_http_scdn_api_location(r, location);
 #endif
+        if (edge_request_headers(r, request) != NGX_OK) return NGX_HTTP_INTERNAL_SERVER_ERROR;
         request->routed = 1;
         (void) ngx_http_named_location(r, location);
         /* Named redirects take a request reference, as in try_files. */
@@ -343,5 +460,7 @@ edge_postconfiguration(ngx_conf_t *cf)
     if (handler == NULL) { return NGX_ERROR; } *handler = edge_access;
     handler = ngx_array_push(&core->phases[NGX_HTTP_LOG_PHASE].handlers);
     if (handler == NULL) { return NGX_ERROR; } *handler = scdn_edge_record;
+    edge_next_header = ngx_http_top_header_filter;
+    ngx_http_top_header_filter = edge_header_filter;
     return NGX_OK;
 }

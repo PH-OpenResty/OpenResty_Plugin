@@ -143,3 +143,7 @@ sudo /tmp/scdn-plugin-nginx/sbin/nginx \
 bootstrap 用于让 Nginx 建立 TLS 上下文，实际新握手由模块选择已准备的站点证书。没有 SNI、未知 SNI、停用站点或无有效 TLS 材料时拒绝握手。该回调与 Lua 证书回调、变量证书选择不能混用；保持示例关闭 session cache/tickets，直到自行验收恢复和撤销策略。
 
 证书签发、续期与 CA 信任部署由外部系统完成。如何发布配对文件、观察切换及回退见 [操作手册](OPERATIONS.zh-CN.md)。
+
+## 缓存头配置与 Ban 集群材料
+
+Config/Edge 按相同源码版本一起重编译后，可在站点数据启用 [缓存头字段](CACHE-HEADERS.zh-CN.md)；模块升级走现有二进制/模块回退流程，字段后续修改使用热更新。移除同名 X-Cache 等 add_header，防止重复。Ban 的 [全节点同步设计](../native-ban/design/CLUSTER-SYNC.zh-CN.md)仍非可安装组件，policy v2、签名清单 ABI 和示例不能直接启动 Agent 或加载 BPF。
