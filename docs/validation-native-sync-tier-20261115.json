@@ -81,5 +81,13 @@
   "legacy_lua_protocol_interoperability": false,
   "ban_runtime_implemented": false,
   "performance_claimed": false,
-  "ci": "See the latest matching commit checks on PR 9; Nginx CI includes ASan/UBSan."
+  "ci": "See the latest matching commit checks on PR 9; Nginx CI includes ASan/UBSan.",
+  "merge_review_followup": {
+    "tier_checks": 48,
+    "additional_checks": 9,
+    "expected_checks_per_runtime": 646,
+    "local_targeted_nginx_tier": "passed",
+    "scope": "credential and no-cache bypass, duplicate headers, prewarmed public object and caller isolation",
+    "ci": "All three runtime modes must pass on the latest reviewed commit before merge."
+  }
 }

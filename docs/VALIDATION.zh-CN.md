@@ -2,9 +2,13 @@
 
 统一构建和 CI 包含 Sync、Config、API、Edge、Tier、Purge 六个插件。Sync 角色/身份见 [Sync 验证](../native-sync/tests/VALIDATION.zh-CN.md)，Purge 见 [清理模块验证](../native-purge/tests/VALIDATION.zh-CN.md)和[基准报告](../native-purge/bench/README.zh-CN.md)。本页保留历史基线，并单独记录当前整合结果。
 
-## Sync 0.3.0 与 Tier 0.1.0 当前矩阵
+## PR #9 合并审查补充
 
-当前运行时包含六模块。新增站点/证书原生发布套件 40 项，Tier 独立层级缓存 39 项，六模块真实代理共存 51 项；连同既有启动 6、角色 50、缓存任务 99、Config/Edge 47、缓存头 32、API 44、五模块组合 50、Purge 70、模式 64、源站/stale 45，每种构建共 637 项进程检查。Nginx 动态、OpenResty 动态和 OpenResty 静态各通过 637 项，共 1,911 项；本地结构化结果见 [validation-native-sync-tier-20261115.json](validation-native-sync-tier-20261115.json)。
+审查补齐 Tier 独立运行时的 Api-Key、Proxy-Authorization 和 Pragma: no-cache 绕过，并修复重复凭据/缓存控制头不能被识别的问题。新增 9 项实际回源/隔离检查，覆盖已存在的匿名缓存、不同调用者凭据和重复字段；Tier 套件增为 48 项，当前每种构建矩阵为 646 项，三种合计 1,938 项。旧 637 项结果仍按初次交付基线保留，最新提交的全部 Actions 成功才允许合并。
+
+## Sync 0.3.0 与 Tier 0.1.0 初次交付矩阵
+
+初次交付运行时包含六模块。新增站点/证书原生发布套件 40 项，Tier 独立层级缓存 39 项，六模块真实代理共存 51 项；连同既有启动 6、角色 50、缓存任务 99、Config/Edge 47、缓存头 32、API 44、五模块组合 50、Purge 70、模式 64、源站/stale 45，每种构建共 637 项进程检查。Nginx 动态、OpenResty 动态和 OpenResty 静态各通过 637 项，共 1,911 项；本地结构化结果见 [validation-native-sync-tier-20261115.json](validation-native-sync-tier-20261115.json)。
 
 配置发布证据包括两个 Node 的路由与证书实效、源变更、删除/停用、签名/加密/过期/旧序号/跨节点拒绝、损坏水位、业务探测回退、ACK 重报、Master 断线和启动恢复；Tier 验证 L2 命中晋升、固定层级下绝对期限保持、大小预算、Vary/查询串、两层共同失效、穿透 L2 的源站校验，以及 L1 丢失后从 L2 恢复。六模块组合含真实 API/AI/SSE/WebSocket/gRPC 流程。
 

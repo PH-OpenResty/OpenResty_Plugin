@@ -58,7 +58,7 @@ scdn_tier_bypass $scdn_api_skip_cache;
 include /etc/scdn-tier/front.conf;
 ```
 
-API/AI、SSE、gRPC、WebSocket 继续使用各自直达源站的 profile，不把长流塞入 L1/L2。即使未接入 API，Tier 也会绕过非 GET/HEAD、有正文、Authorization/Cookie/API key/Upgrade/no-cache/no-store 请求。原生 proxy 的 Set-Cookie/Cache-Control/Vary 规则继续适用，不设置强制忽略私有头。
+API/AI、SSE、gRPC、WebSocket 继续使用各自直达源站的 profile，不把长流塞入 L1/L2。即使未接入 API，Tier 也会绕过非 GET/HEAD、有正文、Authorization/Proxy-Authorization/Cookie/X-API-Key/Api-Key/Upgrade 请求，以及 Cache-Control/Pragma 禁用缓存请求。原生 proxy 的 Set-Cookie/Cache-Control/Vary 规则继续适用，不设置强制忽略私有头。
 
 backend 只接受真实 Unix transport，并验证随机实例令牌；网络请求即使伪造头也不能访问。front 覆盖所有内部 X-Tier 头，backend 在回源前剥离它们。它们只承载本次已确定的路由/缓存身份，不重新在另一 Worker 解析可能已改变的站点配置。必须完整使用模板，不能遗漏令牌/字段覆盖或剥离，不能让业务客户端自行设置 origin。Socket 父目录保持受限，同服务 UID 属于受信边界。
 
@@ -87,3 +87,5 @@ Sync 缓存预热走同一业务入口，能填充相应层。热对象 L1 HIT �
 业务响应 `X-Cache-Layer` 返回实际来源 l1/l2/origin/off，`X-Cache` 合并显示是否任一层命中；Edge 的 X-Cache-Policy/Revision 仍表示配置选择和请求版本。内部 X-Tier-Source/Store/Expires 不向客户端输出。不要额外 add_header 同名字段。
 
 `native-tier/tests/integration.py` 验证选层、L2 读取晋升、大小准入、私有响应、Vary/查询串、Purge、源站再验证、并发锁、L1 丢失重启和信息边界；`native-tier/tests/coexist.py` 同时启用六模块并运行真实 API/AI/SSE/WebSocket/gRPC 代理检查。两者接受 `--prefix`、`--static` 和 `--report`。缓存管理仍由 Nginx 完成，不保证任意旧二进制 ABI、不同模块过滤顺序或未经验证的代理模板均兼容；真实 tmpfs/SSD 压力、PPS/QPS、磁盘掉电和容量需单独测量。
+
+合并审查补充：凭据字段即使重复出现也始终绕过缓存；重复 Cache-Control/Pragma 保守绕过，不能因严格唯一字段查找失败而退回共享缓存。回归会先填充匿名公共对象，再验证不同凭据请求均真实回源且不会相互复用。

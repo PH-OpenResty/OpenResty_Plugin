@@ -26,6 +26,9 @@ class Origin(fixture.Origin):
             self.server.seen.append(dict(self.headers))
         language = self.headers.get('Accept-Language', 'none')
         body = (f'v{version}:{language}:' + self.path).encode()
+        if '/credential-review/' in self.path:
+            credential = self.headers.get('Api-Key') or self.headers.get('Proxy-Authorization') or 'anonymous'
+            body += (':' + credential).encode()
         if '/large/' in self.path: body += b'x' * 2048
         if '/huge/' in self.path: body += b'x' * 8192
         status = 503 if '/failure/' in self.path else 200
@@ -131,6 +134,42 @@ class Review(fixture.Review):
                 self.check('credentialed request bypasses both tiers', response.getheader('X-Cache') == 'BYPASS')
             self.check('credentialed responses are never reused', self.origin.calls == before + 2)
         finally: connection.close()
+        for header_name in ('Api-Key', 'Proxy-Authorization', 'Pragma'):
+            path = '/l1/credential-review/' + header_name.lower()
+            self.request(path); self.request(path)
+            connection = http.client.HTTPConnection('127.0.0.1', self.http, timeout=5)
+            responses = []
+            before = self.origin.calls
+            try:
+                for value in ('fixture-user-a', 'fixture-user-b'):
+                    supplied = 'no-cache' if header_name == 'Pragma' else value
+                    connection.request('GET', path, headers={'Host': '127.0.0.1', 'X-Scope': 'one', 'X-Revision': 'a', header_name: supplied})
+                    response = connection.getresponse()
+                    responses.append((response.getheader('X-Cache'), response.read()))
+            finally: connection.close()
+            self.check(header_name + ' bypasses an existing public object in both tiers',
+                       all(status == 'BYPASS' for status, _ in responses) and self.origin.calls == before + 2)
+            if header_name != 'Pragma':
+                self.check(header_name + ' keeps different caller responses isolated',
+                           responses[0][1].endswith(b':fixture-user-a') and responses[1][1].endswith(b':fixture-user-b')
+                           and self.request(path)[2].endswith(b':anonymous'))
+        for header_name, first_value, second_value in (
+                ('Api-Key', 'fixture-a', 'fixture-b'), ('X-API-Key', 'fixture-a', 'fixture-b'),
+                ('Cache-Control', 'public', 'no-cache'), ('Pragma', 'fixture', 'no-cache')):
+            path = '/l1/duplicate-privacy/' + header_name.lower()
+            self.request(path); self.request(path)
+            before = self.origin.calls
+            connection = http.client.HTTPConnection('127.0.0.1', self.http, timeout=5)
+            try:
+                connection.putrequest('GET', path, skip_host=True)
+                for name, value in (('Host', '127.0.0.1'), ('X-Scope', 'one'), ('X-Revision', 'a'),
+                                    (header_name, first_value), (header_name.lower(), second_value)):
+                    connection.putheader(name, value)
+                connection.endheaders()
+                response = connection.getresponse(); response.read()
+                self.check('duplicate ' + header_name + ' cannot disable cache bypass',
+                           response.getheader('X-Cache') == 'BYPASS' and self.origin.calls == before + 1)
+            finally: connection.close()
         for path in ('/l1/private/item', '/l1/failure/item'):
             before = self.origin.calls
             self.request(path); self.request(path)

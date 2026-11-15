@@ -189,7 +189,7 @@ static ngx_int_t zone_init(ngx_shm_zone_t *zone, void *previous)
     }
     return main->shared && main->shared->format == 1 ? NGX_OK : NGX_ERROR;
 }
-static ngx_str_t *find_header(ngx_list_t *list, const char *name)
+static ngx_str_t *find_header_value(ngx_list_t *list, const char *name, ngx_flag_t unique)
 {
     ngx_list_part_t *part = &list->part;
     ngx_table_elt_t *h = part->elts;
@@ -199,10 +199,15 @@ static ngx_str_t *find_header(ngx_list_t *list, const char *name)
         if (h[i].hash && h[i].key.len == strlen(name) && !ngx_strncasecmp(h[i].key.data, (u_char *) name, h[i].key.len)) {
             if (value) return NULL;
             value = &h[i].value;
+            if (!unique) return value;
         }
     }
     return value;
 }
+static ngx_str_t *find_header(ngx_list_t *list, const char *name)
+{ return find_header_value(list, name, 1); }
+static ngx_str_t *private_header(ngx_http_request_t *r, const char *name)
+{ return find_header_value(&r->headers_in.headers, name, 0); }
 static ngx_flag_t local_socket(ngx_http_request_t *r)
 {
     struct sockaddr_storage peer; socklen_t size = sizeof(peer);
@@ -212,11 +217,16 @@ static ngx_flag_t private_request(ngx_http_request_t *r)
 {
     ngx_str_t *value;
     if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD)) || r->headers_in.content_length_n > 0 || r->headers_in.chunked
-        || r->headers_in.authorization || find_header(&r->headers_in.headers, "Cookie")
-        || find_header(&r->headers_in.headers, "X-API-Key") || find_header(&r->headers_in.headers, "Upgrade")) return 1;
+        || r->headers_in.authorization || private_header(r, "Cookie")
+        || private_header(r, "X-API-Key") || private_header(r, "Api-Key")
+        || private_header(r, "Proxy-Authorization") || private_header(r, "Upgrade")) return 1;
     value = find_header(&r->headers_in.headers, "Cache-Control");
+    if (!value && private_header(r, "Cache-Control")) return 1;
     if (value && (ngx_strlcasestrn(value->data, value->data + value->len, (u_char *) "no-cache", 7)
                  || ngx_strlcasestrn(value->data, value->data + value->len, (u_char *) "no-store", 7))) return 1;
+    value = find_header(&r->headers_in.headers, "Pragma");
+    if (!value && private_header(r, "Pragma")) return 1;
+    if (value && ngx_strlcasestrn(value->data, value->data + value->len, (u_char *) "no-cache", 7)) return 1;
     return 0;
 }
 static ngx_flag_t hot(tier_main *main, tier_request *ctx)
