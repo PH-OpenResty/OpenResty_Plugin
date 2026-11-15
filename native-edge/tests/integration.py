@@ -15,6 +15,7 @@ import signal
 import socket
 import ssl
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -23,6 +24,10 @@ from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
+
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'tests'))
+from nginx_process import (assert_clean_startup,dump_runtime_logs,
+                           runtime_log_offsets,wait_for_workers,worker_pids)
 
 
 def port():
@@ -204,10 +209,7 @@ http {{
         raise AssertionError('deadline: '+description)
 
     def workers(self):
-        text=Path(f'/proc/{self.process.pid}/task/{self.process.pid}/children').read_text()
-        return {int(pid) for pid in text.split()
-                if Path(f'/proc/{pid}/cmdline').exists()
-                and b'nginx: worker process' in Path(f'/proc/{pid}/cmdline').read_bytes()}
+        return worker_pids(self.process.pid)
 
     def generation(self):return self.control()['generation']
 
@@ -244,9 +246,11 @@ http {{
         self.check('native nginx configuration validates',result.returncode==0)
         if result.returncode:raise AssertionError(result.stderr)
         self.log=(self.root/'stdout.log').open('wb')
+        offsets=runtime_log_offsets(self.root)
         self.process=subprocess.Popen([str(self.nginx),'-p',str(self.root)+'/', '-c',str(path),'-g','daemon off;'],stdout=self.log,stderr=self.log)
         self.until(lambda:self.control(),'startup')
-        initial_workers=self.workers()
+        initial_workers=wait_for_workers(self.process)
+        assert_clean_startup(self.root,offsets)
         self.check('two real workers started',len(initial_workers)==2)
         self.check('HTTP route resolves from the watched source',self.request()[2]==b'a:/asset')
         self.check('alias host resolves',self.request(host='alias.example.com')[0]==200)
@@ -374,7 +378,7 @@ def main():
                 args.report.write_text(json.dumps(dict(passed=len(checks),checks=checks),indent=2)+'\n')
             print(f'{len(checks)} native configuration/edge checks passed',flush=True)
         except Exception:
-            if (review.root/'error.log').exists():print((review.root/'error.log').read_text(errors='replace')[-6000:],flush=True)
+            dump_runtime_logs(review.root)
             raise
         finally:review.close()
 

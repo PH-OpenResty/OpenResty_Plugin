@@ -92,6 +92,16 @@ CI 的 nginx 构建为整个运行时和两个动态模块启用 `-fsanitize=add
 
 既有本地 UBSan trap 调试发现上游 Nginx 缓存对缺失 ETag 使用 `memcpy(NULL, 0)` 的检查触发点。测试源站提供正常 ETag，插件没有修改该核心路径；不能把当前语料通过描述为 Nginx 全部缓存路径都已通过 UBSan。
 
+## Worker 启动时差回归
+
+2026-11-14 的主分支 [Actions 43658761073](https://github.com/PH-OpenResty/OpenResty_Plugin/actions/runs/43658761073) 在 `two real workers started` 断言失败：首个 Worker 可以先回答状态请求，另一个还未完成初始化，测试过早记录了 PID 集合。Nginx 在 `ngx_worker_process_init` 返回后才设置 `worker process` 标题；单个 HTTP 响应不能替代全部 Worker 就绪。
+
+Config/Edge 和 Purge 测试夹具现在都等待实际的两个 Worker（最多 10 秒），再记录完整 PID 基线。源站校验测试直接沿用该基线，后续 PID 保持断言仍严格比较原集合。进程枚举处理子进程退出时的 `/proc` 读取竞争；启动检查还检查本次启动新增的错误/标准输出，不把崩溃后的重建视为正常启动。按日志偏移读取，避免原有故障注入的历史记录干扰下一次有意重启。
+
+[worker_startup.py](../tests/worker_startup.py) 增加 6 项真实进程检查：测试专用 fork 夹具暂停第二个子进程，证明首个 HTTP 响应早于全部 Worker 就绪；验证有限等待、释放后返回完整集合、崩溃重建仍失败，以及 master 退出时立即失败。夹具只在临时目录编译并通过 LD_PRELOAD 注入，不链接进生产模块。两种运行时均执行这组检查；Nginx CI 仍启用 ASan/UBSan，未增加诊断抑制或失败重试。
+
+当前每种运行时共 232 项：6 项启动回归、47 项 Config/Edge、70 项原有 Purge、64 项模式清理、45 项源站校验/过时复用。失败时同时输出有长度限制的 error.log 和 stdout.log，已产生的检查报告也会上传；报告不包含 token、证书或 journal。
+
 ## 文档与发布验证
 
 独立发布前检查模块摘要、相对文档链接、示例所需文件、脚本语法、实际待提交文件和凭据扫描。源码仅包含通用模板，实际运行配置和二进制不进入 Git。新仓库 Actions 分别执行源码摘要核对、两种运行时的 47 项测试及公开内容检查。

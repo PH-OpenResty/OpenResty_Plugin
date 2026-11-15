@@ -9,6 +9,7 @@ from pathlib import Path
 import tempfile
 
 from integration import Review
+from nginx_process import dump_runtime_logs
 
 
 class Patterns(Review):
@@ -131,8 +132,7 @@ def main():
                 args.report.write_text(json.dumps(dict(passed=len(checks), checks=checks), indent=2) + '\n')
             print(f'{len(checks)} pattern checks passed', flush=True)
         except Exception:
-            if (review.root / 'error.log').exists():
-                print((review.root / 'error.log').read_text(errors='replace')[-5000:], flush=True)
+            dump_runtime_logs(review.root)
             raise
         finally:
             review.close()

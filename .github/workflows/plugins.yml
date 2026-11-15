@@ -45,6 +45,11 @@ jobs:
             export SCDN_NATIVE_CC="sh $GITHUB_WORKSPACE/tools/sanitizer-cc.sh"
           fi
           sh tools/build-runtime.sh "$RUNNER_TEMP/scdn-plugin" "$PLUGIN_RUNTIME" "$PLUGIN_LINKAGE"
+      - name: Staggered worker startup and readiness deadlines
+        env:
+          ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+        run: python tests/worker_startup.py --prefix "$RUNNER_TEMP/scdn-plugin" --report "$RUNNER_TEMP/startup-results.json"
       - name: Configuration, TLS and updates without worker reloads
         env:
           ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
@@ -100,9 +105,11 @@ jobs:
           if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
           python native-purge/tests/revalidate.py --prefix "$RUNNER_TEMP/scdn-plugin" --report "$RUNNER_TEMP/revalidate-results.json" "${extra[@]}"
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: config-api-edge-${{ matrix.runtime }}-${{ matrix.linkage }}-results
           path: |
+            ${{ runner.temp }}/startup-results.json
             ${{ runner.temp }}/plugin-results.json
             ${{ runner.temp }}/api-results.json
             ${{ runner.temp }}/api-purge-results.json

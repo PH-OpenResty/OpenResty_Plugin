@@ -49,6 +49,8 @@ python native-purge/tests/revalidate.py --prefix /tmp/scdn-purge-validation
 
 新增功能共 109 项，加原有回归后每种运行时共 226 项。报告只包含检查名称，不发布测试源站、token、journal 或实际缓存文件。有限后台宽限期结束后的同步并发、锁超时、高基数抑制表冲突不被描述为严格单次回源保证；需要在目标流量下另外压测。
 
+CI 另增加 [6 项 Worker 启动时差检查](../../tests/worker_startup.py)，每种运行时合计 232 项。夹具在两个 Worker 完成初始化后才记录 PID 基线，仍检查后续请求期间进程不重建；错误诊断和故障注入不会因为等待就绪而被忽略。实现及失败原因见 [验证说明](../../docs/VALIDATION.zh-CN.md#worker-启动时差回归)。
+
 ## 未覆盖的范围
 
 真实掉电/存储损坏的全部模式、不同文件系统的 fsync 保证、超大工作集、长时间压力、ARM64、所有非 root/systemd 组合、TLS/HTTP2/HTTP3、slice/range/其他子请求组合、其他缓存后端和跨节点清理均需按目标环境另行验证。本模块启用的 proxy_cache background_update 已覆盖；不能扩展为任意第三方后台请求组合保证。CRC 用于检测记录损坏，不是防止有权改写私有文件的攻击者。
