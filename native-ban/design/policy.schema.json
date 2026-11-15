@@ -1,12 +1,12 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "urn:scdn:ban:policy:v1:draft",
-  "title": "SCDN Ban v1 design policy",
+  "$id": "urn:scdn:ban:policy:v2:draft",
+  "title": "SCDN Ban v2 cluster design policy",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "node_id", "agent_uid", "runtime_dir", "policy", "ipc", "instances", "trusted_rules", "capacity", "datapath", "services", "allowlist", "logs"],
+  "required": ["schema_version", "node_id", "agent_uid", "runtime_dir", "policy", "ipc", "instances", "trusted_rules", "capacity", "datapath", "services", "allowlist", "logs", "cluster"],
   "properties": {
-    "schema_version": {"const": 1},
+    "schema_version": {"const": 2},
     "node_id": {"type": "string", "format": "uuid"},
     "agent_uid": {"type": "integer", "minimum": 1, "maximum": 4294967294},
     "runtime_dir": {"$ref": "#/$defs/absolute_path"},
@@ -110,6 +110,135 @@
         "retention_days": {"type": "integer", "minimum": 1, "maximum": 3650},
         "file_mode": {"enum": ["0600", "0640"]}
       }
+    },
+    "cluster": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "enabled",
+        "cluster_id",
+        "role",
+        "master_url",
+        "device_id",
+        "mtls_ca",
+        "mtls_certificate",
+        "mtls_key",
+        "snapshot_verify_key",
+        "state_dir",
+        "mode",
+        "target_nodes",
+        "coalesce_ms",
+        "poll_ms",
+        "clock_uncertainty_ms",
+        "max_proposals_per_batch",
+        "max_snapshot_bytes",
+        "snapshot_max_ips",
+        "ack_requires_kernel"
+      ],
+      "properties": {
+        "enabled": {
+          "const": true
+        },
+        "cluster_id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "role": {
+          "enum": [
+            "authority",
+            "node"
+          ]
+        },
+        "master_url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://[^/?#@]+/?$"
+        },
+        "device_id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9_-]{0,95}$"
+        },
+        "mtls_ca": {
+          "$ref": "#/$defs/absolute_path"
+        },
+        "mtls_certificate": {
+          "$ref": "#/$defs/absolute_path"
+        },
+        "mtls_key": {
+          "$ref": "#/$defs/absolute_path"
+        },
+        "snapshot_verify_key": {
+          "$ref": "#/$defs/absolute_path"
+        },
+        "state_dir": {
+          "$ref": "#/$defs/absolute_path"
+        },
+        "mode": {
+          "const": "full_snapshot"
+        },
+        "target_nodes": {
+          "const": "all_registered"
+        },
+        "coalesce_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000
+        },
+        "poll_ms": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 60000
+        },
+        "clock_uncertainty_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 5000
+        },
+        "max_proposals_per_batch": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 256
+        },
+        "max_snapshot_bytes": {
+          "type": "integer",
+          "minimum": 1048576,
+          "maximum": 268435456
+        },
+        "snapshot_max_ips": {
+          "type": "integer",
+          "minimum": 1024,
+          "maximum": 1048576
+        },
+        "ack_requires_kernel": {
+          "const": true
+        },
+        "snapshot_signing_key": {
+          "$ref": "#/$defs/absolute_path"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "role": {
+                "const": "authority"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "snapshot_signing_key"
+            ]
+          },
+          "else": {
+            "not": {
+              "required": [
+                "snapshot_signing_key"
+              ]
+            }
+          }
+        }
+      ]
     }
   },
   "$defs": {

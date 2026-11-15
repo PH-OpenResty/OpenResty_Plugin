@@ -19,3 +19,5 @@ sha256sum -c SOURCE-SHA256SUMS
 `native-purge` 是本仓库新增的原生实现，未从第三方清理模块复制代码。其缓存机制调研基于固定归档的 Nginx 文件缓存源码和公开文档，见 [调研报告](docs/CACHE-MECHANISM.zh-CN.md)。当前 SOURCE-SHA256SUMS 覆盖五个运行模块的 config、C 源码和头文件；它是当前实现的校验清单，不把后续修改冒充为最初导入内容。Ban 的设计契约另列在 native-ban，尚不属于运行模块。
 
 构建脚本固定 OpenResty 测试归档为 1.31.8.1，归档 SHA-256 为 `b569c63b420f80a4ac8466f2deffe73ed93ab760026532e039c3658409a997f4`。归档用于可复现的测试环境，不表示预编译插件能跨任意 Nginx/OpenResty ABI 使用。
+
+2026-11-15 增加 Config/Edge 的站点/前缀缓存头解析和原生请求/响应处理，SOURCE-SHA256SUMS 已按当前 24 个实现文件重新生成。Ban v2 集群快照头文件和策略仍是设计材料，未混入运行模块清单。

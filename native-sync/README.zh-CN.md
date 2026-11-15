@@ -98,3 +98,5 @@ python native-api/tests/integration.py --prefix /tmp/scdn-native-openresty \
 ## 后续实现边界
 
 配置快照的加密封装与请求签名、发布分发、Node 拉取、事务准备/提交/回退和持久恢复仍需分阶段迁移。完整合同与完成标准见 [Sync 路线及缺口](../docs/SYNC-ROADMAP.zh-CN.md)，旧服务的保留与独立接入步骤见 [Sync 迁移说明](../docs/SYNC-MIGRATION.zh-CN.md)。Config 的本机 watcher、API 的业务协议识别和 Purge 的私有 journal 各自独立，不是配置快照传输或应用事务已经完成的证明。
+
+Config/Edge 已支持 [缓存响应头与规则回源头](../docs/CACHE-HEADERS.zh-CN.md)。与 Edge 共用时由原生响应过滤器输出 X-Cache，删除重复 add_header；仅 Purge 独立使用时仍按原模板设置 X-Cache。API/私有/流式绕过优先，配置头不提供缓存权限。

@@ -42,3 +42,7 @@
 6. **本机配置版本唯一。** Config generation/revision 不充当远程序号，Purge journal 不充当 Sync journal。
 
 这些阶段尚不能通过给现有功能加字段或状态名认定完成。新能力实现并通过真实进程验收后，才逐项把 capabilities 从 false 改为 true。当前迁移方式见 [Sync 迁移说明](SYNC-MIGRATION.zh-CN.md)。
+
+## Ban 全节点有效 IP 快照
+
+新增必须实施的 [Ban 集群合同](../native-ban/design/CLUSTER-SYNC.zh-CN.md)：任意登记设备上报原始 L3 决策，所有登记节点接收完整有效快照并逐节点确认实际内核应用。此通道独立于缓存任务和配置快照，当前尚未实现；缓存任务成功不能证明封禁已跨机生效。

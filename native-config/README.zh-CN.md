@@ -182,3 +182,7 @@ prefix /api/private/ {
 ## HTTP 头与缓存任务联动
 
 自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.2.0 的缓存刷新/预热任务及原生配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。
+
+## 缓存规则 HTTP 头
+
+site/prefix 可设置 `cache_headers on|off;`（站点默认 on、前缀继承），以及至多 8 个 `cache_request_header X-Name "literal-value";`。前缀自定义列表替换站点列表，`cache_request_headers off;` 可禁用继承；字段名、重复、控制字符和身份/协议保留头均严格校验。它们属于热更新数据，值不执行变量替换。完整语法、安全边界、缓存 key 版本要求和诊断头见 [缓存头手册](../docs/CACHE-HEADERS.zh-CN.md)。

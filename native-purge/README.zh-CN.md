@@ -207,3 +207,5 @@ status 新增 `worker_revalidate`：probes、not_modified、fetched、failures�
 自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.2.0 的缓存刷新/预热任务及原生配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。
 
 0.3.0 将控制头改为无产品前缀的名称，不接受旧名别名；与 Sync 缓存任务联动时使用独立的 Purge token 和 Unix Socket。
+
+Config/Edge 已支持 [缓存响应头与规则回源头](../docs/CACHE-HEADERS.zh-CN.md)。与 Edge 共用时由原生响应过滤器输出 X-Cache，删除重复 add_header；仅 Purge 独立使用时仍按原模板设置 X-Cache。API/私有/流式绕过优先，配置头不提供缓存权限。

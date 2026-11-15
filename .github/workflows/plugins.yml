@@ -34,6 +34,10 @@ jobs:
           python -m pip install -r tests/requirements.txt
       - name: Verify implementation checksums
         run: sha256sum -c SOURCE-SHA256SUMS
+      - name: Ban cluster design schema, example and ABI contracts
+        run: |
+          python -m pip install -r native-ban/tests/requirements.txt
+          python native-ban/tests/check-design.py
       - name: Sync core role and identity boundaries
         env:
           PLUGIN_RUNTIME: ${{ matrix.runtime }}
@@ -87,6 +91,15 @@ jobs:
           extra=()
           if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
           python native-edge/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/plugin-results.json"
+      - name: Hot cache response and upstream request headers
+        env:
+          ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+          PLUGIN_LINKAGE: ${{ matrix.linkage }}
+        run: |
+          extra=()
+          if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
+          python native-edge/tests/cache_headers.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/cache-header-results.json"
       - name: Automatic API detection and real streaming proxy integration
         env:
           ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
@@ -141,6 +154,7 @@ jobs:
             ${{ runner.temp }}/sync-results.json
             ${{ runner.temp }}/cache-task-results.json
             ${{ runner.temp }}/plugin-results.json
+            ${{ runner.temp }}/cache-header-results.json
             ${{ runner.temp }}/api-results.json
             ${{ runner.temp }}/api-purge-sync-results.json
             ${{ runner.temp }}/purge-results.json

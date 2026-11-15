@@ -147,3 +147,9 @@ python native-edge/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
 ## HTTP 头与缓存任务联动
 
 自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.2.0 的缓存刷新/预热任务及原生配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。
+
+## 原生缓存头
+
+Edge 按当前请求持有的配置版本生成 `X-Cache`、`X-Cache-Layer`、`X-Cache-Policy` 和 `X-Cache-Revision`，站点/prefix 的 `cache_headers off;` 可关闭。删除已有同名 add_header，避免重复。规则的静态回源头在 proxy_pass 前替换客户端全部同名值；站点/前缀继承、私有绕过、Nginx 固定 proxy_set_header 的优先级及 HTTP/gRPC 边界见 [缓存头手册](../docs/CACHE-HEADERS.zh-CN.md)。
+
+Edge 现在以 HTTP_FILTER 类型注册，确保静态和动态构建均在 Nginx 基础 header filter 之后接入原生缓存诊断；动态加载仍保持 Config → API → Edge，三个模块需同源码版本一起编译。

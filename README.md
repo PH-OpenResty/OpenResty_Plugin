@@ -7,7 +7,7 @@
 | `ngx_http_scdn_sync_module.so` | Master/Node 角色、scope、私有本机鉴权、mTLS 节点登记、缓存任务分发/执行/结果恢复 | [Sync 完整手册](native-sync/README.zh-CN.md) |
 | `ngx_http_scdn_config_module.so` | 后台检测文件内容、校验并预加载候选版本、等待各 Worker 就绪、切换不可变配置版本 | [Config 完整手册](native-config/README.zh-CN.md) |
 | `ngx_http_scdn_api_module.so` | 请求/响应自动识别、API/AI 代理策略、缓存绕过、流式响应与 TLS 连接复用身份检查 | [API 完整手册](native-api/README.zh-CN.md) |
-| `ngx_http_scdn_edge_module.so` | Host 与最长前缀路由、启停、静态目录、SNI 证书选择、缓存层/可选热度、Prometheus 指标 | [Edge 完整手册](native-edge/README.zh-CN.md) |
+| `ngx_http_scdn_edge_module.so` | Host 与最长前缀路由、启停、静态目录、SNI 证书选择、缓存层/可选热度、规则回源头/响应诊断、Prometheus 指标 | [Edge 完整手册](native-edge/README.zh-CN.md) |
 | `ngx_http_scdn_purge_module.so` | 持久化精确/批量/通配符/正则/后缀/目录/整站/节点失效、源站条件校验、有界过时复用 | [Purge 完整手册](native-purge/README.zh-CN.md) |
 
 Edge 依赖 Config 的 C 接口；一起构建 API 时也调用其判定接口。业务模块必须使用同一源码版本编译，动态加载顺序为 Config → API → Edge；Sync 与 Purge 可独立加载。代理、静态文件与缓存文件管理继续使用 Nginx 自带模块。WAF、业务限速仍由外部能力承担。
@@ -25,13 +25,14 @@ Purge 可独立加载，不依赖其他四个插件，也不修改 Nginx 核心�
 - [安装、编译和最小运行](docs/INSTALL.zh-CN.md)：依赖、独立构建、现有安装接入、权限与 ABI。
 - [配置监听与完整站点语法](native-config/README.zh-CN.md)：全部指令、字段、限制、提交与失败行为。
 - [业务路由、TLS、缓存和指标](native-edge/README.zh-CN.md)：全部指令、变量、请求路径与兼容边界。
+- [缓存响应头与规则回源头](docs/CACHE-HEADERS.zh-CN.md)：命中状态、缓存层/策略/版本、站点/前缀配置与热更新。
 - [自动 API/AI 识别与代理优化](native-api/README.zh-CN.md)：判定规则、流式配置、HTTPS 回源和连接复用检查。
 - [日常操作与故障处理](docs/OPERATIONS.zh-CN.md)：原子发布、证书轮换、状态查询、回退和常见错误。
 - [从旧 Lua 流程迁移](docs/MIGRATION.zh-CN.md)：字段映射、替换步骤、热更新边界。
 - [验证记录](docs/VALIDATION.zh-CN.md)：实测项目、CI、内存检查及未验证范围。
 - [缓存机制调研](docs/CACHE-MECHANISM.zh-CN.md)、[精确清理接入](native-purge/README.zh-CN.md)和[缓存清理基准](native-purge/bench/README.zh-CN.md)。
 - [源站校验、过时复用与匹配清理调研](docs/CACHE-REVALIDATION-RESEARCH.zh-CN.md)：ETag/Last-Modified、两个 stale 窗口、规则预算与节点范围。
-- [IP 封禁与 eBPF 详细设计（草案）](native-ban/README.zh-CN.md)：固定期限、WAF/CC 事件、L7/L3 升级、只读共享视图、内核表及两类日志契约；尚未加入运行模块。
+- [IP 封禁与 eBPF 详细设计（草案）](native-ban/README.zh-CN.md)：固定期限、WAF/CC 事件、L7/L3 升级、只读共享视图、内核表、任意设备上报至所有节点的完整封禁快照及两类日志契约；尚未加入运行模块。
 - [源码来源](SOURCE.md)、[公开发布规则](PUBLISHING.md)、[许可证](LICENSE)。
 
 ## 独立构建与验证

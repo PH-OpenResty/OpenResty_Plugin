@@ -61,3 +61,7 @@ Config 的 generation/revision 用于本机内存版本选择，不能代替 Syn
 ## 缓存任务及 HTTP 头升级
 
 Sync 0.2.0 的持久化缓存任务投递、状态、删除、Node 后台执行及故障恢复见 [缓存任务手册](CACHE-TASKS.zh-CN.md)。刷新成功再提交预热，不能假定队列顺序。配置快照的旧同步流程仍需独立保留。代理头采用 `X-Clinet-IP`，Purge 控制调用方同步切换为 `X-Purge-Mode` / `X-Purge-Scope`，见 [HTTP 头约定](HTTP-HEADERS.zh-CN.md)。
+
+## 缓存头升级
+
+站点/前缀缓存策略可增加 cache_headers、cache_request_header，继承和优先级见 [手册](CACHE-HEADERS.zh-CN.md)。删除旧 X-Cache 等重复 add_header，缓存 key 保留配置 revision；错误候选仍保留旧活动版本。Ban 的节点本地设计已改为 [全节点完整有效表合同](../native-ban/design/CLUSTER-SYNC.zh-CN.md)，跨机运行实现仍待对应 Agent/执行器完成。
