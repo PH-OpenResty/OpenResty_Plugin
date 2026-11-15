@@ -21,7 +21,7 @@ python native-purge/bench/run.py --prefix /tmp/scdn-purge-bench \
 
 当前场景是 HTTP/1.1 keepalive、两个 Worker、128 个并发连接、一个热键；不证明 TLS、HTTP/2/3、高基数键、最坏前缀数量、磁盘故障、百万连接或公网生产容量。实际缓存工作集超出本地解析缓存、频繁清理和大量前缀时，需要另外测量慢路径。
 
-## 本次 OpenResty 测量
+## 0.1.0 原有失效路径测量
 
 2026-11-14，隔离 WSL2/Alpine x86_64、GCC 14.2.0、OpenSSL 3.5.9、OpenResty 1.31.8.1，优化构建 `-O2 -Werror`，未启用 sanitizer 和故障辅助库。最终构建包含共享临界区故障保护。两个 Worker、wrk 两个客户端线程、128 个连接，每场景 5 秒、3 轮；两次运行都等待 cache loader 退出约 60 秒后开始。以下均为各轮中位数：
 
@@ -47,3 +47,25 @@ python native-purge/bench/run.py --prefix /tmp/scdn-purge-bench \
 这些管理键没有逐个预填缓存，测量的是持久化失效规则提交，不是删除文件数，也不是保证同样数量的对象曾经存在。持久性和文件系统决定吞吐上限；批量将 fsync 和连接成本摊到更多目标。
 
 完整原始数据：[131B](results-openresty-131.json)、[16KiB](results-openresty-16k.json)。所有轮次均保留，不能只挑最佳值。不要将当前对照或源码中的低开销设计等同于所有负载下的绝对最低开销。
+
+## 0.2.0 源站条件校验对照
+
+新增 [origin.py](origin.py)，在同一个完整 OpenResty 1.31.8.1 运行时比较原生 HIT、仅版本键 HIT，以及版本键加每 2 秒条件校验的 HIT。响应正文均为 131B，两个 Worker、128 个连接、wrk 两个线程，每场景 5 秒、3 轮，未启用 sanitizer/故障注入。先等待 cache loader 退出，每轮每项开始前还等待资源处于 fresh 状态，避免把闲置超过后台窗口后的首波同步校验混入稳态。
+
+```sh
+python native-purge/bench/origin.py --prefix /tmp/scdn-purge-bench \
+  --body-bytes 128 --connections 128 --seconds 5 --runs 3 \
+  --output /tmp/scdn-origin-benchmark.json
+```
+
+2026-11-14，隔离 WSL2/Alpine x86_64 环境，测量实现提交 `8eaceac`，三轮中位数（后续修正了空 ETag/撤回响应边界，此表不作为后续提交的重新测量）：
+
+| 场景 | QPS | p99 | Worker CPU/请求 |
+| --- | ---: | ---: | ---: |
+| 原生缓存 HIT | 20,152 | 15.01ms | 98.11μs |
+| 版本键 HIT | 19,071 | 14.10ms | 103.77μs |
+| 版本键 + 周期条件 GET | 19,419 | 11.98ms | 100.82μs |
+
+每个再校验场景都实际产生携带 ETag 的条件 GET 和 304，不是只配置开关后测一个永远不校验的 HIT。再校验场景相对原生 HIT 的吞吐约为 96.4%；其相对仅版本键的表面提升属于本机波动，不能据此声称自动校验是负开销。单轮原生 QPS 约 1.67 万～2.11 万，调度噪声明显；该数据不能精确分离再校验的增量开销，更不能证明所有工作集的最低开销。
+
+保留全部轮次及条件请求数量：[原始 JSON](results-origin-openresty.json)。本次未测复杂 regex/高基数匹配、跨实例和宽限期结束后的闲置并发突发；这些情形不能从单热键稳态结果推导。后者可能有多个同步回源，需要按目标业务选择可接受的后台窗口和原生回源并发配置。

@@ -1,12 +1,12 @@
 # OpenResty Plugin
 
-纯 C 的 Nginx/OpenResty HTTP 插件：直接读取站点数据热更新路由、证书和缓存策略，并提供精确、批量、前缀和整站的持久化缓存失效。运行时不依赖 Lua，不生成站点 Lua、字节码或 `nginx.conf`。
+纯 C 的 Nginx/OpenResty HTTP 插件：直接读取站点数据热更新路由、证书和缓存策略，提供多种规则的持久化缓存失效、源站条件校验及有时间上限的过时缓存复用。运行时不依赖 Lua，不生成站点 Lua、字节码或 `nginx.conf`。
 
 | 插件 | 职责 | 文档 |
 | --- | --- | --- |
 | `ngx_http_scdn_config_module.so` | 后台检测文件内容、校验并预加载候选版本、等待各 Worker 就绪、切换不可变配置版本 | [Config 完整手册](native-config/README.zh-CN.md) |
 | `ngx_http_scdn_edge_module.so` | Host 与最长前缀路由、启停、静态目录、SNI 证书选择、缓存层/可选热度、Prometheus 指标 | [Edge 完整手册](native-edge/README.zh-CN.md) |
-| `ngx_http_scdn_purge_module.so` | 持久化版本隔离、精确/批量/前缀/整站失效、并发写回防护与后台检查点 | [Purge 完整手册](native-purge/README.zh-CN.md) |
+| `ngx_http_scdn_purge_module.so` | 持久化精确/批量/通配符/正则/后缀/目录/整站/节点失效、源站条件校验、有界过时复用 | [Purge 完整手册](native-purge/README.zh-CN.md) |
 
 Edge 依赖 Config 的 C 接口，必须使用同一源码版本编译，并先加载 Config。代理、静态文件与缓存文件管理继续使用 Nginx 自带模块。WAF、请求限速、连接限速、远程 Master→Node 同步不在本仓库实现范围内。
 
@@ -21,6 +21,7 @@ Purge 可独立加载，不依赖前两个插件，也不修改 Nginx 核心或�
 - [从旧 Lua 流程迁移](docs/MIGRATION.zh-CN.md)：字段映射、替换步骤、热更新边界。
 - [验证记录](docs/VALIDATION.zh-CN.md)：实测项目、CI、内存检查及未验证范围。
 - [缓存机制调研](docs/CACHE-MECHANISM.zh-CN.md)、[精确清理接入](native-purge/README.zh-CN.md)和[缓存清理基准](native-purge/bench/README.zh-CN.md)。
+- [源站校验、过时复用与匹配清理调研](docs/CACHE-REVALIDATION-RESEARCH.zh-CN.md)：ETag/Last-Modified、两个 stale 窗口、规则预算与节点范围。
 - [源码来源](SOURCE.md)、[公开发布规则](PUBLISHING.md)、[许可证](LICENSE)。
 
 ## 独立构建与验证
@@ -38,6 +39,8 @@ python native-edge/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
   --report /tmp/scdn-plugin-nginx-results.json
 python native-purge/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
   --report /tmp/scdn-plugin-purge-results.json
+python native-purge/tests/patterns.py --prefix /tmp/scdn-plugin-nginx
+python native-purge/tests/revalidate.py --prefix /tmp/scdn-plugin-nginx
 ```
 
 系统构建依赖与 OpenResty 构建方式见 [安装文档](docs/INSTALL.zh-CN.md)。脚本固定下载归档并验证 SHA-256，编译三个插件，拒绝覆盖已有安装。

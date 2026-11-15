@@ -3,6 +3,8 @@
 typedef struct {
     uint32_t hash;
     uint64_t sequence, used;
+    time_t revalidate;
+    time_t stale_updating,stale_error;
     ngx_str_t scope,key,resource,value;
     u_char *allocation;
 } scdn_purge_lru_t;
@@ -11,6 +13,7 @@ typedef struct {
     ngx_http_request_t *request;
     scdn_purge_location_t *location;
     ngx_str_t value;
+    ngx_str_t scope, resource;
 } scdn_purge_request_t;
 
 static scdn_purge_lru_t *purge_lru;
@@ -23,6 +26,8 @@ static char *purge_merge(ngx_conf_t *cf,void *parent,void *child);
 static char *purge_zone(ngx_conf_t *cf,ngx_command_t *cmd,void *data);
 static char *purge_key(ngx_conf_t *cf,ngx_command_t *cmd,void *data);
 static char *purge_api(ngx_conf_t *cf,ngx_command_t *cmd,void *data);
+static char *purge_revalidate(ngx_conf_t *cf,ngx_command_t *cmd,void *data);
+static char *purge_stale(ngx_conf_t *cf,ngx_command_t *cmd,void *data);
 static ngx_int_t purge_preconfiguration(ngx_conf_t *cf);
 static ngx_int_t purge_postconfiguration(ngx_conf_t *cf);
 static ngx_int_t purge_worker(ngx_cycle_t *cycle);
@@ -46,6 +51,10 @@ static ngx_command_t purge_commands[]={
      ngx_conf_set_size_slot,NGX_HTTP_MAIN_CONF_OFFSET,offsetof(scdn_purge_main_t,checkpoint),NULL},
     {ngx_string("scdn_purge_key"),NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE2|NGX_CONF_TAKE3,
      purge_key,NGX_HTTP_LOC_CONF_OFFSET,0,NULL},
+    {ngx_string("scdn_purge_revalidate"),NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
+     purge_revalidate,NGX_HTTP_LOC_CONF_OFFSET,0,NULL},
+    {ngx_string("scdn_purge_stale"),NGX_HTTP_MAIN_CONF|NGX_HTTP_SRV_CONF|NGX_HTTP_LOC_CONF|NGX_CONF_TAKE2,
+     purge_stale,NGX_HTTP_LOC_CONF_OFFSET,0,NULL},
     {ngx_string("scdn_purge_api"),NGX_HTTP_LOC_CONF|NGX_CONF_NOARGS,
      purge_api,NGX_HTTP_LOC_CONF_OFFSET,1,NULL},
     {ngx_string("scdn_purge_status"),NGX_HTTP_LOC_CONF|NGX_CONF_NOARGS,
@@ -71,7 +80,11 @@ static void *purge_main(ngx_conf_t *cf)
     return main;
 }
 static void *purge_location(ngx_conf_t *cf)
-{ return ngx_pcalloc(cf->pool,sizeof(scdn_purge_location_t)); }
+{
+    scdn_purge_location_t *conf=ngx_pcalloc(cf->pool,sizeof(*conf));
+    if(conf)conf->revalidate=conf->stale_updating=conf->stale_error=NGX_CONF_UNSET;
+    return conf;
+}
 
 static char *purge_merge(ngx_conf_t *cf,void *parent,void *child)
 {
@@ -81,8 +94,60 @@ static char *purge_merge(ngx_conf_t *cf,void *parent,void *child)
         conf->scope=previous->scope;conf->key=previous->key;conf->configured=1;
         conf->resource=previous->resource;conf->has_resource=previous->has_resource;
     }
+    ngx_conf_merge_sec_value(conf->revalidate,previous->revalidate,0);
+    ngx_conf_merge_sec_value(conf->stale_updating,previous->stale_updating,30);
+    ngx_conf_merge_sec_value(conf->stale_error,previous->stale_error,0);
+    if(conf->revalidate && (!conf->configured || conf->api))
+        return "scdn_purge_revalidate requires scdn_purge_key and a business proxy location";
     core=ngx_http_conf_get_module_loc_conf(cf,ngx_http_core_module);
     if(conf->api && core->handler!=purge_handler) return "scdn_purge endpoint conflicts with another content handler";
+    return NGX_CONF_OK;
+}
+
+static char *purge_revalidate(ngx_conf_t *cf,ngx_command_t *cmd,void *data)
+{
+    scdn_purge_location_t *conf=data,**entry;
+    scdn_purge_main_t *main=ngx_http_conf_get_module_main_conf(cf,ngx_http_scdn_purge_module);
+    ngx_str_t *values=cf->args->elts;
+    time_t interval;
+    (void)cmd;
+    if(conf->revalidate!=NGX_CONF_UNSET)return "is duplicate";
+    if(ngx_strcmp(values[1].data,"off")==0)interval=0;
+    else {
+        interval=ngx_parse_time(&values[1],1);
+        if(interval<1 || interval>86400)return "requires off or an interval from 1s to 24h";
+    }
+    conf->revalidate=interval;
+    if(interval)main->revalidate_enabled=1;
+    entry=ngx_array_push(&main->locations);if(entry==NULL)return NGX_CONF_ERROR;
+    *entry=conf;
+    return NGX_CONF_OK;
+}
+
+static char *purge_stale(ngx_conf_t *cf,ngx_command_t *cmd,void *data)
+{
+    scdn_purge_location_t *conf=data;
+    ngx_str_t *values=cf->args->elts, value;
+    ngx_uint_t i;
+    time_t updating=NGX_CONF_UNSET,error=NGX_CONF_UNSET,seconds;
+    (void)cmd;
+    if(conf->stale_updating!=NGX_CONF_UNSET)return "is duplicate";
+    for(i=1;i<3;i++) {
+        value=values[i];
+        if(value.len>9 && ngx_strncmp(value.data,"updating=",9)==0) {
+            if(updating!=NGX_CONF_UNSET)return "duplicate updating window";
+            value.data+=9;value.len-=9;seconds=ngx_parse_time(&value,1);
+            if(seconds<0 || seconds>86400)return "window must be from 0 to 24h";
+            updating=seconds;
+        } else if(value.len>6 && ngx_strncmp(value.data,"error=",6)==0) {
+            if(error!=NGX_CONF_UNSET)return "duplicate error window";
+            value.data+=6;value.len-=6;seconds=ngx_parse_time(&value,1);
+            if(seconds<0 || seconds>86400)return "window must be from 0 to 24h";
+            error=seconds;
+        } else return "requires updating=TIME error=TIME";
+    }
+    if(updating==NGX_CONF_UNSET || error==NGX_CONF_UNSET)return "requires updating=TIME error=TIME";
+    conf->stale_updating=updating;conf->stale_error=error;
     return NGX_CONF_OK;
 }
 
@@ -251,10 +316,11 @@ static ngx_int_t purge_postconfiguration(ngx_conf_t *cf)
     if(api && !load_token(cf,main)) {
         ngx_conf_log_error(NGX_LOG_EMERG,cf,0,"scdn_purge API requires a private regular token file (43 to 128 base64url characters)");return NGX_ERROR;
     }
-    if(api) {
+    if(api || main->revalidate_enabled) {
         main->threads=ngx_thread_pool_add(cf,&pool);
         if(main->threads==NULL) return NGX_ERROR;
     }
+    if(main->revalidate_enabled && scdn_purge_revalidate_configure(cf,main)!=NGX_OK)return NGX_ERROR;
     if(own_journal(cf,main)!=NGX_OK)return NGX_ERROR;
     core=ngx_http_conf_get_module_main_conf(cf,ngx_http_core_module);
     handler=ngx_array_push(&core->phases[NGX_HTTP_PREACCESS_PHASE].handlers);
@@ -289,6 +355,7 @@ static void purge_exit(ngx_cycle_t *cycle)
         for(i=0;i<purge_lru_count;i++) if(purge_lru[i].allocation)ngx_free(purge_lru[i].allocation);
         ngx_free(purge_lru);purge_lru=NULL;
     }
+    scdn_purge_match_exit();
 }
 
 static void request_key_cleanup(void *data) { (void)data; }
@@ -316,6 +383,34 @@ static ngx_flag_t state_ready(scdn_purge_main_t *main)
     return ready;
 }
 
+static ngx_int_t purge_reject_create(ngx_http_request_t *r)
+{ (void)r;return NGX_ERROR; }
+
+static ngx_int_t purge_key_failure(ngx_http_request_t *r,ngx_http_variable_value_t *v)
+{
+    typedef struct {
+        ngx_http_upstream_conf_t conf;
+        ngx_array_t predicates;
+        ngx_http_complex_value_t value;
+    } failed_key_t;
+    failed_key_t *failure;
+    if(r->upstream==NULL || r->upstream->conf==NULL)return NGX_ERROR;
+    failure=ngx_pcalloc(r->pool,sizeof(*failure));if(failure==NULL)return NGX_ERROR;
+    failure->conf=*r->upstream->conf;
+    ngx_str_set(&failure->value.value,"1");
+    failure->predicates.elts=&failure->value;failure->predicates.nelts=1;
+    failure->predicates.nalloc=1;failure->predicates.size=sizeof(failure->value);
+    failure->predicates.pool=r->pool;
+    failure->conf.cache_bypass=&failure->predicates;
+    failure->conf.no_cache=&failure->predicates;
+    r->upstream->conf=&failure->conf;r->upstream->create_request=purge_reject_create;
+    /* Script variables do not propagate getter errors to proxy create_key.
+     * Explicitly bypass lookup, then fail before opening an origin socket. */
+    v->data=(u_char *)"SCDN_INVALID";v->len=sizeof("SCDN_INVALID")-1;
+    v->valid=1;v->no_cacheable=1;v->not_found=0;
+    return NGX_OK;
+}
+
 static ngx_int_t purge_guard(ngx_http_request_t *r)
 {
     scdn_purge_main_t *main=ngx_http_get_module_main_conf(r,ngx_http_scdn_purge_module);
@@ -341,8 +436,8 @@ static ngx_int_t purge_variable(ngx_http_request_t *r,ngx_http_variable_value_t 
     (void)data;
     main=ngx_http_get_module_main_conf(r,ngx_http_scdn_purge_module);
     location=ngx_http_get_module_loc_conf(r,ngx_http_scdn_purge_module);
-    if(!location->configured || main->shared==NULL || purge_lru==NULL) return NGX_ERROR;
-    if(!state_ready(main))return NGX_ERROR;
+    if(!location->configured || main->shared==NULL || purge_lru==NULL) return purge_key_failure(r,v);
+    if(!state_ready(main))return purge_key_failure(r,v);
     for(cleanup=r->pool->cleanup;cleanup;cleanup=cleanup->next) {
         if(cleanup->handler==request_key_cleanup) {
             context=cleanup->data;
@@ -351,11 +446,11 @@ static ngx_int_t purge_variable(ngx_http_request_t *r,ngx_http_variable_value_t 
     }
     if(ngx_http_complex_value(r,&location->scope,&scope)!=NGX_OK
        || ngx_http_complex_value(r,&location->key,&key)!=NGX_OK
-       || !valid_scope(&scope) || !valid_bytes(&key,SCDN_PURGE_KEY)) return NGX_ERROR;
+       || !valid_scope(&scope) || !valid_bytes(&key,SCDN_PURGE_KEY)) return purge_key_failure(r,v);
     resource=key;
     if(location->has_resource
        && (ngx_http_complex_value(r,&location->resource,&resource)!=NGX_OK
-           || !valid_bytes(&resource,SCDN_PURGE_KEY)))return NGX_ERROR;
+           || !valid_bytes(&resource,SCDN_PURGE_KEY)))return purge_key_failure(r,v);
     distinct=resource.len!=key.len || ngx_memcmp(resource.data,key.data,key.len)!=0;
     hash=scdn_purge_hash('E',&scope,&resource);
     sequence=(uint64_t)main->shared->sequence;ngx_memory_barrier();
@@ -363,6 +458,9 @@ static ngx_int_t purge_variable(ngx_http_request_t *r,ngx_http_variable_value_t 
     for(i=0;i<4;i++) {
         entry=&purge_lru[bucket+i];
         if(entry->allocation && entry->sequence==sequence && entry->hash==hash
+           && entry->revalidate==location->revalidate
+           && (!location->revalidate || (entry->stale_updating==location->stale_updating
+               && entry->stale_error==location->stale_error))
            && entry->scope.len==scope.len && entry->key.len==key.len && entry->resource.len==resource.len
            && ngx_memcmp(entry->scope.data,scope.data,scope.len)==0
            && ngx_memcmp(entry->key.data,key.data,key.len)==0
@@ -373,12 +471,12 @@ static ngx_int_t purge_variable(ngx_http_request_t *r,ngx_http_variable_value_t 
     }
     purge_misses++;
     epoch=scdn_purge_epoch(main,&scope,&resource,&sequence);
-    if(epoch==UINT64_MAX)return NGX_ERROR;
+    if(epoch==UINT64_MAX)return purge_key_failure(r,v);
     if(selected->allocation)ngx_free(selected->allocation);
     ngx_memzero(selected,sizeof(*selected));
     length=scope.len+key.len+(distinct?resource.len:0)+128;
     selected->allocation=ngx_alloc(scope.len+key.len+(distinct?resource.len:0)+length,r->connection->log);
-    if(selected->allocation==NULL) return NGX_ERROR;
+    if(selected->allocation==NULL) return purge_key_failure(r,v);
     selected->scope.data=selected->allocation;selected->scope.len=scope.len;
     selected->key.data=selected->allocation+scope.len;selected->key.len=key.len;
     selected->resource.data=distinct?selected->allocation+scope.len+key.len:selected->key.data;
@@ -391,17 +489,31 @@ static ngx_int_t purge_variable(ngx_http_request_t *r,ngx_http_variable_value_t 
     if(distinct) {
         out=ngx_snprintf(out,selected->value.data+length-out,":%uz:%V",resource.len,&resource);
     }
+    if(location->revalidate)
+        out=ngx_snprintf(out,selected->value.data+length-out,":R2:%T:%T:%T",location->revalidate,
+            location->stale_updating,location->stale_error);
     selected->value.len=out-selected->value.data;
     selected->sequence=sequence;selected->hash=hash;
+    selected->revalidate=location->revalidate;
+    selected->stale_updating=location->stale_updating;selected->stale_error=location->stale_error;
 cached:
     selected->used=++purge_clock;
-    cleanup=ngx_pool_cleanup_add(r->pool,sizeof(*context));if(cleanup==NULL)return NGX_ERROR;
+    cleanup=ngx_pool_cleanup_add(r->pool,sizeof(*context));if(cleanup==NULL)return purge_key_failure(r,v);
     context=cleanup->data;context->request=r;context->location=location;
-    context->value.data=ngx_palloc(r->pool,ngx_align(selected->value.len,NGX_ALIGNMENT));
-    if(context->value.data==NULL)return NGX_ERROR;
+    context->value.data=ngx_palloc(r->pool,ngx_align(selected->value.len
+        +(location->revalidate?scope.len+resource.len:0),NGX_ALIGNMENT));
+    if(context->value.data==NULL)return purge_key_failure(r,v);
     context->value.len=selected->value.len;ngx_memcpy(context->value.data,selected->value.data,selected->value.len);
+    if(location->revalidate) {
+        context->scope.len=scope.len;context->scope.data=context->value.data+context->value.len;
+        context->resource.len=resource.len;context->resource.data=context->scope.data+scope.len;
+        ngx_memcpy(context->scope.data,scope.data,scope.len);
+        ngx_memcpy(context->resource.data,resource.data,resource.len);
+    }
     cleanup->handler=request_key_cleanup;
 found:
+    if(location->revalidate && scdn_purge_revalidate_attach(r,location,&context->scope,&context->resource)!=NGX_OK)
+        return purge_key_failure(r,v);
     v->data=context->value.data;v->len=context->value.len;v->valid=1;v->no_cacheable=1;v->not_found=0;
     return NGX_OK;
 }
@@ -496,8 +608,14 @@ static void body_ready(ngx_http_request_t *r)
     if(mode==NULL)goto invalid;
     if(mode->len==5 && ngx_memcmp(mode->data,"exact",5)==0)kind='E';
     else if(mode->len==6 && ngx_memcmp(mode->data,"prefix",6)==0)kind='P';
+    else if(mode->len==8 && ngx_memcmp(mode->data,"wildcard",8)==0)kind='W';
+    else if(mode->len==5 && ngx_memcmp(mode->data,"regex",5)==0)kind='R';
+    else if(mode->len==6 && ngx_memcmp(mode->data,"suffix",6)==0)kind='T';
+    else if(mode->len==9 && ngx_memcmp(mode->data,"directory",9)==0)kind='D';
     else if(mode->len==5 && ngx_memcmp(mode->data,"scope",5)==0)kind='S';
+    else if(mode->len==4 && ngx_memcmp(mode->data,"site",4)==0)kind='S';
     else if(mode->len==3 && ngx_memcmp(mode->data,"all",3)==0)kind='A';
+    else if(mode->len==4 && ngx_memcmp(mode->data,"node",4)==0)kind='A';
     else goto invalid;
     if(kind=='A' && !main->allow_all) {
         ngx_http_finalize_request(r,reply(r,403,"all_disabled",0,0));return;
@@ -511,7 +629,7 @@ static void body_ready(ngx_http_request_t *r)
         if(length>SCDN_PURGE_BODY)goto invalid;
     }
     if((kind=='S' || kind=='A') && length!=0)goto invalid;
-    if((kind=='E' || kind=='P') && length==0)goto invalid;
+    if(kind!='S' && kind!='A' && length==0)goto invalid;
     task=ngx_thread_task_alloc(r->pool,sizeof(*job));if(task==NULL)goto failed;
     job=task->ctx;ngx_memzero(job,sizeof(*job));job->main=main;job->request=r;
     if(kind=='S' || kind=='A') {
@@ -533,6 +651,7 @@ static void body_ready(ngx_http_request_t *r)
             job->operations[job->count].key.data=start;
             job->operations[job->count].key.len=p-start;
             if(!valid_bytes(&job->operations[job->count].key,SCDN_PURGE_KEY))goto invalid;
+            if(!scdn_purge_pattern_valid(kind,&job->operations[job->count].key))goto invalid;
             job->count++;if(p<end)p++;
         }
     }
@@ -567,8 +686,10 @@ static ngx_int_t status(ngx_http_request_t *r,scdn_purge_main_t *main)
     buffer->last=ngx_snprintf(buffer->last,1024,
         "{\"ok\":true,\"version\":\"" SCDN_PURGE_VERSION "\",\"sequence\":%uL,\"metadata_nodes\":%ui,\"journal_bytes\":%uL,"
         "\"batches\":%uL,\"checkpoints\":%uL,\"worker_pid\":%P,\"worker_lru_hits\":%uL,"
-        "\"worker_lru_misses\":%uL,\"state_recovery_required\":%s,\"physical_deleted\":false}\n",
+        "\"worker_lru_misses\":%uL,\"state_recovery_required\":%s,\"physical_deleted\":false",
         sequence,nodes,offset,batches,compacted,ngx_pid,purge_hits,purge_misses,recovery?"true":"false");
+    buffer->last=scdn_purge_revalidate_status(buffer->last,buffer->end);
+    buffer->last=ngx_snprintf(buffer->last,buffer->end-buffer->last,"}\n");
     ngx_str_set(&r->headers_out.content_type,"application/json");r->headers_out.status=200;
     header=ngx_list_push(&r->headers_out.headers);if(header==NULL)return NGX_HTTP_INTERNAL_SERVER_ERROR;
     header->hash=1;ngx_str_set(&header->key,"Cache-Control");ngx_str_set(&header->value,"no-store");

@@ -98,7 +98,7 @@ static void rollback_reservations(scdn_purge_job_t *job)
     mutation_begin(main);
     while(job->created_count) {
         node=job->created[--job->created_count];
-        if(node->mode=='P') {
+        if(strchr("PWRTD",node->mode)!=NULL) {
             name.data=node->bytes;name.len=node->scope_length;
             scope=lookup(main,'S',&name,&empty,0);
             if(scope!=NULL) {
@@ -125,13 +125,13 @@ static int prepare(scdn_purge_main_t *main,scdn_purge_operation_t *op)
         op->node=lookup(main,'S',&op->scope,&empty,1);
         return op->node!=NULL;
     }
-    if(op->mode=='P') {
+    if(strchr("PWRTD",op->mode)!=NULL) {
         scope=lookup(main,'S',&op->scope,&empty,1);
         if(scope==NULL) return 0;
-        existing=lookup(main,'P',&op->scope,&op->key,0);
+        existing=lookup(main,op->mode,&op->scope,&op->key,0);
         if(existing!=NULL) { op->node=existing; return 1; }
         if(scope->prefix_count>=SCDN_PURGE_PREFIXES) return 0;
-        op->node=lookup(main,'P',&op->scope,&op->key,1);
+        op->node=lookup(main,op->mode,&op->scope,&op->key,1);
         if(op->node==NULL) return 0;
         op->node->prefix_next=scope->prefixes;
         scope->prefixes=op->node; scope->prefix_count++;
@@ -199,24 +199,49 @@ uint64_t
 scdn_purge_epoch(scdn_purge_main_t *main,const ngx_str_t *scope,
     const ngx_str_t *key,uint64_t *sequence)
 {
+    typedef struct { ngx_str_t pattern; uint64_t epoch; u_char mode; } rule_t;
     scdn_purge_node_t *node,*prefix;
+    rule_t *rules=NULL;
+    ngx_uint_t count=0,i=0;
+    size_t bytes=0;
+    u_char *out;
+    ngx_int_t matched;
     ngx_str_t empty=ngx_string("");
     uint64_t epoch;
     ngx_shmtx_lock(&main->slab->mutex);
     if(main->shared->mutating) { ngx_shmtx_unlock(&main->slab->mutex);return UINT64_MAX; }
     epoch=main->shared->all_epoch;
+    node=lookup(main,'E',scope,key,0);
+    if(node!=NULL && node->epoch>epoch)epoch=node->epoch;
     node=lookup(main,'S',scope,&empty,0);
     if(node!=NULL) {
         if(node->epoch>epoch) epoch=node->epoch;
         for(prefix=node->prefixes;prefix;prefix=prefix->prefix_next) {
-            if(prefix->epoch>epoch && prefix->key_length<=key->len
-               && ngx_memcmp(prefix->bytes+scope->len,key->data,prefix->key_length)==0) epoch=prefix->epoch;
+            if(prefix->epoch>epoch) { count++;bytes+=prefix->key_length; }
+        }
+        if(count) {
+            rules=ngx_alloc(count*sizeof(*rules)+bytes,ngx_cycle->log);
+            if(rules==NULL) { ngx_shmtx_unlock(&main->slab->mutex);return UINT64_MAX; }
+            out=(u_char *)(rules+count);
+            for(prefix=node->prefixes;prefix;prefix=prefix->prefix_next) {
+                if(prefix->epoch<=epoch)continue;
+                rules[i].pattern.data=out;rules[i].pattern.len=prefix->key_length;
+                out=ngx_cpymem(out,prefix->bytes+scope->len,prefix->key_length);
+                rules[i].epoch=prefix->epoch;rules[i].mode=prefix->mode;i++;
+            }
         }
     }
-    node=lookup(main,'E',scope,key,0);
-    if(node!=NULL && node->epoch>epoch) epoch=node->epoch;
     *sequence=(uint64_t)main->shared->sequence;
     ngx_shmtx_unlock(&main->slab->mutex);
+    /* Pattern evaluation and PCRE compilation must not hold the shared slab
+     * mutex. Nodes can be reclaimed concurrently; use this bounded snapshot. */
+    for(i=0;i<count;i++) {
+        if(rules[i].epoch<=epoch)continue;
+        matched=scdn_purge_match(rules[i].mode,&rules[i].pattern,key);
+        if(matched==NGX_ERROR) { epoch=UINT64_MAX;break; }
+        if(matched && rules[i].epoch>epoch)epoch=rules[i].epoch;
+    }
+    if(rules)ngx_free(rules);
     return epoch;
 }
 
@@ -320,9 +345,10 @@ static int recover(scdn_purge_main_t *main,int fd,int fresh)
             ops[i].key.len=((size_t)p[0]<<8)|p[1];p+=2;
             if(ops[i].scope.len>SCDN_PURGE_SCOPE || ops[i].key.len>SCDN_PURGE_KEY
                || (size_t)(end-p)<ops[i].scope.len+ops[i].key.len
-               || strchr("EPSA",ops[i].mode)==NULL || ops[i].mode==0) break;
+               || strchr("EPSAWRTD",ops[i].mode)==NULL || ops[i].mode==0) break;
             ops[i].scope.data=p;p+=ops[i].scope.len;
             ops[i].key.data=p;p+=ops[i].key.len;
+            if(!scdn_purge_pattern_valid(ops[i].mode,&ops[i].key))break;
         }
         if(i!=count || p!=end) { ngx_free(body);return 0; }
         if((ops[0].mode=='A' || ops[0].mode=='S') && count!=1) { ngx_free(body);return 0; }

@@ -11,7 +11,7 @@
 #endif
 
 #define SCDN_PURGE_BUCKETS 4096
-#define SCDN_PURGE_VERSION "0.1.0"
+#define SCDN_PURGE_VERSION "0.2.0"
 #define SCDN_PURGE_BATCH 256
 #define SCDN_PURGE_KEY 4096
 #define SCDN_PURGE_SCOPE 256
@@ -56,6 +56,10 @@ typedef struct {
     ngx_flag_t allow_all;
     int owner_fd;
     ngx_array_t locations;
+    ngx_flag_t revalidate_enabled;
+    ngx_shm_zone_t *revalidate_zone;
+    ngx_slab_pool_t *revalidate_slab;
+    void *revalidate_shared;
 } scdn_purge_main_t;
 
 typedef struct {
@@ -63,6 +67,8 @@ typedef struct {
     ngx_flag_t configured;
     ngx_flag_t has_resource;
     ngx_uint_t api;
+    time_t revalidate;
+    time_t stale_updating, stale_error;
 } scdn_purge_location_t;
 
 typedef struct {
@@ -82,5 +88,12 @@ uint32_t scdn_purge_hash(u_char mode, const ngx_str_t *scope, const ngx_str_t *k
 uint64_t scdn_purge_epoch(scdn_purge_main_t *main, const ngx_str_t *scope,
     const ngx_str_t *key, uint64_t *sequence);
 void scdn_purge_commit(void *data, ngx_log_t *log);
+ngx_int_t scdn_purge_revalidate_configure(ngx_conf_t *cf, scdn_purge_main_t *main);
+ngx_int_t scdn_purge_revalidate_attach(ngx_http_request_t *r,
+    scdn_purge_location_t *location, ngx_str_t *scope, ngx_str_t *resource);
+u_char *scdn_purge_revalidate_status(u_char *p, u_char *last);
+ngx_flag_t scdn_purge_pattern_valid(u_char mode, const ngx_str_t *pattern);
+ngx_int_t scdn_purge_match(u_char mode, const ngx_str_t *pattern, const ngx_str_t *key);
+void scdn_purge_match_exit(void);
 
 #endif
