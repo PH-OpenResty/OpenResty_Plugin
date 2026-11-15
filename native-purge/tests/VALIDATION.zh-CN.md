@@ -37,7 +37,7 @@ python native-purge/tests/integration.py --prefix /tmp/scdn-purge-validation \
 先核对 [源站校验与 stale 调研](../../docs/CACHE-REVALIDATION-RESEARCH.zh-CN.md)，再扩展实现。两个 Worker 的 Nginx 1.31.8 和完整 OpenResty 1.31.8.1 均运行新增真实进程测试；最终提交还由 CI 重建并执行，Nginx CI 包含完整 ASan/UBSan。
 
 - [patterns.py](patterns.py)：64 项，覆盖 glob/转义、PCRE2 锚定与查询串、后缀、目录边界与重复斜杠、站点隔离、批次语法拒绝、共享模式容量、失败关闭、检查点、重启及跨 cache zone 的 node 清理。
-- [revalidate.py](revalidate.py)：44 项，覆盖 ETag/Last-Modified/完整 GET、相同 Last-Modified 下的等长正文变化、304 连续续期及缺失新鲜度头、长 Cache-Control/X-Accel-Expires 上限、HEAD/Vary、后台并发合并、失败重试、有限 stale、显式清理隔离、403/404/410/private/Set-Cookie、部分正文、分段响应头、无重启更新、状态指标和配置校验。
+- [revalidate.py](revalidate.py)：45 项，覆盖 ETag/Last-Modified/完整 GET、相同 Last-Modified 下的等长正文变化、304 连续续期及缺失新鲜度头、长 Cache-Control/X-Accel-Expires 上限、HEAD/Vary、后台并发合并、失败重试、有限 stale、显式清理隔离、301/403/404/410/private/Set-Cookie、部分正文、分段响应头、无重启更新、状态指标和配置校验。
 - 源站返回不可缓存的 304 时，临时移走测试 journal，确认失效提交失败也不会把旧长 TTL 再次续期，恢复 journal 后可重新提交失效。
 - 原有 70 项 Purge 和 47 项 Config/Edge 回归继续保留；导入的八个 Config/Edge 实现文件 SHA-256 不变。
 
@@ -46,7 +46,7 @@ python native-purge/tests/patterns.py --prefix /tmp/scdn-purge-validation
 python native-purge/tests/revalidate.py --prefix /tmp/scdn-purge-validation
 ```
 
-新增功能共 108 项，加原有回归后每种运行时共 225 项。报告只包含检查名称，不发布测试源站、token、journal 或实际缓存文件。有限后台宽限期结束后的同步并发、锁超时、高基数抑制表冲突不被描述为严格单次回源保证；需要在目标流量下另外压测。
+新增功能共 109 项，加原有回归后每种运行时共 226 项。报告只包含检查名称，不发布测试源站、token、journal 或实际缓存文件。有限后台宽限期结束后的同步并发、锁超时、高基数抑制表冲突不被描述为严格单次回源保证；需要在目标流量下另外压测。
 
 ## 未覆盖的范围
 

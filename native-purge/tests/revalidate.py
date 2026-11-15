@@ -200,6 +200,12 @@ class Revalidation(Review):
         self.expire(); self.request(path); self.fresh(path, 2)
         record = self.records(path)[-1]
         self.check('missing validators fall back to full GET', record['etag'] is None and record['modified'] is None and record['status'] == 200)
+        path='/redirect/item'
+        self.fill(path);self.set(path,status=301);self.expire()
+        sequence=self.status()['sequence'];self.request(path)
+        self.until(lambda:self.status()['sequence']>sequence,'redirect invalidation')
+        values=[self.request(path),self.request(path)]
+        self.check('redirects withdraw old successful bodies without becoming cached successes',all(v[0]==301 and v[1]['X-Cache']!='HIT' for v in values))
 
         path = '/forced/item'
         self.set(path, cache_control='public,max-age=86400', accel=True)

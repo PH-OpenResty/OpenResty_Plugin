@@ -23,6 +23,7 @@ typedef struct {
     ngx_int_t (*reinit)(ngx_http_request_t *r);
     void (*finalize)(ngx_http_request_t *r, ngx_int_t rc);
     ngx_str_t scope, resource;
+    ngx_table_elt_t empty_etag;
     time_t interval, stale_updating, stale_error;
     ngx_msec_t deadline;
     ngx_flag_t attempted, invalidated, suppressed;
@@ -283,6 +284,18 @@ revalidate_header(ngx_http_request_t *r)
         return rc;
     }
     status=u->headers_in.status_n;
+    if(status==NGX_HTTP_OK || status==NGX_HTTP_PARTIAL_CONTENT) {
+        /* Core file_cache_set_header copies even a zero-length ETag. Supply
+         * non-null storage without adding a response header or validator. */
+        if(u->headers_in.etag==NULL) {
+            context->empty_etag.value.data=(u_char *)"";
+            u->headers_in.etag=&context->empty_etag;
+        }
+    } else if(status!=NGX_HTTP_NOT_MODIFIED) {
+        /* The core explicitly nulls cache->etag for other statuses. They
+         * also must not replace the successful representation we monitor. */
+        u->cacheable=0;
+    }
     if(status>=500 || status==NGX_HTTP_TOO_MANY_REQUESTS) {
         /* Even a mistaken public/max-age header on an error must not replace
          * the last successful object with a cached 5xx/429 response. */
