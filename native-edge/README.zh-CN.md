@@ -8,7 +8,7 @@
 
 业务链由 Config、API、Edge 构成，动态加载顺序为 Config → API → Edge，三者使用同一源码与目标 ABI 构建。统一构建还提供独立的 Sync、Purge，共五个模块。运行时需要 HTTP SSL，Config 还需要线程池支持。Edge 用到 Nginx 代理/静态文件/缓存功能时，这些原生模块也必须存在。API 默认关闭，启用方式见 [API 手册](../native-api/README.zh-CN.md)。
 
-[Sync](../native-sync/README.zh-CN.md) 的角色/身份接口不改变 Edge 站点版本，0.1.0 也不会替 Edge 写入同步配置。五模块共存、独立控制 token 与流式代理的验证入口是 `native-api/tests/integration.py --purge --sync`，静态构建增加 `--static`。
+[Sync](../native-sync/README.zh-CN.md) 的角色/身份接口不改变 Edge 站点版本，0.2.0 的缓存任务也不会替 Edge 写入同步配置。五模块共存、独立控制 token 与流式代理的验证入口是 `native-api/tests/integration.py --purge --sync`，静态构建增加 `--static`。
 
 | 指令 | 上下文 | 默认/参数 | 作用 |
 | --- | --- | --- | --- |
@@ -143,3 +143,7 @@ python native-edge/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
 ```
 
 运行时也可为 openresty。测试创建临时证书、源站、Unix Socket 和两个真实 Worker，退出后清理。详细验证内容、ASan/UBSan 设置和未验证项见 [验证记录](../docs/VALIDATION.zh-CN.md)。本插件没有远程分发、配置编辑或自动恢复历史服务。
+
+## HTTP 头与缓存任务联动
+
+自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.2.0 的缓存刷新/预热任务及原生配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。

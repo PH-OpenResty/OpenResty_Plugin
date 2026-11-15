@@ -54,3 +54,7 @@ python native-purge/tests/revalidate.py --prefix /tmp/scdn-purge-validation
 ## 未覆盖的范围
 
 真实掉电/存储损坏的全部模式、不同文件系统的 fsync 保证、超大工作集、长时间压力、ARM64、所有非 root/systemd 组合、TLS/HTTP2/HTTP3、slice/range/其他子请求组合、其他缓存后端和跨节点清理均需按目标环境另行验证。本模块启用的 proxy_cache background_update 已覆盖；不能扩展为任意第三方后台请求组合保证。CRC 用于检测记录损坏，不是防止有权改写私有文件的攻击者。
+
+## 0.3.0 控制头与 Sync 缓存任务
+
+2026-11-15 的三种构建均重跑原 70 项清理检查、64 项模式和 45 项源站/stale 检查。控制头统一为 `X-Purge-Mode` / `X-Purge-Scope`；原生 Sync 还新增 99 项缓存任务链路检查。细项及边界见 [当前验证](../../docs/VALIDATION.zh-CN.md)和 [HTTP 头约定](../../docs/HTTP-HEADERS.zh-CN.md)。

@@ -3,7 +3,7 @@
 
 #include <stddef.h>
 
-#define SCDN_SYNC_NATIVE_VERSION "0.1.0"
+#define SCDN_SYNC_NATIVE_VERSION "0.2.0"
 #define SCDN_SYNC_PROTOCOL "scdn.sync.v1"
 #define SCDN_SYNC_MAX_ID 96
 #define SCDN_SYNC_MAX_PEERS 1024

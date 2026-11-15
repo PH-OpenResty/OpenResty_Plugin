@@ -38,3 +38,7 @@ C
 ```
 
 策略是 TOML 解码后的 JSON Schema 2020-12。可在独立 Python 环境安装 `jsonschema==4.25.1`，用 `Draft202012Validator.check_schema` 和带 `FormatChecker` 的 validator 校验示例；CIDR、文件别名、内存及 UID 等跨字段/运行环境约束仍按详细设计单独检查。
+
+## HTTP 头与缓存任务联动
+
+自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.2.0 的缓存刷新/预热任务及原生配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。

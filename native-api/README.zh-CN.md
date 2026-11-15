@@ -165,3 +165,7 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
 ```
 
 真实进程测试覆盖 API/AI 结构识别、混淆输入、正文完整性、异步读取、缓存绕过、SSE 首段延迟、HTTP/2 多路复用、gRPC 二进制与 trailers、WebSocket 双向数据、连接取消、TCP 复用、HTTPS/SNI 验证与热更新。测试不调用真实模型厂商，不证明所有外部模型协议或高负载容量；精确结果见 [验证记录](../docs/VALIDATION.zh-CN.md)。
+
+## HTTP 头与缓存任务联动
+
+自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.2.0 的缓存刷新/预热任务及原生配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。

@@ -1,6 +1,6 @@
 # 安装、构建和首次运行
 
-统一构建生成 Sync、Config、API、Edge、Purge 五个插件。Config/API/Edge 需同版本编译，动态加载顺序为 Config → API → Edge；Sync 和 Purge 可独立使用。Purge 的私有日志/token 见 [手册](../native-purge/README.zh-CN.md)，Sync 的独立身份/token/mTLS 接入见 [迁移说明](SYNC-MIGRATION.zh-CN.md)。当前原生模块不依赖 Lua 或 Python；完整远程同步尚由原 Lua Sync 服务承担，不能把安装 Sync 0.1.0 当作替换该服务。
+统一构建生成 Sync、Config、API、Edge、Purge 五个插件。Config/API/Edge 需同版本编译，动态加载顺序为 Config → API → Edge；Sync 和 Purge 可独立使用。Purge 的私有日志/token 见 [手册](../native-purge/README.zh-CN.md)，Sync 的独立身份/token/mTLS 接入见 [迁移说明](SYNC-MIGRATION.zh-CN.md)。当前原生模块不依赖 Lua 或 Python；完整远程同步尚由原 Lua Sync 服务承担，不能把安装 Sync 0.2.0 当作替换该服务。
 
 ## 1. 构建要求
 
@@ -10,11 +10,13 @@ Debian/Ubuntu 构建依赖：
 
 ```sh
 sudo apt-get update
-sudo apt-get install -y build-essential perl libpcre2-dev libssl-dev zlib1g-dev curl \
+sudo apt-get install -y build-essential perl libpcre2-dev libssl-dev zlib1g-dev libcurl4-openssl-dev curl \
   python3 python3-venv
 ```
 
-Alpine 的对应构建包为 `build-base perl pcre2-dev openssl-dev zlib-dev curl`，测试还需 Python 和 `cryptography`。本地不具备 ASan 库时可运行普通构建；远程 CI 在 Ubuntu 上进行 ASan/UBSan 验证，不能据此声称本地也完成同样的检查。
+Alpine 的对应构建包为 `build-base perl pcre2-dev openssl-dev zlib-dev curl curl-dev`，测试还需 Python 和 `cryptography`。本地不具备 ASan 库时可运行普通构建；远程 CI 在 Ubuntu 上进行 ASan/UBSan 验证，不能据此声称本地也完成同样的检查。
+
+Sync 缓存任务链接 libcurl 7.85+，运行主机也需安装对应 libcurl 动态库；不启用任务时不创建轮询器。启用任务需要额外的私有目录、独立凭据和线程池，见 [缓存任务手册](CACHE-TASKS.zh-CN.md)。代理模板统一覆盖 `X-Clinet-IP`，接入规则见 [HTTP 头约定](HTTP-HEADERS.zh-CN.md)。
 
 ## 2. 用固定测试运行时独立构建
 
@@ -29,6 +31,7 @@ sh native-sync/tests/check-core.sh
 sh tools/build-runtime.sh /tmp/scdn-plugin-nginx nginx
 python native-sync/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
   --report /tmp/scdn-sync-nginx-results.json
+python native-sync/tests/cache_tasks.py --prefix /tmp/scdn-plugin-nginx
 python native-edge/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
   --report /tmp/scdn-plugin-nginx-results.json
 python native-api/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
@@ -87,7 +90,7 @@ load_module modules/ngx_http_scdn_edge_module.so;
 
 相对 `modules/` 路径按 Nginx 的运行前缀解析；系统发行包的模块目录可能不同，可以改用绝对路径。出现 `module is not binary compatible`、`module version ... instead of ...` 时重新按目标构建，不应忽略检查。配置/模块程序更新仍遵循 Nginx 的重载或重启流程；只有站点数据在加载后支持无 Worker 重建更新。
 
-Sync 仅加载但不设置 role 时保持 off。启用它应使用独立路径、控制 token、Socket 和明确的 mTLS 节点登记；其默认关闭与只读能力不改变站点文件的权威发布者。静态构建的 Sync 测试同样增加 `--static`，完整接入步骤见 [Sync 迁移](SYNC-MIGRATION.zh-CN.md)。
+Sync 仅加载但不设置 role 时保持 off。启用它应使用独立路径、控制 token、Socket 和明确的 mTLS 节点登记；其默认关闭与独立缓存任务能力不改变站点文件的权威发布者。静态构建的 Sync 测试同样增加 `--static`，完整接入步骤见 [Sync 迁移](SYNC-MIGRATION.zh-CN.md)。
 
 ## 4. 创建数据目录与服务账户
 

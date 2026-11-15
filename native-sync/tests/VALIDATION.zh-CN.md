@@ -1,6 +1,12 @@
-# 原生 Sync 0.1.0 验证记录
+# 原生 Sync 验证记录
 
-## OpenResty_Plugin 迁入验证
+## 0.2.0 缓存任务验证入口
+
+新增 `cache_tasks.py` 在真实 Master/Node、临时 mTLS、原生 Purge、HTTP/HTTPS 缓存及临时源站之间验证任务全链路：落盘/重启、ACK 丢失后的收据重报、队列容量、节点/缓存 scope、租约耗尽、匹配清理、预热 HIT、无凭据默认表示、拒绝重定向/私有响应、并发创建和 Worker PID 保持。当前结果见 [总验证记录](../../docs/VALIDATION.zh-CN.md)。
+
+此前 0.1.0 的迁入结果保留如下；0.2.0 已修改角色模块、头文件和 config，新增任务源码，不再与来源提交逐字节相同。
+
+## 0.1.0 历史迁入验证
 
 日期：2026-11-14。本仓库统一构建包含 Sync、Config、API、Edge、Purge 五个模块，Sync 的 config/核心 C/模块 C/头文件与来源提交 62fb619 保持一致。测试入口、动态/静态支持、启动就绪与诊断接入当前仓库。
 
@@ -30,4 +36,4 @@
 
 本地 Alpine 工具链未提供 ASan 运行库，因此本地未宣称 ASan 通过。GitHub Actions 在 Ubuntu 上配置 AddressSanitizer 与 UndefinedBehaviorSanitizer 的核心检查，以及 nginx/OpenResty 两种构建；远程结果以对应提交的 Actions 记录为准。
 
-本记录不证明加密分发、Node 拉取、应用事务或业务健康检查已经迁移，也不证明生产容量、ARM64、HTTP/3 或所有目标 OpenResty 构建的 ABI 兼容。部署产物需按目标构建重新生成。
+历史迁入记录不证明配置快照加密分发、Node 拉取、应用事务或业务健康检查已经迁移，也不证明生产容量、ARM64、HTTP/3 或所有目标 OpenResty 构建的 ABI 兼容。部署产物需按目标构建重新生成。

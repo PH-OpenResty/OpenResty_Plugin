@@ -2,7 +2,7 @@
 #include <ngx_core.h>
 #include <ngx_http.h>
 
-#include "scdn_sync_core.h"
+#include "scdn_sync_module.h"
 
 #if (NGX_HTTP_SSL)
 #include <ngx_http_ssl_module.h>
@@ -11,28 +11,6 @@
 #define SCDN_API_OFF       0
 #define SCDN_API_CONTROL   1
 #define SCDN_API_EXCHANGE  2
-
-typedef struct {
-    ngx_str_t id;
-    ngx_str_t scope;
-    u_char fingerprint[32];
-} ngx_http_scdn_peer_t;
-
-typedef struct {
-    ngx_http_conf_ctx_t *context;
-    ngx_uint_t mode;
-} ngx_http_scdn_endpoint_t;
-
-typedef struct {
-    scdn_sync_role_t role;
-    ngx_flag_t role_set;
-    ngx_str_t id;
-    ngx_str_t scope;
-    ngx_str_t token_file;
-    ngx_str_t token;
-    ngx_array_t peers;
-    ngx_array_t endpoints;
-} ngx_http_scdn_main_conf_t;
 
 typedef struct {
     ngx_uint_t mode;
@@ -68,6 +46,22 @@ static ngx_command_t ngx_http_scdn_commands[] = {
       ngx_http_scdn_peer, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
     { ngx_string("scdn_sync_api"), NGX_HTTP_LOC_CONF|NGX_CONF_TAKE1,
       ngx_http_scdn_api, NGX_HTTP_LOC_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_cache_tasks"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      scdn_sync_tasks_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_cache_master"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      scdn_sync_tasks_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_cache_mtls"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE3,
+      scdn_sync_tasks_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_cache_purge"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE3,
+      scdn_sync_tasks_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_cache_site"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE2,
+      scdn_sync_tasks_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_cache_local_ca"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      scdn_sync_tasks_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_cache_poll"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      scdn_sync_tasks_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_cache_allow_all"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      scdn_sync_tasks_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
     ngx_null_command
 };
 
@@ -87,7 +81,7 @@ ngx_module_t ngx_http_scdn_sync_module = {
     &ngx_http_scdn_context,
     ngx_http_scdn_commands,
     NGX_HTTP_MODULE,
-    NULL, NULL, NULL, NULL, NULL, NULL, NULL,
+    NULL, NULL, scdn_sync_tasks_process, NULL, NULL, NULL, NULL,
     NGX_MODULE_V1_PADDING
 };
 
@@ -230,8 +224,8 @@ ngx_http_scdn_clear_token(void *data)
     scdn_sync_clear(token->data, token->len);
 }
 
-static ngx_int_t
-ngx_http_scdn_load_token(ngx_conf_t *cf, ngx_http_scdn_main_conf_t *conf)
+ngx_int_t
+scdn_sync_load_token(ngx_conf_t *cf, ngx_str_t *path, ngx_str_t *token)
 {
     int fd, flags;
     ssize_t count;
@@ -240,7 +234,7 @@ ngx_http_scdn_load_token(ngx_conf_t *cf, ngx_http_scdn_main_conf_t *conf)
     struct stat info;
     ngx_pool_cleanup_t *cleanup;
 
-    if (conf->token_file.len == 0 || conf->token_file.data[0] != '/') {
+    if (path->len == 0 || path->data[0] != '/') {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, 0,
                           "scdn_sync control requires an absolute token file");
         return NGX_ERROR;
@@ -252,7 +246,7 @@ ngx_http_scdn_load_token(ngx_conf_t *cf, ngx_http_scdn_main_conf_t *conf)
 #ifdef O_CLOEXEC
     flags |= O_CLOEXEC;
 #endif
-    fd = open((char *) conf->token_file.data, flags);
+    fd = open((char *) path->data, flags);
     if (fd == -1) {
         ngx_conf_log_error(NGX_LOG_EMERG, cf, ngx_errno,
                           "scdn_sync cannot open the control token file");
@@ -296,16 +290,16 @@ ngx_http_scdn_load_token(ngx_conf_t *cf, ngx_http_scdn_main_conf_t *conf)
             "scdn_sync token must contain 43 to 128 base64url characters");
         return NGX_ERROR;
     }
-    conf->token.data = ngx_pnalloc(cf->pool, length);
+    token->data = ngx_pnalloc(cf->pool, length);
     cleanup = ngx_pool_cleanup_add(cf->pool, 0);
-    if (conf->token.data == NULL || cleanup == NULL) {
+    if (token->data == NULL || cleanup == NULL) {
         scdn_sync_clear(bytes, sizeof(bytes));
         return NGX_ERROR;
     }
-    conf->token.len = length;
-    ngx_memcpy(conf->token.data, bytes, length);
+    token->len = length;
+    ngx_memcpy(token->data, bytes, length);
     scdn_sync_clear(bytes, sizeof(bytes));
-    cleanup->data = &conf->token;
+    cleanup->data = token;
     cleanup->handler = ngx_http_scdn_clear_token;
     return NGX_OK;
 }
@@ -323,6 +317,9 @@ ngx_http_scdn_configure(ngx_conf_t *cf)
 #endif
 
     conf = ngx_http_conf_get_module_main_conf(cf, ngx_http_scdn_sync_module);
+    if (scdn_sync_tasks_configure(cf, conf) != NGX_OK) {
+        return NGX_ERROR;
+    }
     if (conf->role == SCDN_SYNC_OFF) {
         if (conf->endpoints.nelts != 0 || conf->peers.nelts != 0
             || conf->id.data != NULL || conf->scope.data != NULL
@@ -386,7 +383,7 @@ ngx_http_scdn_configure(ngx_conf_t *cf)
 #endif
     }
     if (control) {
-        return ngx_http_scdn_load_token(cf, conf);
+        return scdn_sync_load_token(cf, &conf->token_file, &conf->token);
     }
     return NGX_OK;
 }
@@ -437,7 +434,7 @@ ngx_http_scdn_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v,
     return NGX_OK;
 }
 
-static ngx_int_t
+ngx_int_t
 ngx_http_scdn_header(ngx_http_request_t *r, const char *key, const char *value)
 {
     ngx_table_elt_t *header;
@@ -454,7 +451,7 @@ ngx_http_scdn_header(ngx_http_request_t *r, const char *key, const char *value)
     return NGX_OK;
 }
 
-static ngx_int_t
+ngx_int_t
 ngx_http_scdn_reply(ngx_http_request_t *r, ngx_uint_t status, ngx_str_t *body)
 {
     ngx_buf_t *buffer;
@@ -472,14 +469,16 @@ ngx_http_scdn_reply(ngx_http_request_t *r, ngx_uint_t status, ngx_str_t *body)
     }
     buffer->pos = body->data;
     buffer->last = body->data + body->len;
-    buffer->memory = 1;
+    buffer->memory = body->len != 0;
     buffer->last_buf = (r == r->main);
     buffer->last_in_chain = 1;
     chain.buf = buffer;
     chain.next = NULL;
     r->headers_out.status = status;
     r->headers_out.content_length_n = body->len;
-    ngx_str_set(&r->headers_out.content_type, "application/json");
+    if (r->headers_out.content_type.len == 0) {
+        ngx_str_set(&r->headers_out.content_type, "application/json");
+    }
     r->headers_out.content_type_len = r->headers_out.content_type.len;
     rc = ngx_http_send_header(r);
     if (rc == NGX_ERROR || rc > NGX_OK || r->header_only) {
@@ -488,7 +487,7 @@ ngx_http_scdn_reply(ngx_http_request_t *r, ngx_uint_t status, ngx_str_t *body)
     return ngx_http_output_filter(r, &chain);
 }
 
-static ngx_int_t
+ngx_int_t
 ngx_http_scdn_error(ngx_http_request_t *r, ngx_uint_t status, const char *code)
 {
     ngx_str_t body;
@@ -596,9 +595,13 @@ ngx_http_scdn_capabilities(ngx_http_request_t *r,
         "\"features\":{\"role_isolation\":true,\"authenticated_control\":true,"
         "\"mtls_peer_registry\":%s,\"encrypted_distribution\":false,"
         "\"node_pull\":false,\"apply_transactions\":false,"
-        "\"business_health\":false}",
+        "\"business_health\":false,\"cache_tasks\":%s,"
+        "\"cache_refresh\":%s,\"cache_preheat\":%s}",
         scdn_sync_role_name(conf->role), &conf->id,
-        conf->role == SCDN_SYNC_MASTER ? "true" : "false");
+        conf->role == SCDN_SYNC_MASTER ? "true" : "false",
+        conf->cache.directory.len ? "true" : "false",
+        conf->cache.directory.len ? "true" : "false",
+        conf->cache.directory.len ? "true" : "false");
     if (peer != NULL) {
         end = ngx_snprintf(end, body.data + 1536 - end,
             ",\"peer\":{\"node_id\":\"%V\",\"scope_id\":\"%V\"}",
@@ -709,6 +712,11 @@ ngx_http_scdn_handler(ngx_http_request_t *r)
         if (peer == NULL) {
             return ngx_http_scdn_error(r, NGX_HTTP_FORBIDDEN, "node_forbidden");
         }
+    }
+    rc = scdn_sync_tasks_handler(r, conf, peer,
+                                location->mode == SCDN_API_EXCHANGE);
+    if (rc != NGX_DECLINED) {
+        return rc;
     }
     if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD))) {
         r->keepalive = 0;

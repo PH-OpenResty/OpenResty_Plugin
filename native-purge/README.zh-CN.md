@@ -75,7 +75,7 @@ token 用密码学随机源生成，放在仓库之外，仅所有者有权限�
 
 端点同时要求真实 Unix/loopback 连接和 `Authorization: Bearer ...`。这个 token 是整实例的可信管理权限，不是按租户授权系统。请求使用 `Content-Type: text/plain`，固定 Content-Length，不接受 chunked、非空查询参数或子请求。
 
-模式通过 `X-SCDN-Purge-Mode` 指定；scope 通过 `X-SCDN-Purge-Scope` 指定。精确/前缀 body 每行一个目标，最后一行 LF 可有可无；不接受空行、CRLF 或原始控制字符。最多 256 行、每项 4096 字节、总 body 最多 1MiB。UTF-8/百分号编码按实际字节比较，不做 URL 解码或查询参数重排。
+模式通过 `X-Purge-Mode` 指定；scope 通过 `X-Purge-Scope` 指定。精确/前缀 body 每行一个目标，最后一行 LF 可有可无；不接受空行、CRLF 或原始控制字符。最多 256 行、每项 4096 字节、总 body 最多 1MiB。UTF-8/百分号编码按实际字节比较，不做 URL 解码或查询参数重排。
 
 | mode | scope | body | 作用 |
 | --- | --- | --- | --- |
@@ -106,21 +106,21 @@ umask 077
 printf '/assets/a.css?x=1\n/assets/b.js\n' > /tmp/purge-keys.txt
 curl --config /etc/scdn-purge/control.curl.conf \
   --unix-socket /run/scdn-purge/control.sock http://localhost/purge \
-  -H 'Content-Type: text/plain' -H 'X-SCDN-Purge-Mode: exact' \
-  -H 'X-SCDN-Purge-Scope: http|www.example.com' --data-binary @/tmp/purge-keys.txt
+  -H 'Content-Type: text/plain' -H 'X-Purge-Mode: exact' \
+  -H 'X-Purge-Scope: http|www.example.com' --data-binary @/tmp/purge-keys.txt
 
 # 前缀清理。
 printf '/assets/\n' > /tmp/purge-prefixes.txt
 curl --config /etc/scdn-purge/control.curl.conf \
   --unix-socket /run/scdn-purge/control.sock http://localhost/purge \
-  -H 'Content-Type: text/plain' -H 'X-SCDN-Purge-Mode: prefix' \
-  -H 'X-SCDN-Purge-Scope: http|www.example.com' --data-binary @/tmp/purge-prefixes.txt
+  -H 'Content-Type: text/plain' -H 'X-Purge-Mode: prefix' \
+  -H 'X-Purge-Scope: http|www.example.com' --data-binary @/tmp/purge-prefixes.txt
 
 # 整站，body 为空。
 curl --config /etc/scdn-purge/control.curl.conf \
   --unix-socket /run/scdn-purge/control.sock http://localhost/purge \
-  -H 'Content-Type: text/plain' -H 'X-SCDN-Purge-Mode: scope' \
-  -H 'X-SCDN-Purge-Scope: http|www.example.com' --data-binary ''
+  -H 'Content-Type: text/plain' -H 'X-Purge-Mode: scope' \
+  -H 'X-Purge-Scope: http|www.example.com' --data-binary ''
 ```
 
 成功响应为 `ok=true`、sequence、operations、`durable=true`、`physical_deleted=false`。operations 是输入操作数量，不是删除文件数量。队列不可用或 I/O 错误返回 503，元数据/前缀容量不足返回 507；错误响应不会包含原始资源和 token。
@@ -201,3 +201,9 @@ location /assets/ {
 空闲资源不轮询；inactive/max_size 可先回收旧文件，所以 stale 不是持久保留承诺。不要把浏览器缓存或其他未接入模块的 CDN 当作已更新。关闭再校验会恢复原始版本键，关闭前应显式做相关 scope/all 失效，避免重新命中启用前的长 TTL 对象。新增正则/通配符等日志记录需要本版本恢复，降级前保留一致的缓存和 journal 备份。
 
 status 新增 `worker_revalidate`：probes、not_modified、fetched、failures、suppressed、cooldown_evictions、invalidated、invalidate_failed，均为回答请求的 Worker 局部计数。fetched 表示完成的 200 缓存更新；failures 包括无法缓存、撤回和回源错误等未完成缓存更新的尝试，不是单纯网络错误计数。测试见 [revalidate.py](tests/revalidate.py) 与 [patterns.py](tests/patterns.py)。新功能不依赖 Lua、不增加 WAF 或业务限速，也不提供跨节点传播。
+
+## HTTP 头与缓存任务联动
+
+自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.2.0 的缓存刷新/预热任务及原生配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。
+
+0.3.0 将控制头改为无产品前缀的名称，不接受旧名别名；与 Sync 缓存任务联动时使用独立的 Purge token 和 Unix Socket。

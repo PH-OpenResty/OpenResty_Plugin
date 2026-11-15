@@ -1,10 +1,14 @@
-# 原生 Sync 模块：Master / Node 角色与身份基础
+# 原生 Sync 模块：Master / Node 身份与缓存任务
 
-版本：0.1.0。当前交付为可编译、加载的 `ngx_http_scdn_sync_module.so`，不依赖 Lua。实现实例级角色、配置约束、本机控制鉴权、Master 的 mTLS 节点登记与能力发现。
+版本：0.2.0。当前交付为可编译、加载的 `ngx_http_scdn_sync_module.so`，不依赖 Lua。实现实例级角色、配置约束、本机控制鉴权、Master 的 mTLS 节点登记与能力发现。
 
 本目录是 `OpenResty_Plugin` 的原生 Sync 入口。实现来源及校验摘要见 [SOURCE](../SOURCE.md)，安装、角色示例、测试和迁移说明均在本仓库内；完整 Lua 同步仍由外部部署保留。
 
-**这一版尚未迁移加密发布、Node 拉取、配置应用事务和持久化。** 能力接口将这些项目明确返回 `false`；状态为 `not_started`，`applied_revision=null`、`business_health=unknown`。旧 Lua Sync 仍承担完整同步，不要用本模块替换正在运行的同步服务。
+**这一版尚未迁移配置快照的加密发布、Node 拉取、配置应用事务及其持久化。** 能力接口将这些项目明确返回 `false`；状态为 `not_started`，`applied_revision=null`、`business_health=unknown`。旧 Lua Sync 仍承担完整同步，不要用本模块替换正在运行的同步服务。
+
+## 缓存刷新与预热
+
+0.2.0 提供 Master 持久队列、Node 原生后台 mTLS 拉取、Purge 刷新、验证 HIT 的本机预热及结果回报。该功能默认关闭，独立于仍未迁移的配置同步；启用后能力位 `cache_tasks/cache_refresh/cache_preheat=true`，未启用时为 false。完整指令、接口、恢复语义与示例见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。自定义 HTTP 头见 [统一约定](../docs/HTTP-HEADERS.zh-CN.md)。
 
 ## Master 与 Node
 
@@ -36,7 +40,7 @@ Node 使用 `scdn_sync_role node`，配置自己的 ID 与 `scdn_sync_scope edge
 
 在选定 location 中配置 `scdn_sync_api control` 或 `scdn_sync_api exchange`；不能与另一个 content handler 组合。完整示例见 [Master](examples/master.nginx.conf) 与 [Node](examples/node.nginx.conf)。示例不包含实际凭据；Master 节点登记默认为空，所有远程节点访问均被拒绝。
 
-示例使用独立的 `/etc/scdn-sync-native`、`/run/scdn-sync-native-master` 和 `/run/scdn-sync-native-node` 路径。Master 8443 是示意端口；不要让这些只读原生 location 替换旧 Lua Sync 正在使用的 desired/objects/reports 或本机事务入口。
+示例使用独立的 `/etc/scdn-sync-native`、`/run/scdn-sync-native-master` 和 `/run/scdn-sync-native-node` 路径。Master 8443 是示意端口；不要让这些原生角色 location 替换旧 Lua Sync 正在使用的 desired/objects/reports 或本机事务入口。
 
 token 文件要求绝对路径、普通文件、无组/其他用户权限，不接受叶路径符号链接；内容为 43～128 个 base64url 字符，可附一行 LF/CRLF。部署时使用受限父目录和正确文件所有者，并由密码学安全随机源生成。配置检查和 reload 时读取，运行中替换文件需 reload 才生效。日志不记录 token 内容，控制 location 建议关闭访问日志。
 
@@ -51,7 +55,7 @@ token 文件要求绝对路径、普通文件、无组/其他用户权限，不�
 
 control 同时要求真实传输连接来自 Unix Socket 或 loopback，并验证 `Authorization: Bearer ...`。检查不依赖客户端提供的转发头。exchange 要求配置 `ssl_verify_client on`，运行中还核对实际 TLS 客户端证书验证结果及登记的 SHA-256；token 或自报 Node ID 不授予 exchange 权限。
 
-拒绝查询参数、编码后的 API 路径、GET body 与修改方法。响应为 JSON、`Cache-Control: no-store`。未实现的 desired、objects、reports、heartbeat、stage、commit 等操作不会返回成功；后续迁移按能力位逐项开放。此处的 bearer 控制接口是原生组件新接口，不能宣称与旧 Lua 控制 token 请求头已经兼容。
+角色查询拒绝查询参数、编码后的 API 路径、GET body 与修改方法；缓存任务按独立的 POST/GET/DELETE 合同开放。响应为 JSON、`Cache-Control: no-store`。未实现的 desired、objects、reports、heartbeat、stage、commit 等操作不会返回成功；后续迁移按能力位逐项开放。此处的 bearer 控制接口是原生组件新接口，不能宣称与旧 Lua 控制 token 请求头已经兼容。
 
 本机调用可把凭据保存在 0600 的 curl 配置文件，使用 `curl --config /etc/scdn-sync-native/master/control.curl.conf --unix-socket /run/scdn-sync-native-master/control.sock http://localhost/__scdn_sync/v1/status`。配置文件内容为私有的 `header = "Authorization: Bearer <private-token>"`，不把实际 token 写入脚本、Git 或命令行。Node 相应替换目录与 Socket 路径。
 
@@ -72,6 +76,7 @@ python native-sync/tests/integration.py --prefix /tmp/scdn-native-openresty
 # Also prove the module works without Lua, using the bundle's nginx core.
 sh tools/build-runtime.sh /tmp/scdn-native-nginx nginx
 python native-sync/tests/integration.py --prefix /tmp/scdn-native-nginx
+python native-sync/tests/cache_tasks.py --prefix /tmp/scdn-native-nginx
 
 # Static OpenResty includes all five modules; remove load_module directives.
 sh tools/build-runtime.sh /tmp/scdn-native-static openresty static
@@ -82,7 +87,7 @@ python native-api/tests/integration.py --prefix /tmp/scdn-native-openresty \
   --purge --sync --report /tmp/scdn-five-modules.json
 ```
 
-构建脚本固定 OpenResty 1.31.8.1 并校验归档 SHA-256；拒绝覆盖已有安装。系统需要 C 编译器、make、Perl、PCRE2/OpenSSL/zlib 开发包和 curl。进程测试需要 Python `cryptography`，复用仓库现有测试依赖。
+构建脚本固定 OpenResty 1.31.8.1 并校验归档 SHA-256；拒绝覆盖已有安装。系统需要 C 编译器、make、Perl、PCRE2/OpenSSL/zlib 开发包、libcurl 开发包（7.85+）和 curl。进程测试需要 Python `cryptography`，复用仓库现有测试依赖。
 
 `native-sync/tests/build-runtime.sh` 保留为统一构建入口的兼容包装器，支持相同的 runtime/linkage 参数。测试 `--module` 可指定另一个动态产物，不能与 `--static` 同用。Sanitizer 使用仓库公共 [tests/asan.supp](../tests/asan.supp)，只排除 Nginx 生成注册表的既有 ODR 报告。
 
@@ -92,4 +97,4 @@ python native-api/tests/integration.py --prefix /tmp/scdn-native-openresty \
 
 ## 后续实现边界
 
-加密封装与请求签名、发布分发、Node 拉取、事务准备/提交/回退和持久恢复仍需分阶段迁移。完整合同与完成标准见 [Sync 路线及缺口](../docs/SYNC-ROADMAP.zh-CN.md)，旧服务的保留与独立接入步骤见 [Sync 迁移说明](../docs/SYNC-MIGRATION.zh-CN.md)。Config 的本机 watcher、API 的业务协议识别和 Purge 的私有 journal 各自独立，不是 Sync 传输或事务已经完成的证明。
+配置快照的加密封装与请求签名、发布分发、Node 拉取、事务准备/提交/回退和持久恢复仍需分阶段迁移。完整合同与完成标准见 [Sync 路线及缺口](../docs/SYNC-ROADMAP.zh-CN.md)，旧服务的保留与独立接入步骤见 [Sync 迁移说明](../docs/SYNC-MIGRATION.zh-CN.md)。Config 的本机 watcher、API 的业务协议识别和 Purge 的私有 journal 各自独立，不是配置快照传输或应用事务已经完成的证明。

@@ -598,7 +598,7 @@ static void complete(ngx_event_t *event)
 static void body_ready(ngx_http_request_t *r)
 {
     scdn_purge_main_t *main=ngx_http_get_module_main_conf(r,ngx_http_scdn_purge_module);
-    ngx_str_t *mode=find_header(r,"X-SCDN-Purge-Mode"),*scope=find_header(r,"X-SCDN-Purge-Scope");
+    ngx_str_t *mode=find_header(r,"X-Purge-Mode"),*scope=find_header(r,"X-Purge-Scope");
     ngx_thread_task_t *task;
     scdn_purge_job_t *job;
     ngx_chain_t *chain;

@@ -211,8 +211,8 @@ http {{
         connection.sock.connect(str(self.control_socket))
         headers={'Content-Type':'text/plain'}
         if token:headers['Authorization']='Bearer '+self.token
-        if mode:headers['X-SCDN-Purge-Mode']=mode
-        if scope is not None:headers['X-SCDN-Purge-Scope']=scope
+        if mode:headers['X-Purge-Mode']=mode
+        if scope is not None:headers['X-Purge-Scope']=scope
         if extra:headers.update(extra)
         body=('\n'.join(keys)+'\n').encode() if keys is not None else b''
         try:
@@ -388,7 +388,7 @@ http {{
         connection=socket.socket(socket.AF_UNIX);connection.connect(str(self.control_socket))
         body=b'/disconnect\n'
         message=(f'POST /purge HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer {self.token}\r\n'
-                 f'X-SCDN-Purge-Mode: exact\r\nX-SCDN-Purge-Scope: one\r\nContent-Type: text/plain\r\n'
+                 f'X-Purge-Mode: exact\r\nX-Purge-Scope: one\r\nContent-Type: text/plain\r\n'
                  f'Content-Length: {len(body)}\r\n\r\n').encode()+body
         connection.sendall(message);connection.close();time.sleep(0.1)
         self.check('client disconnect cannot invalidate the job lifetime',self.control('exact',keys=['/after-disconnect'])[0]==200)

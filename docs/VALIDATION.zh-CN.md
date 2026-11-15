@@ -2,11 +2,33 @@
 
 统一构建和 CI 包含 Sync、Config、API、Edge、Purge 五个插件。Sync 角色/身份见 [Sync 验证](../native-sync/tests/VALIDATION.zh-CN.md)，Purge 见 [清理模块验证](../native-purge/tests/VALIDATION.zh-CN.md)和[基准报告](../native-purge/bench/README.zh-CN.md)。本页保留历史基线，并单独记录当前整合结果。
 
-## Sync 迁入后的五模块验证
+## Sync 0.2.0 缓存任务与 HTTP 头更新
 
-Sync 的来源实现不改动，独立测试补齐静态编入和当前启动就绪/错误诊断。API 组合套件增加 `--purge --sync`：实际启用五个模块，使用不同 Sync/Purge token，检查 Node 身份、不冒报远程 applied、准确能力位及原有代理、缓存和流式行为。结构化结果见 [validation-sync-import-20261114.json](validation-sync-import-20261114.json)。
+本地日期：2026-11-15，隔离 WSL2/Alpine x86_64。Nginx 动态、OpenResty 动态、OpenResty 静态各通过 475 项进程检查：
 
-当前三种构建为 Nginx 动态、OpenResty 动态和 OpenResty 静态。每种执行启动 6 项、Sync 50 项、Config/Edge 47 项、API 43 项、五模块组合 49 项、Purge 70 项、模式 64 项、再验证 45 项，共 374 项；纯 C 核心另行执行。它们验证角色/身份和共存，不证明 JWE/JWS、Node 拉取或事务已经原生化。CI 报告按套件分别上传，不包含运行目录和密钥。
+| 套件 | 每种构建通过数 |
+| --- | ---: |
+| Worker 启动 | 6 |
+| Sync 角色、鉴权及 mTLS | 50 |
+| Master/Node 缓存任务及公开配置片段 | 99 |
+| Config/Edge | 47 |
+| API 及客户端 IP 头覆盖 | 44 |
+| 五模块组合 | 50 |
+| Purge | 70 |
+| 匹配失效 | 64 |
+| 源站校验与 stale | 45 |
+
+结构化结果见 [validation-cache-tasks-20261115.json](validation-cache-tasks-20261115.json)。缓存任务覆盖真实落盘、Master/Node 重启、ACK 丢失、租约耗尽、登记 scope 变化、并发幂等、128 项队列容量、各清理模式、HTTP/HTTPS 预热、HIT 验证和 Worker PID 保持；API/任务代理验证 `X-Clinet-IP` 被连接地址覆盖。任务始终以至少一次执行表述，不把重启测试当作任意掉电或 exactly-once 的证明。
+
+纯 C 核心严格 C99 和 UBSan trap 通过；24 个当前实现文件摘要、相对 Markdown 链接/围栏、脚本语法、实际索引公开检查及 Gitleaks 工作树/历史扫描通过。本地没有宣称 ASan；Actions 的 Nginx 任务保留 ASan/UBSan，新缓存任务套件已加入全部三种构建，最终结果以对应提交的检查为准。
+
+这些是功能验证，不证明生产吞吐、跨地域网络故障、完整磁盘故障矩阵或配置快照同步已原生化。配置快照仍按 [Sync 路线图](SYNC-ROADMAP.zh-CN.md)迁移，缓存任务合同见 [任务手册](CACHE-TASKS.zh-CN.md)。
+
+## Sync 0.1.0 迁入后的五模块验证（历史）
+
+该次迁入的 Sync 来源实现不改动，独立测试补齐静态编入和当前启动就绪/错误诊断。API 组合套件增加 `--purge --sync`：实际启用五个模块，使用不同 Sync/Purge token，检查 Node 身份、不冒报远程 applied、准确能力位及原有代理、缓存和流式行为。结构化结果见 [validation-sync-import-20261114.json](validation-sync-import-20261114.json)。
+
+该次三种构建为 Nginx 动态、OpenResty 动态和 OpenResty 静态。每种执行启动 6 项、Sync 50 项、Config/Edge 47 项、API 43 项、五模块组合 49 项、Purge 70 项、模式 64 项、再验证 45 项，共 374 项；纯 C 核心另行执行。它们验证角色/身份和共存，不证明 JWE/JWS、Node 拉取或事务已经原生化。CI 报告按套件分别上传，不包含运行目录和密钥。
 
 ## API 合入时的四模块验证（历史）
 
@@ -96,7 +118,7 @@ CI 的 nginx 构建为运行时和五个动态模块启用 `-fsanitize=address,u
 
 [tests/asan.supp](../tests/asan.supp)仅排除 Nginx 按 dlsym 设计同时从可执行文件与动态模块导出的 `ngx_modules`、`ngx_module_names`、`ngx_module_order` 注册表 ODR 报告，不排除模块缓冲区、释放后访问或其他全局数据诊断。
 
-既有本地 UBSan trap 调试发现上游 Nginx 缓存对缺失 ETag 使用 `memcpy(NULL, 0)` 的检查触发点。测试源站提供正常 ETag，插件没有修改该核心路径；不能把当前语料通过描述为 Nginx 全部缓存路径都已通过 UBSan。
+既有本地 UBSan trap 调试发现上游 Nginx 缓存对缺失 ETag 使用 `memcpy(NULL, 0)` 的检查触发点。测试源站对正常 200 响应提供 ETag；新增缓存任务负例的 302/503 和私有响应明确声明 no-store。Nginx 会主动清空非 200/206 缓存响应的内部 ETag，因此只补响应 ETag 不能避免这些负例进入该路径。失败预热断言及 sanitizer 诊断检查继续保留，插件没有修改该核心路径；不能把当前语料通过描述为 Nginx 全部缓存路径都已通过 UBSan。
 
 ## Worker 启动时差回归
 
@@ -106,7 +128,7 @@ Config/Edge 和 Purge 测试夹具现在都等待实际的两个 Worker（最多
 
 [worker_startup.py](../tests/worker_startup.py) 增加 6 项真实进程检查：测试专用 fork 夹具暂停第二个子进程，证明首个 HTTP 响应早于全部 Worker 就绪；验证有限等待、释放后返回完整集合、崩溃重建仍失败，以及 master 退出时立即失败。夹具只在临时目录编译并通过 LD_PRELOAD 注入，不链接进生产模块。两种运行时均执行这组检查；Nginx CI 仍启用 ASan/UBSan，未增加诊断抑制或失败重试。
 
-该次启动修复的基线每种运行时共 232 项：6 项启动回归、47 项 Config/Edge、70 项原有 Purge、64 项模式、45 项源站/stale。当前五模块完整矩阵为本页顶部的 374 项。失败诊断与报告仍保留，报告不包含 token、证书或 journal。
+该次启动修复的基线每种运行时共 232 项：6 项启动回归、47 项 Config/Edge、70 项原有 Purge、64 项模式、45 项源站/stale。迁入时的五模块完整矩阵为上面的 374 项。失败诊断与报告仍保留，报告不包含 token、证书或 journal。
 
 ## 文档与发布验证
 
@@ -114,4 +136,4 @@ Config/Edge 和 Purge 测试夹具现在都等待实际的两个 Worker（最多
 
 ## 未验证范围
 
-当前不证明生产吞吐/容量上限、长时间压力与磁盘故障、ARM64、所有非 root/systemd 组合、HTTP/2/HTTP/3 全部行为、会话恢复/撤销政策或任意目标构建的 ABI。ready 不是业务健康结果，插件也没有实现远程 Master→Node 协议或完整高可用控制面。
+当前不证明生产吞吐/容量上限、长时间压力与磁盘故障、ARM64、所有非 root/systemd 组合、HTTP/2/HTTP/3 全部行为、会话恢复/撤销政策或任意目标构建的 ABI。ready 不是业务健康结果，配置快照的远程同步与完整高可用控制面仍未原生实现；缓存任务有单独的原生 Master→Node 通道。

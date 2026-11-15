@@ -12,9 +12,9 @@
 sha256sum -c SOURCE-SHA256SUMS
 ```
 
-项目沿用目标仓库已有的 [Apache License 2.0](LICENSE)。没有将 Lua 运行库、Nginx、OpenResty 或 OpenSSL 源码打包进仓库。构建时使用的 Nginx/OpenResty、OpenSSL、PCRE2、zlib 和测试用 Python 包各自适用其上游许可证。
+项目沿用目标仓库已有的 [Apache License 2.0](LICENSE)。没有将 Lua 运行库、Nginx、OpenResty 或 OpenSSL 源码打包进仓库。构建时使用的 Nginx/OpenResty、OpenSSL、PCRE2、zlib、libcurl 和测试用 Python 包各自适用其上游许可证。
 
-`native-sync` 从同一来源提交 `62fb61947f4c6d10eca468b7b66979009957de55` 的 `native-sync/` 提取。[角色模块、公共核心、头文件和 config](https://github.com/PH-OpenResty/OpenResty_Lua/tree/62fb61947f4c6d10eca468b7b66979009957de55/native-sync)逐字节保留；本仓库调整文档、通用路径、统一构建包装器与动态/静态测试接入。旧 Lua 仓库 PR #1 是来源记录，本仓库中的本地目录和手册是安装入口。
+`native-sync` 从同一来源提交 `62fb61947f4c6d10eca468b7b66979009957de55` 的 `native-sync/` 提取。[角色模块、公共核心、头文件和 config](https://github.com/PH-OpenResty/OpenResty_Lua/tree/62fb61947f4c6d10eca468b7b66979009957de55/native-sync)在最初导入时逐字节保留；0.2.0 增加本仓库原创的缓存任务实现及 libcurl 接入，角色模块、头文件和 config 已相应修改；本仓库调整文档、通用路径、统一构建包装器与动态/静态测试接入。旧 Lua 仓库 PR #1 是来源记录，本仓库中的本地目录和手册是安装入口。
 
 `native-purge` 是本仓库新增的原生实现，未从第三方清理模块复制代码。其缓存机制调研基于固定归档的 Nginx 文件缓存源码和公开文档，见 [调研报告](docs/CACHE-MECHANISM.zh-CN.md)。当前 SOURCE-SHA256SUMS 覆盖五个运行模块的 config、C 源码和头文件；它是当前实现的校验清单，不把后续修改冒充为最初导入内容。Ban 的设计契约另列在 native-ban，尚不属于运行模块。
 
