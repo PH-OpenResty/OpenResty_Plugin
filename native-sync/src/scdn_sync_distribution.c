@@ -713,8 +713,10 @@ static void api_complete(ngx_event_t *event)
         && body.data[body.len - 2] == '}')
     {
         body.len = ngx_snprintf(body.data + body.len - 2, 512,
-            ",\"role\":\"%s\",\"instance_id\":\"%V\",\"scope_id\":\"%V\"}\n",
-            scdn_sync_role_name(job->main->role), &job->main->id, &job->main->scope) - body.data;
+            ",\"role\":\"%s\",\"instance_id\":\"%V\",\"scope_id\":\"%V\","
+            "\"configured_peers\":%ui,\"worker_pid\":%P}\n",
+            scdn_sync_role_name(job->main->role), &job->main->id, &job->main->scope,
+            job->main->peers.nelts, ngx_pid) - body.data;
     }
     free(job->body);
     if (job->operation == 1) { ngx_str_set(&r->headers_out.content_type, "application/octet-stream"); }

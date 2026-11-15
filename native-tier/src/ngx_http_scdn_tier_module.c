@@ -341,6 +341,9 @@ static ngx_int_t variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, u
             if (fresh && same(*fresh, "1")) { ngx_str_set(&value, "1"); }
         }
     }
+    /* Core script copies a valid value even at length zero. An absent wire
+     * field must therefore carry a valid empty buffer, not a NULL pointer. */
+    if (!value.data) { ngx_str_set(&value, ""); }
     v->data = value.data; v->len = value.len; v->valid = 1; v->not_found = 0; v->no_cacheable = 1;
     return NGX_OK;
 }

@@ -48,14 +48,14 @@ token 文件要求绝对路径、普通文件、无组/其他用户权限，不�
 
 | 方法与路径 | 入口 | 权限与结果 |
 | --- | --- | --- |
-| `GET/HEAD /__scdn_sync/v1/status` | control | 实例角色、ID、scope、节点数量、当前未启动状态 |
+| `GET/HEAD /__scdn_sync/v1/status` | control | 实例角色、ID、scope；启用发布时返回实际序号/应用摘要/错误，未启用时为 not_started |
 | `GET/HEAD /__scdn_sync/v1/capabilities` | control | 原生版本、目标协议、已实现与未实现能力 |
 | `GET/HEAD /__scdn_sync/v1/peers` | Master control | 已登记节点与 scope，不返回指纹或凭据 |
 | `GET/HEAD /_scdn_sync/v1/capabilities` | Master exchange | 根据真实 mTLS 身份返回该 Node 的绑定与 Master 能力 |
 
 control 同时要求真实传输连接来自 Unix Socket 或 loopback，并验证 `Authorization: Bearer ...`。检查不依赖客户端提供的转发头。exchange 要求配置 `ssl_verify_client on`，运行中还核对实际 TLS 客户端证书验证结果及登记的 SHA-256；token 或自报 Node ID 不授予 exchange 权限。
 
-角色查询拒绝查询参数、编码后的 API 路径、GET body 与修改方法；缓存任务按独立的 POST/GET/DELETE 合同开放。响应为 JSON、`Cache-Control: no-store`。未实现的 desired、objects、reports、heartbeat、stage、commit 等操作不会返回成功；后续迁移按能力位逐项开放。此处的 bearer 控制接口是原生组件新接口，不能宣称与旧 Lua 控制 token 请求头已经兼容。
+角色查询拒绝查询参数、编码后的 API 路径、GET body 与修改方法；缓存任务按独立的 POST/GET/DELETE 合同开放。响应为 JSON、`Cache-Control: no-store`。原生发布使用独立的 config/desired、config/result 和 config/status，详见 [发布 API](../docs/SYNC-PUBLICATION.zh-CN.md)；旧 Lua desired/objects/reports/heartbeat/stage/commit 路由仍不兼容。配置对象响应为 application/octet-stream。此处的 bearer 控制接口是原生组件新接口，不能宣称与旧 Lua 控制 token 请求头已经兼容。
 
 本机调用可把凭据保存在 0600 的 curl 配置文件，使用 `curl --config /etc/scdn-sync-native/master/control.curl.conf --unix-socket /run/scdn-sync-native-master/control.sock http://localhost/__scdn_sync/v1/status`。配置文件内容为私有的 `header = "Authorization: Bearer <private-token>"`，不把实际 token 写入脚本、Git 或命令行。Node 相应替换目录与 Socket 路径。
 
