@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:scdn:ban:policy:v1:draft",
+  "title": "SCDN Ban v1 design policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "node_id", "agent_uid", "runtime_dir", "policy", "ipc", "instances", "trusted_rules", "capacity", "datapath", "services", "allowlist", "logs"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "node_id": {"type": "string", "format": "uuid"},
+    "agent_uid": {"type": "integer", "minimum": 1, "maximum": 4294967294},
+    "runtime_dir": {"$ref": "#/$defs/absolute_path"},
+    "policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["l7_seconds", "l3_seconds", "escalate_window_ms", "escalate_threshold", "count_l7_rejects", "renew_on_hit"],
+      "properties": {
+        "l7_seconds": {"type": "integer", "minimum": 1, "maximum": 2592000},
+        "l3_seconds": {"type": "integer", "minimum": 1, "maximum": 2592000},
+        "escalate_window_ms": {"type": "integer", "minimum": 100, "maximum": 3600000},
+        "escalate_threshold": {"type": "integer", "minimum": 2, "maximum": 1024},
+        "count_l7_rejects": {"const": true},
+        "renew_on_hit": {"const": false}
+      }
+    },
+    "ipc": {
+      "type": "object", "additionalProperties": false,
+      "required": ["event_socket", "admin_socket", "admin_uids", "event_gid", "queue_events_per_worker", "receipt_cache_per_producer", "max_event_age_ms", "frame_max_bytes"],
+      "properties": {
+        "event_socket": {"$ref": "#/$defs/absolute_path"},
+        "admin_socket": {"$ref": "#/$defs/absolute_path"},
+        "admin_uids": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"$ref": "#/$defs/uid"}},
+        "event_gid": {"$ref": "#/$defs/uid"},
+        "queue_events_per_worker": {"type": "integer", "minimum": 64, "maximum": 8192},
+        "receipt_cache_per_producer": {"type": "integer", "minimum": 128, "maximum": 16384},
+        "max_event_age_ms": {"type": "integer", "minimum": 1, "maximum": 10000},
+        "frame_max_bytes": {"const": 8192}
+      }
+    },
+    "instances": {
+      "type": "array", "minItems": 1, "maxItems": 32,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["id", "worker_uid"],
+        "properties": {"id": {"type": "string", "format": "uuid"}, "worker_uid": {"type": "integer", "minimum": 1, "maximum": 4294967294}}
+      }
+    },
+    "trusted_rules": {
+      "type": "array", "minItems": 1, "maxItems": 4096,
+      "items": {
+        "type": "object", "additionalProperties": false, "required": ["source", "id"],
+        "properties": {
+          "source": {"enum": ["waf_deny", "cc_confirmed"]},
+          "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_:.-]{0,63}$"}
+        }
+      }
+    },
+    "capacity": {
+      "type": "object", "additionalProperties": false,
+      "required": ["max_l7_bans", "max_l3_bans", "max_stats_ips", "request_dedup_entries", "max_producers", "view_max_bytes", "agent_memory_mib"],
+      "properties": {
+        "max_l7_bans": {"type": "integer", "minimum": 1024, "maximum": 1048576},
+        "max_l3_bans": {"type": "integer", "minimum": 1024, "maximum": 1048576},
+        "max_stats_ips": {"type": "integer", "minimum": 1024, "maximum": 1048576},
+        "request_dedup_entries": {"type": "integer", "minimum": 1024, "maximum": 4194304},
+        "max_producers": {"type": "integer", "minimum": 1, "maximum": 1024},
+        "view_max_bytes": {"type": "integer", "minimum": 1048576, "maximum": 2147483648},
+        "agent_memory_mib": {"type": "integer", "minimum": 32, "maximum": 8192}
+      }
+    },
+    "datapath": {
+      "type": "object", "additionalProperties": false,
+      "required": ["interfaces", "mode", "direction", "compatibility_fallback", "existing_program", "fragment_policy"],
+      "properties": {
+        "interfaces": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"type": "string", "pattern": "^[A-Za-z0-9_.:-]{1,15}$"}},
+        "mode": {"enum": ["xdp_native", "tcx_ingress"]},
+        "direction": {"const": "ingress"},
+        "compatibility_fallback": {"const": "disabled"},
+        "existing_program": {"const": "require_compatible_chain"},
+        "fragment_policy": {"const": "drop_banned_source_to_protected_vip"}
+      }
+    },
+    "services": {
+      "type": "array", "minItems": 1, "maxItems": 128,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["name", "addresses", "tcp_ports", "udp_ports"],
+        "properties": {
+          "name": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.-]{0,63}$"},
+          "addresses": {"type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": {"anyOf": [{"type": "string", "format": "ipv4"}, {"type": "string", "format": "ipv6"}]}},
+          "tcp_ports": {"$ref": "#/$defs/ports"},
+          "udp_ports": {"$ref": "#/$defs/ports"}
+        }
+      }
+    },
+    "allowlist": {
+      "type": "object", "additionalProperties": false, "required": ["exempt_ip_bans"],
+      "properties": {
+        "exempt_ip_bans": {"type": "array", "maxItems": 4096, "uniqueItems": true, "items": {"type": "string", "minLength": 3, "maxLength": 49, "pattern": "^[0-9A-Fa-f:.]+/[0-9]{1,3}$"}}
+      }
+    },
+    "logs": {
+      "type": "object", "additionalProperties": false,
+      "required": ["state_dir", "event_file", "ip_file", "flush_interval_ms", "rotate_bytes", "retention_days", "file_mode"],
+      "properties": {
+        "state_dir": {"$ref": "#/$defs/absolute_path"},
+        "event_file": {"$ref": "#/$defs/absolute_path"},
+        "ip_file": {"$ref": "#/$defs/absolute_path"},
+        "active_snapshot": {"$ref": "#/$defs/absolute_path"},
+        "flush_interval_ms": {"type": "integer", "minimum": 0, "maximum": 100},
+        "rotate_bytes": {"type": "integer", "minimum": 1048576, "maximum": 1073741824},
+        "retention_days": {"type": "integer", "minimum": 1, "maximum": 3650},
+        "file_mode": {"enum": ["0600", "0640"]}
+      }
+    }
+  },
+  "$defs": {
+    "absolute_path": {"type": "string", "minLength": 2, "maxLength": 4095, "pattern": "^/[^\u0000\r\n]+$"},
+    "uid": {"type": "integer", "minimum": 0, "maximum": 4294967294},
+    "ports": {"type": "array", "maxItems": 1024, "uniqueItems": true, "items": {"type": "integer", "minimum": 1, "maximum": 65535}}
+  }
+}

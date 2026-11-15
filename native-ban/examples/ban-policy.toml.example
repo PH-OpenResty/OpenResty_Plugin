@@ -1,0 +1,78 @@
+# Design v1 draft. The current runtime does not load this file yet.
+schema_version = 1
+node_id = "00000000-0000-0000-0000-000000000001"
+agent_uid = 2000
+runtime_dir = "/run/scdn-ban"
+
+[policy]
+l7_seconds = 600
+l3_seconds = 3600
+escalate_window_ms = 60000
+escalate_threshold = 20
+count_l7_rejects = true
+renew_on_hit = false
+
+[ipc]
+event_socket = "/run/scdn-ban/events.sock"
+admin_socket = "/run/scdn-ban/admin.sock"
+admin_uids = [0]
+event_gid = 1001
+queue_events_per_worker = 1024
+receipt_cache_per_producer = 8192
+max_event_age_ms = 2000
+frame_max_bytes = 8192
+
+[[instances]]
+id = "00000000-0000-0000-0000-000000000100"
+# Illustrative dedicated worker UID; substitute the actual service account.
+worker_uid = 1001
+
+[[trusted_rules]]
+source = "waf_deny"
+id = "crs:942100"
+
+[[trusted_rules]]
+source = "cc_confirmed"
+id = "cc:confirmed-rate"
+
+[capacity]
+max_l7_bans = 16384
+max_l3_bans = 65536
+max_stats_ips = 65536
+request_dedup_entries = 131072
+max_producers = 256
+view_max_bytes = 134217728
+agent_memory_mib = 512
+
+[datapath]
+interfaces = ["eth0"]
+mode = "xdp_native"
+direction = "ingress"
+compatibility_fallback = "disabled"
+existing_program = "require_compatible_chain"
+fragment_policy = "drop_banned_source_to_protected_vip"
+
+[[services]]
+name = "web"
+addresses = ["192.0.2.10", "2001:db8::10"]
+tcp_ports = [80, 443]
+udp_ports = [443]
+
+[[services]]
+name = "load_balancer"
+addresses = ["192.0.2.10", "2001:db8::10"]
+tcp_ports = [8443, 9000]
+udp_ports = [5353]
+
+[allowlist]
+exempt_ip_bans = ["203.0.113.0/28", "2001:db8:ffff::/64"]
+
+[logs]
+state_dir = "/var/lib/scdn-ban"
+event_file = "/var/log/scdn-ban/events.jsonl"
+ip_file = "/var/log/scdn-ban/banned-ips.jsonl"
+active_snapshot = "/var/lib/scdn-ban/active-ips.json"
+flush_interval_ms = 5
+rotate_bytes = 104857600
+retention_days = 30
+file_mode = "0640"

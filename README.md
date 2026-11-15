@@ -24,6 +24,7 @@ Purge 可独立加载，不依赖其他三个插件，也不修改 Nginx 核心�
 - [验证记录](docs/VALIDATION.zh-CN.md)：实测项目、CI、内存检查及未验证范围。
 - [缓存机制调研](docs/CACHE-MECHANISM.zh-CN.md)、[精确清理接入](native-purge/README.zh-CN.md)和[缓存清理基准](native-purge/bench/README.zh-CN.md)。
 - [源站校验、过时复用与匹配清理调研](docs/CACHE-REVALIDATION-RESEARCH.zh-CN.md)：ETag/Last-Modified、两个 stale 窗口、规则预算与节点范围。
+- [IP 封禁与 eBPF 详细设计（草案）](native-ban/README.zh-CN.md)：固定期限、WAF/CC 事件、L7/L3 升级、只读共享视图、内核表及两类日志契约；尚未加入运行模块。
 - [源码来源](SOURCE.md)、[公开发布规则](PUBLISHING.md)、[许可证](LICENSE)。
 
 ## 独立构建与验证
