@@ -81,7 +81,7 @@ ready=true 只表示该 Worker 可用的配置版本匹配共享活动摘要。�
 
 Sync 使用独立的 `/__scdn_sync/v1/status` 与 `/__scdn_sync/v1/capabilities`，不能与 Config 的 `/status` 混读。本机查询同时需要真实 Unix/loopback 连接与私有 Bearer token；Master exchange 还要求真实 mTLS 身份登记。使用受限 curl 配置文件承载 token，路径与命令见 [Sync 迁移](SYNC-MIGRATION.zh-CN.md)。
 
-0.2.0 的配置同步状态仍为 `not_started`、`applied_revision=null`、`business_health=unknown`，表示传输/应用事务尚未迁移。Config ready/revision、Purge journal 与 Sync 角色可同时正常，但不共同构成一次远程同步成功的证明。现有 Lua Sync 工作入口与凭据继续独立保留。
+0.3.0 未启用 config_state 时保持 not_started；启用发布后状态表示真实 published/applying/applied/failed/recovery_required，见 [发布手册](SYNC-PUBLICATION.zh-CN.md)。Config ready/revision、Purge journal 与 Sync 角色可同时正常，但不共同构成一次远程同步成功的证明。现有 Lua Sync 工作入口与凭据继续独立保留。
 
 ## 5. 错误处理
 
@@ -96,7 +96,7 @@ Sync 使用独立的 `/__scdn_sync/v1/status` 与 `/__scdn_sync/v1/capabilities`
 | status 403 | 请求是否来自真实本机/Unix 传输，是否另有 Nginx 访问规则 |
 | Sync control 401 | 是否为该实例独立 token；不要使用 Purge token、旧 Lua 头或查询串凭据 |
 | Sync exchange 403 | mTLS 验证、CA、客户端叶 DER 指纹登记、Node/scope 是否正确 |
-| Sync desired/stage 等不成功 | 当前角色模块尚未实现传输或事务；核对 capabilities，保留旧服务 |
+| Sync desired/stage 等不成功 | 核对是否启用 config_state，使用 native v2 的 config/desired/result；旧 Lua desired/stage 路由不兼容 |
 | 业务 403 | Host 未登记或站点停用；也可能由用户自行配置的其他访问模块返回 |
 | 业务 503 | Worker 尚未装入活动摘要；检查就绪、源文件与后台任务 |
 | 业务 502/504 | 源站、DNS resolver、端口、网络与原生 proxy 超时；不代表 watcher 解析失败 |
@@ -136,4 +136,8 @@ Config 的共享活动代际在手工 reload 后属于新配置周期；Edge 指
 
 ## 缓存任务及 HTTP 头升级
 
-Sync 0.2.0 的持久化缓存任务投递、状态、删除、Node 后台执行及故障恢复见 [缓存任务手册](CACHE-TASKS.zh-CN.md)。刷新成功再提交预热，不能假定队列顺序。配置快照的旧同步流程仍需独立保留。代理头采用 `X-Clinet-IP`，Purge 控制调用方同步切换为 `X-Purge-Mode` / `X-Purge-Scope`，见 [HTTP 头约定](HTTP-HEADERS.zh-CN.md)。
+Sync 0.3.0 保留的持久化缓存任务投递、状态、删除、Node 后台执行及故障恢复见 [缓存任务手册](CACHE-TASKS.zh-CN.md)。刷新成功再提交预热，不能假定队列顺序。站点/证书发布使用独立原生 v2 通道，旧服务按迁移计划交接。代理头采用 `X-Clinet-IP`，Purge 控制调用方同步切换为 `X-Purge-Mode` / `X-Purge-Scope`，见 [HTTP 头约定](HTTP-HEADERS.zh-CN.md)。
+
+## 规则缓存头与全节点封禁设计
+
+站点/prefix 中的缓存诊断开关和静态回源头可热更新，使用 [缓存头手册](CACHE-HEADERS.zh-CN.md)的字段，并确认缓存 key 保留配置 revision。Ban v2 的 [全节点同步](../native-ban/design/CLUSTER-SYNC.zh-CN.md)规定任意设备上报、完整有效表、固定期限和逐节点内核 ACK，目前仍是待实现合同，不能把缓存任务 ACK 当作封禁全量完成。

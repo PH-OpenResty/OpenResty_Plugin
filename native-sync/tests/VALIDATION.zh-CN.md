@@ -1,5 +1,9 @@
 # 原生 Sync 验证记录
 
+## 0.3.0 配置与证书发布验证
+
+`distribution.py` 使用真实 Master 和两个 Node 验证按节点加密签名、源变更自动发布、路由/证书热应用、全 Worker 确认、错误源、篡改/过期/重放、业务探测回退、结果重报、Master 离线和启动事务恢复。它与仅角色/缓存任务测试分别计数；当前验证及边界见 [总验证记录](../../docs/VALIDATION.zh-CN.md)。
+
 ## 0.2.0 缓存任务验证入口
 
 新增 `cache_tasks.py` 在真实 Master/Node、临时 mTLS、原生 Purge、HTTP/HTTPS 缓存及临时源站之间验证任务全链路：落盘/重启、ACK 丢失后的收据重报、队列容量、节点/缓存 scope、租约耗尽、匹配清理、预热 HIT、无凭据默认表示、拒绝重定向/私有响应、并发创建和 Worker PID 保持。当前结果见 [总验证记录](../../docs/VALIDATION.zh-CN.md)。

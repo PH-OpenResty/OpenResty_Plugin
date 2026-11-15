@@ -106,4 +106,4 @@ curl --config /etc/scdn-sync-native/master/control.curl.conf \
 
 ## 当前边界
 
-缓存任务的 mTLS、Node/scope 校验、摘要、持久队列和幂等结果属于这条任务协议。配置/证书快照的 JWE/JWS、HTTP 签名/nonce、stage/commit/rollback、完整发布历史和业务探测仍未原生化，原有能力位保持 false。缓存任务不把旧 Lua 配置同步迁移完成。验收入口为 `python native-sync/tests/cache_tasks.py --prefix /isolated/runtime`，静态构建加 `--static`。
+缓存任务的 mTLS、Node/scope 校验、摘要、持久队列和幂等结果属于独立任务协议。Sync 0.3.0 新增站点/证书的 [原生发布与应用](SYNC-PUBLICATION.zh-CN.md)，不使用缓存队列冒充配置事务。旧 Lua JWE/JWS/HTTP nonce API 仍不与 native v2 直接兼容。预热可走 [Tier](../native-tier/README.zh-CN.md) 的同一业务入口；先确认配置已应用，再刷新/预热相应版本。验收入口为 `python native-sync/tests/cache_tasks.py --prefix /isolated/runtime`，静态构建加 `--static`。

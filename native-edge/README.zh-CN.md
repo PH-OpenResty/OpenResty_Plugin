@@ -6,9 +6,9 @@
 
 ## 1. 依赖与指令
 
-业务链由 Config、API、Edge 构成，动态加载顺序为 Config → API → Edge，三者使用同一源码与目标 ABI 构建。统一构建还提供独立的 Sync、Purge，共五个模块。运行时需要 HTTP SSL，Config 还需要线程池支持。Edge 用到 Nginx 代理/静态文件/缓存功能时，这些原生模块也必须存在。API 默认关闭，启用方式见 [API 手册](../native-api/README.zh-CN.md)。
+业务链由 Config、API、Edge 构成，动态加载顺序为 Config → API → Edge，三者使用同一源码与目标 ABI 构建。统一构建还提供 Sync、Tier、Purge，共六个模块。运行时需要 HTTP SSL，Config 还需要线程池支持。Edge 用到 Nginx 代理/静态文件/缓存功能时，这些原生模块也必须存在。API 默认关闭，启用方式见 [API 手册](../native-api/README.zh-CN.md)。
 
-[Sync](../native-sync/README.zh-CN.md) 的角色/身份接口不改变 Edge 站点版本，0.2.0 的缓存任务也不会替 Edge 写入同步配置。五模块共存、独立控制 token 与流式代理的验证入口是 `native-api/tests/integration.py --purge --sync`，静态构建增加 `--static`。
+[Sync](../native-sync/README.zh-CN.md) 的角色/身份接口不改变 Edge 站点版本，0.3.0 的配置发布通过受管 active.conf 和 Config 热更新生效。五模块共存、独立控制 token 与流式代理的验证入口是 `native-api/tests/integration.py --purge --sync`，静态构建增加 `--static`。
 
 | 指令 | 上下文 | 默认/参数 | 作用 |
 | --- | --- | --- | --- |
@@ -69,7 +69,7 @@ server {
 
 缓存键应包含版本和 Host，防止回源或策略变更后返回旧源站内容。当前 revision 对完整源文件及有效 TLS 材料计算，因此注释、空白或证书变动也可能使整个快照换摘要；版本化缓存键会相应降低旧缓存复用。按实际需求制定容量与保留策略。
 
-本模块选择 cache zone，不实现多级缓存读取链、L1 miss 后查询 L2、缓存文件复制或自动晋升/下沉。写入、锁、过期与清理由 Nginx 管理。支持 HTTP/HTTPS、括号 IPv6、命名 upstream 及 origin_host 字段；TLS 验证与连接池定义由原生代理配置实施。命名池成员不通过站点文件热更新。
+Edge 自身仍负责路由和策略选层；新增 [Tier](../native-tier/README.zh-CN.md) 实现 L1 miss 后读取 L2、热对象晋升与冷层保留，接替旧 Lua 选层/flush 流程。写入、锁、过期与清理由 Nginx 管理。支持 HTTP/HTTPS、括号 IPv6、命名 upstream 及 origin_host 字段；TLS 验证与连接池定义由原生代理配置实施。命名池成员不通过站点文件热更新。
 
 变量 proxy_pass 的域名解析需要配置 resolver。上游连接池和 DNS 行为仍按 Nginx 变量代理语义执行，不能假定它和静态命名 upstream 的 keepalive 行为完全相同。默认保留原 URI 和查询串，匹配 prefix 不剥离路径。
 
@@ -142,8 +142,14 @@ python native-edge/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
   --report /tmp/scdn-plugin-results.json
 ```
 
-运行时也可为 openresty。测试创建临时证书、源站、Unix Socket 和两个真实 Worker，退出后清理。详细验证内容、ASan/UBSan 设置和未验证项见 [验证记录](../docs/VALIDATION.zh-CN.md)。本插件没有远程分发、配置编辑或自动恢复历史服务。
+运行时也可为 openresty。测试创建临时证书、源站、Unix Socket 和两个真实 Worker，退出后清理。详细验证内容、ASan/UBSan 设置和未验证项见 [验证记录](../docs/VALIDATION.zh-CN.md)。远程站点/证书发布与回退由 [Sync 0.3.0](../docs/SYNC-PUBLICATION.zh-CN.md) 承担，Edge 继续读取 Config 的活动快照。
 
 ## HTTP 头与缓存任务联动
 
-自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.2.0 的缓存刷新/预热任务及原生配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。
+自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.3.0 保留的缓存刷新/预热任务及配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。
+
+## 原生缓存头
+
+Edge 按当前请求持有的配置版本生成 `X-Cache`、`X-Cache-Layer`、`X-Cache-Policy` 和 `X-Cache-Revision`，站点/prefix 的 `cache_headers off;` 可关闭。删除已有同名 add_header，避免重复。规则的静态回源头在 proxy_pass 前替换客户端全部同名值；站点/前缀继承、私有绕过、Nginx 固定 proxy_set_header 的优先级及 HTTP/gRPC 边界见 [缓存头手册](../docs/CACHE-HEADERS.zh-CN.md)。
+
+Edge 现在以 HTTP_FILTER 类型注册，确保静态和动态构建均在 Nginx 基础 header filter 之后接入原生缓存诊断；动态加载仍保持 Config → API → Edge，三个模块需同源码版本一起编译。

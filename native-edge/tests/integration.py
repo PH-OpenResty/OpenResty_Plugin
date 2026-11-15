@@ -157,7 +157,6 @@ http {{
         add_header X-Site $scdn_edge_site always;
         add_header X-Revision $scdn_edge_revision always;
         add_header X-Layer $scdn_edge_cache always;
-        add_header X-Cache $upstream_cache_status always;
         location / {{ root $scdn_edge_root; disable_symlinks on; }}
         location @scdn_edge_proxy {{
             proxy_pass $scdn_edge_upstream;

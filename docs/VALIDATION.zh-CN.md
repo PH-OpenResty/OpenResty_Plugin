@@ -1,8 +1,28 @@
 # 验证记录与复现
 
-统一构建和 CI 包含 Sync、Config、API、Edge、Purge 五个插件。Sync 角色/身份见 [Sync 验证](../native-sync/tests/VALIDATION.zh-CN.md)，Purge 见 [清理模块验证](../native-purge/tests/VALIDATION.zh-CN.md)和[基准报告](../native-purge/bench/README.zh-CN.md)。本页保留历史基线，并单独记录当前整合结果。
+统一构建和 CI 包含 Sync、Config、API、Edge、Tier、Purge 六个插件。Sync 角色/身份见 [Sync 验证](../native-sync/tests/VALIDATION.zh-CN.md)，Purge 见 [清理模块验证](../native-purge/tests/VALIDATION.zh-CN.md)和[基准报告](../native-purge/bench/README.zh-CN.md)。本页保留历史基线，并单独记录当前整合结果。
 
-## Sync 0.2.0 缓存任务与 HTTP 头更新
+## PR #9 合并审查补充
+
+审查补齐 Tier 独立运行时的 Api-Key、Proxy-Authorization 和 Pragma: no-cache 绕过，并修复重复凭据/缓存控制头不能被识别的问题。新增 9 项实际回源/隔离检查，覆盖已存在的匿名缓存、不同调用者凭据和重复字段；Tier 套件增为 48 项，当前每种构建矩阵为 646 项，三种合计 1,938 项。旧 637 项结果仍按初次交付基线保留，最新提交的全部 Actions 成功才允许合并。
+
+## Sync 0.3.0 与 Tier 0.1.0 初次交付矩阵
+
+初次交付运行时包含六模块。新增站点/证书原生发布套件 40 项，Tier 独立层级缓存 39 项，六模块真实代理共存 51 项；连同既有启动 6、角色 50、缓存任务 99、Config/Edge 47、缓存头 32、API 44、五模块组合 50、Purge 70、模式 64、源站/stale 45，每种构建共 637 项进程检查。Nginx 动态、OpenResty 动态和 OpenResty 静态各通过 637 项，共 1,911 项；本地结构化结果见 [validation-native-sync-tier-20261115.json](validation-native-sync-tier-20261115.json)。
+
+配置发布证据包括两个 Node 的路由与证书实效、源变更、删除/停用、签名/加密/过期/旧序号/跨节点拒绝、损坏水位、业务探测回退、ACK 重报、Master 断线和启动恢复；Tier 验证 L2 命中晋升、固定层级下绝对期限保持、大小预算、Vary/查询串、两层共同失效、穿透 L2 的源站校验，以及 L1 丢失后从 L2 恢复。六模块组合含真实 API/AI/SSE/WebSocket/gRPC 流程。
+
+这些是隔离功能与故障路径检查，未宣称生产吞吐、完整掉电矩阵、任意第三方过滤器或所有目标 ABI。32 个当前实现/config 文件的摘要、全量文档链接/围栏、脚本语法与公开索引检查同时执行。最终结果以当前提交的 CI 和本页链接报告为准；历史基线如下保留原数值。
+
+## 缓存规则头及 Ban v2 集群合同
+
+新增 `native-edge/tests/cache_headers.py` 的 32 项真实进程检查，覆盖静态回源元数据、客户端重复头清除、源站伪造诊断覆盖、MISS/HIT/BYPASS/OFF、site/prefix 继承、非法头和字段预算、在途快照版本及不重建 Worker 的热更新。它和原有 475 项组成每种构建 507 项完整矩阵；实际构建结果另见对应提交 CI。
+
+`native-ban/tests/check-design.py` 校验 v2 必需集群字段、禁止局部/增量替代全量、Schema/TOML、容量约束、四个 C11 ABI 头及合成事件/IP 日志关联。Ban 的 18 项集群运行验收仍为待实现，不能将设计校验或缓存头进程测试计为多机封禁/eBPF DROP 已验收。
+
+缓存头语义见 [手册](CACHE-HEADERS.zh-CN.md)，Ban 完整快照、固定期限、离线/撤销/逐节点内核确认合同见 [设计](../native-ban/design/CLUSTER-SYNC.zh-CN.md)。
+
+## Sync 0.2.0 缓存任务与 HTTP 头更新（历史）
 
 本地日期：2026-11-15，隔离 WSL2/Alpine x86_64。Nginx 动态、OpenResty 动态、OpenResty 静态各通过 475 项进程检查：
 
@@ -20,7 +40,7 @@
 
 结构化结果见 [validation-cache-tasks-20261115.json](validation-cache-tasks-20261115.json)。缓存任务覆盖真实落盘、Master/Node 重启、ACK 丢失、租约耗尽、登记 scope 变化、并发幂等、128 项队列容量、各清理模式、HTTP/HTTPS 预热、HIT 验证和 Worker PID 保持；API/任务代理验证 `X-Clinet-IP` 被连接地址覆盖。任务始终以至少一次执行表述，不把重启测试当作任意掉电或 exactly-once 的证明。
 
-纯 C 核心严格 C99 和 UBSan trap 通过；24 个当前实现文件摘要、相对 Markdown 链接/围栏、脚本语法、实际索引公开检查及 Gitleaks 工作树/历史扫描通过。本地没有宣称 ASan；Actions 的 Nginx 任务保留 ASan/UBSan，新缓存任务套件已加入全部三种构建，最终结果以对应提交的检查为准。
+纯 C 核心严格 C99 和 UBSan trap 通过；24 个当前实现文件摘要、相对 Markdown 链接/围栏、脚本语法、实际索引公开检查及 Gitleaks 工作树/历史扫描通过。该次本地没有宣称 ASan；Actions 的 Nginx 任务保留 ASan/UBSan，结果见对应历史提交。
 
 这些是功能验证，不证明生产吞吐、跨地域网络故障、完整磁盘故障矩阵或配置快照同步已原生化。配置快照仍按 [Sync 路线图](SYNC-ROADMAP.zh-CN.md)迁移，缓存任务合同见 [任务手册](CACHE-TASKS.zh-CN.md)。
 
@@ -40,7 +60,7 @@
 
 ## API 扩展验证（历史基线）
 
-API 引入阶段新增协议识别，并扩展 Config/Edge 的 HTTPS、IPv6、命名池、origin_host 与自动 profile 接入。该阶段摘要覆盖 12 个实现/config 文件；当前清单扩展为五模块 22 个文件，历史记录不作为原始源码未修改的证明。
+API 引入阶段新增协议识别，并扩展 Config/Edge 的 HTTPS、IPv6、命名池、origin_host 与自动 profile 接入。该阶段摘要覆盖 12 个实现/config 文件；后续清单已继续扩展至当前六模块，历史记录不作为原始源码未修改的证明。
 
 结构化结果见 [validation-api-20261114.json](validation-api-20261114.json)。本轮没有替换线上 Node 二进制或配置，没有调用真实模型厂商。
 
@@ -114,7 +134,7 @@ python native-edge/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
 
 ## Sanitizer 设置
 
-CI 的 nginx 构建为运行时和五个动态模块启用 `-fsanitize=address,undefined -fno-omit-frame-pointer`，UBSan 遇错中止；OpenResty 做普通严格编译及动态/静态真实进程检查。上游协议解析的窄 alignment 设置仍按 sanitizer-cc.sh 说明，原生模块不取消该检查。完整测试关闭 leak detection，因为测试中 Nginx fork/退出生命周期与进程级分配不用于此项泄漏验收。
+CI 的 nginx 构建为运行时和六个动态模块启用 `-fsanitize=address,undefined -fno-omit-frame-pointer`，UBSan 遇错中止；OpenResty 做普通严格编译及动态/静态真实进程检查。上游协议解析的窄 alignment 设置仍按 sanitizer-cc.sh 说明，原生模块不取消该检查。完整测试关闭 leak detection，因为测试中 Nginx fork/退出生命周期与进程级分配不用于此项泄漏验收。
 
 [tests/asan.supp](../tests/asan.supp)仅排除 Nginx 按 dlsym 设计同时从可执行文件与动态模块导出的 `ngx_modules`、`ngx_module_names`、`ngx_module_order` 注册表 ODR 报告，不排除模块缓冲区、释放后访问或其他全局数据诊断。
 
@@ -132,8 +152,10 @@ Config/Edge 和 Purge 测试夹具现在都等待实际的两个 Worker（最多
 
 ## 文档与发布验证
 
-独立发布前检查五模块摘要、相对文档链接、示例所需文件、脚本语法、实际待提交文件和凭据扫描。源码仅包含通用模板，实际运行配置和二进制不进入 Git。Actions 执行当前完整矩阵及公开内容检查，历史 47 项仍属于其中 Config/Edge 的独立套件。
+独立发布前检查六模块摘要、相对文档链接、示例所需文件、脚本语法、实际待提交文件和凭据扫描。源码仅包含通用模板，实际运行配置和二进制不进入 Git。Actions 执行当前完整矩阵及公开内容检查，历史 47 项仍属于其中 Config/Edge 的独立套件。
 
 ## 未验证范围
 
-当前不证明生产吞吐/容量上限、长时间压力与磁盘故障、ARM64、所有非 root/systemd 组合、HTTP/2/HTTP/3 全部行为、会话恢复/撤销政策或任意目标构建的 ABI。ready 不是业务健康结果，配置快照的远程同步与完整高可用控制面仍未原生实现；缓存任务有单独的原生 Master→Node 通道。
+当前不证明生产吞吐/容量上限、长时间压力与磁盘故障、ARM64、所有非 root/systemd 组合、HTTP/2/HTTP/3 全部行为、会话恢复/撤销政策或任意目标构建的 ABI。ready 不是业务健康结果，原生配置快照及缓存任务均已有独立通道；完整高可用控制面、旧 Lua 协议互通及全部故障矩阵未宣称完成。
+
+Tier 的缓存期限回归显式固定 L1 选择，在丢失 L1 后由仍有效的 L2 晋升，再在原始绝对到期后核对源站新版本；避免用热度降层掩盖 TTL 重起。远端 UBSan 发现有效空变量返回 NULL 时触发 Nginx 的零长度复制，现返回有效空字符串；保持诊断失败断言并单独用带 UBSan 的 Nginx 重跑 Tier。

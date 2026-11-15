@@ -251,27 +251,96 @@ scdn_string(ngx_str_t *value)
 }
 
 static int
+scdn_header_name(ngx_str_t *name)
+{
+    static const char *reserved[] = {
+        "X-Clinet-IP", "X-Client-IP", "X-Real-IP", "X-API-Key",
+        "X-Requested-With", "X-HTTP-Method-Override"
+    };
+    size_t i;
+    u_char c;
+    if (name->len < 3 || name->len > 64
+        || ngx_strncasecmp(name->data, (u_char *) "X-", 2) != 0) return 0;
+    for (i = 0; i < name->len; i++) {
+        c = name->data[i];
+        if (!((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')
+              || (c >= '0' && c <= '9') || c == '-')) return 0;
+    }
+    if ((name->len >= 12 && !ngx_strncasecmp(name->data, (u_char *) "X-Forwarded-", 12))
+        || (name->len >= 8 && !ngx_strncasecmp(name->data, (u_char *) "X-Accel-", 8))
+        || (name->len >= 7 && !ngx_strncasecmp(name->data, (u_char *) "X-SCDN-", 7))) return 0;
+    for (i = 0; i < sizeof(reserved) / sizeof(reserved[0]); i++) {
+        if (name->len == strlen(reserved[i])
+            && !ngx_strncasecmp(name->data, (u_char *) reserved[i], name->len)) return 0;
+    }
+    return 1;
+}
+
+static int
+scdn_headers(scdn_parser_t *p, ngx_str_t *field, scdn_config_headers_t *headers,
+    ngx_flag_t *response)
+{
+    ngx_str_t name, value;
+    ngx_uint_t i;
+    if (scdn_is(field, "cache_headers")) {
+        if (!scdn_value(p, &value) || !scdn_symbol(p, ';')
+            || (!scdn_is(&value, "on") && !scdn_is(&value, "off"))) return 0;
+        *response = scdn_is(&value, "on"); return 1;
+    }
+    if (scdn_is(field, "cache_request_headers")) {
+        if (headers->configured || !scdn_value(p, &value) || !scdn_is(&value, "off")
+            || !scdn_symbol(p, ';')) return 0;
+        headers->configured = 1; return 1;
+    }
+    if (!scdn_is(field, "cache_request_header")) return -1;
+    if ((headers->configured && !headers->count) || headers->count == SCDN_CONFIG_HEADERS
+        || !scdn_value(p, &name) || !scdn_header_name(&name)
+        || !scdn_value(p, &value) || value.len > 1024 || !scdn_symbol(p, ';')) return 0;
+    for (i = 0; i < value.len; i++) if (value.data[i] < 32 || value.data[i] == 127) return 0;
+    for (i = 0; i < headers->count; i++) {
+        if (headers->fields[i].name.len == name.len
+            && !ngx_strncasecmp(headers->fields[i].name.data, name.data, name.len)) return 0;
+    }
+    headers->fields[headers->count].name = name;
+    headers->fields[headers->count++].value = value;
+    headers->configured = 1; return 1;
+}
+
+static int
 scdn_site(scdn_parser_t *p, scdn_config_site_t *site)
 {
     ngx_str_t field, value, second;
     ngx_uint_t fields = 0, flag;
     scdn_config_route_t *route;
     ngx_int_t hits, window;
+    int header;
 
     site->enabled = 1;
+    site->cache_headers = 1;
     ngx_str_set(&site->cache, "off");
     if (!scdn_value(p, &site->id) || !scdn_identifier(&site->id)
         || !scdn_symbol(p, '{')) { return 0; }
     while (scdn_next(p) && p->symbol == 0) {
         field = p->token;
+        if (scdn_is(&field, "cache_headers") && (fields & 256)) return 0;
+        if (scdn_is(&field, "cache_headers")) fields |= 256;
+        header = scdn_headers(p, &field, &site->cache_request_headers, &site->cache_headers);
+        if (header == 0) return 0;
+        if (header == 1) continue;
         if (scdn_is(&field, "prefix")) {
             if (site->route_count == SCDN_CONFIG_ROUTES) { return 0; }
             route = &site->routes[site->route_count++];
+            route->cache_headers = NGX_CONF_UNSET;
             if (!scdn_value(p, &route->prefix) || !scdn_path(&route->prefix)
                 || !scdn_symbol(p, '{')) { return 0; }
             flag = 0;
             while (scdn_next(p) && p->symbol == 0) {
                 field = p->token;
+                if (scdn_is(&field, "cache_headers") && (flag & 8)) return 0;
+                if (scdn_is(&field, "cache_headers")) flag |= 8;
+                header = scdn_headers(p, &field, &route->cache_request_headers, &route->cache_headers);
+                if (header == 0) return 0;
+                if (header == 1) continue;
                 if (!scdn_value(p, &value) || !scdn_symbol(p, ';')) { return 0; }
                 if (scdn_is(&field, "upstream") && !(flag & 1) && scdn_upstream(&value)) {
                     route->upstream = value; flag |= 1;
@@ -473,6 +542,8 @@ scdn_config_load_cached(const char *path, const char **error,
                 if (scdn_same(&site->routes[i].prefix, &site->routes[j].prefix)) { goto failed; }
             }
             if (site->routes[i].cache.len == 0) { site->routes[i].cache = site->cache; }
+            if (site->routes[i].cache_headers == NGX_CONF_UNSET)
+                site->routes[i].cache_headers = site->cache_headers;
             if (scdn_is(&site->routes[i].cache, "auto") && site->tier_hits == 0) { goto failed; }
         }
         if (site->enabled && site->root.len != 0) {

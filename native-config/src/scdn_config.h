@@ -11,9 +11,22 @@
 #define SCDN_CONFIG_ROUTES 32
 #define SCDN_CONFIG_WORKERS 128
 #define SCDN_CONFIG_BYTES (4 * 1024 * 1024)
+#define SCDN_CONFIG_HEADERS 8
+
+typedef struct {
+    ngx_str_t name, value;
+} scdn_config_header_t;
+
+typedef struct {
+    ngx_uint_t count;
+    ngx_flag_t configured;
+    scdn_config_header_t fields[SCDN_CONFIG_HEADERS];
+} scdn_config_headers_t;
 
 typedef struct {
     ngx_str_t prefix, upstream, cache, origin_host;
+    scdn_config_headers_t cache_request_headers;
+    ngx_flag_t cache_headers;
 } scdn_config_route_t;
 
 typedef struct {
@@ -22,6 +35,8 @@ typedef struct {
     ngx_uint_t host_count, route_count;
     scdn_config_route_t routes[SCDN_CONFIG_ROUTES];
     ngx_flag_t enabled;
+    scdn_config_headers_t cache_request_headers;
+    ngx_flag_t cache_headers;
     ngx_uint_t tier_hits;
     ngx_msec_t tier_window;
     X509 *leaf;
@@ -51,5 +66,6 @@ scdn_config_site_t *scdn_config_lookup(scdn_config_snapshot_t *snapshot,
     const ngx_str_t *host);
 ngx_flag_t scdn_config_local(ngx_http_request_t *r);
 ngx_flag_t scdn_config_enabled(ngx_conf_t *cf);
+int scdn_config_recover(const char *directory);
 
 #endif

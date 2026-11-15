@@ -9,6 +9,7 @@ typedef struct {
     ngx_pid_t pid;
     ngx_msec_t heartbeat;
     u_char prepared[32];
+    u_char applied[32];
 } scdn_worker_slot_t;
 
 typedef struct {
@@ -18,7 +19,7 @@ typedef struct {
 } scdn_shared_t;
 
 typedef struct {
-    ngx_str_t file;
+    ngx_str_t file, managed;
     ngx_msec_t interval, settle;
     ngx_flag_t allow_empty;
     ngx_shm_zone_t *zone;
@@ -49,6 +50,7 @@ static ngx_thread_task_t *scdn_task;
 static void *scdn_create_main(ngx_conf_t *cf);
 static char *scdn_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *data);
 static char *scdn_watch(ngx_conf_t *cf, ngx_command_t *cmd, void *data);
+static char *scdn_managed(ngx_conf_t *cf, ngx_command_t *cmd, void *data);
 static char *scdn_status_directive(ngx_conf_t *cf, ngx_command_t *cmd, void *data);
 static void *scdn_create_location(ngx_conf_t *cf);
 static char *scdn_merge_location(ngx_conf_t *cf, void *parent, void *child);
@@ -61,6 +63,8 @@ static ngx_int_t scdn_status(ngx_http_request_t *r);
 static ngx_command_t scdn_commands[] = {
     { ngx_string("scdn_config_watch"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
       scdn_watch, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_config_managed"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      scdn_managed, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
     { ngx_string("scdn_config_zone"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE2,
       scdn_zone, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
     { ngx_string("scdn_config_interval"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
@@ -179,6 +183,28 @@ scdn_bootstrap_cleanup(void *data)
     scdn_config_destroy(data);
 }
 
+static char *
+scdn_managed(ngx_conf_t *cf, ngx_command_t *cmd, void *data)
+{
+    scdn_main_t *conf = data;
+    ngx_str_t *value = cf->args->elts;
+    u_char *end;
+    (void) cmd;
+    if (conf->file.len) return "conflicts with scdn_config_watch";
+    if (value[1].len < 2 || value[1].len > 1024 || value[1].data[0] != '/') return "requires an absolute state directory";
+    conf->managed = value[1]; conf->file.len = value[1].len + sizeof("/active.conf") - 1;
+    conf->file.data = ngx_pnalloc(cf->pool, conf->file.len + 1);
+    if (conf->file.data == NULL) return NGX_CONF_ERROR;
+    end = ngx_cpymem(conf->file.data, value[1].data, value[1].len);
+    ngx_memcpy(end, "/active.conf", sizeof("/active.conf"));
+    {
+        ngx_str_t name = ngx_string("scdn_config_reader");
+        conf->threads = ngx_thread_pool_add(cf, &name);
+        if (conf->threads == NULL) return NGX_CONF_ERROR;
+    }
+    return NGX_CONF_OK;
+}
+
 static ngx_int_t
 scdn_configure(ngx_conf_t *cf)
 {
@@ -188,6 +214,10 @@ scdn_configure(ngx_conf_t *cf)
     const char *error;
 
     conf = ngx_http_conf_get_module_main_conf(cf, ngx_http_scdn_config_module);
+    if (conf->managed.len && !scdn_config_recover((char *) conf->managed.data)) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "scdn_config managed transaction recovery failed");
+        return NGX_ERROR;
+    }
     if (conf->file.data == NULL) {
         if (conf->zone != NULL) { return NGX_ERROR; }
         return NGX_OK;
@@ -264,6 +294,9 @@ scdn_adopt(void)
         scdn_prepared = NULL;
         scdn_config_release(previous);
     }
+    ngx_shmtx_lock(&scdn_main->slab->mutex);
+    if (scdn_current != NULL) ngx_memcpy(scdn_main->shared->slots[ngx_worker].applied, scdn_current->digest, 32);
+    ngx_shmtx_unlock(&scdn_main->slab->mutex);
 }
 
 scdn_config_snapshot_t *
@@ -407,6 +440,7 @@ scdn_worker_init(ngx_cycle_t *cycle)
     scdn_main->shared->slots[ngx_worker].pid = ngx_pid;
     scdn_main->shared->slots[ngx_worker].heartbeat = ngx_current_msec;
     ngx_memcpy(scdn_main->shared->slots[ngx_worker].prepared, scdn_current->digest, 32);
+    ngx_memcpy(scdn_main->shared->slots[ngx_worker].applied, scdn_current->digest, 32);
     ngx_shmtx_unlock(&scdn_main->slab->mutex);
     ngx_add_timer(&scdn_timer, scdn_main->interval);
     return NGX_OK;
@@ -453,6 +487,7 @@ scdn_status(ngx_http_request_t *r)
     ngx_table_elt_t *header;
     ngx_int_t rc;
     ngx_uint_t generation, i;
+    ngx_flag_t all_ready = 1;
     u_char revision[65];
 
     if (!scdn_config_local(r)) { return NGX_HTTP_FORBIDDEN; }
@@ -471,6 +506,12 @@ scdn_status(ngx_http_request_t *r)
         revision[i * 2 + 1] = "0123456789abcdef"[scdn_main->shared->active[i] & 15];
     }
     revision[64] = 0;
+    for (i = 0; i < scdn_main->shared->workers; i++) {
+        scdn_worker_slot_t *slot = &scdn_main->shared->slots[i];
+        if (slot->pid <= 0 || kill(slot->pid, 0) != 0
+            || (ngx_msec_int_t) (ngx_current_msec - slot->heartbeat) > 5000
+            || ngx_memcmp(slot->applied, scdn_main->shared->active, 32)) all_ready = 0;
+    }
     ngx_shmtx_unlock(&scdn_main->slab->mutex);
     buffer->last = ngx_snprintf(buffer->last, 1024,
         "{\"generation\":%ui,\"revision\":\"%s\",\"sites\":%ui,"
@@ -483,6 +524,33 @@ scdn_status(ngx_http_request_t *r)
     if (header == NULL) { return NGX_HTTP_INTERNAL_SERVER_ERROR; }
     header->hash = 1;
     ngx_str_set(&header->key, "Cache-Control"); ngx_str_set(&header->value, "no-store");
+    header = ngx_list_push(&r->headers_out.headers);
+    if (!header) return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    ngx_memzero(header, sizeof(*header)); header->hash = 1;
+    ngx_str_set(&header->key, "X-Config-Revision");
+    header->value.data = ngx_pnalloc(r->pool, 64); header->value.len = 64;
+    if (!header->value.data) return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    ngx_memcpy(header->value.data, revision, 64);
+    header = ngx_list_push(&r->headers_out.headers);
+    if (!header) return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    ngx_memzero(header, sizeof(*header)); header->hash = 1;
+    ngx_str_set(&header->key, "X-Config-Ready");
+    if (all_ready) { ngx_str_set(&header->value, "1"); } else { ngx_str_set(&header->value, "0"); }
+    if (scdn_main->managed.len) {
+        u_char digest[32]; unsigned length;
+        if (EVP_Digest(scdn_main->managed.data, scdn_main->managed.len, digest, &length, EVP_sha256(), NULL) != 1 || length != 32)
+            return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        header = ngx_list_push(&r->headers_out.headers);
+        if (!header) return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        ngx_memzero(header, sizeof(*header)); header->hash = 1;
+        ngx_str_set(&header->key, "X-Config-Managed"); header->value.len = 64;
+        header->value.data = ngx_pnalloc(r->pool, 64);
+        if (!header->value.data) return NGX_HTTP_INTERNAL_SERVER_ERROR;
+        for (i = 0; i < 32; i++) {
+            header->value.data[i * 2] = "0123456789abcdef"[digest[i] >> 4];
+            header->value.data[i * 2 + 1] = "0123456789abcdef"[digest[i] & 15];
+        }
+    }
     ngx_str_set(&r->headers_out.content_type, "application/json");
     r->headers_out.status = NGX_HTTP_OK;
     r->headers_out.content_length_n = buffer->last - buffer->pos;

@@ -1,5 +1,5 @@
-# Design v1 draft. The current runtime does not load this file yet.
-schema_version = 1
+# Design v2 cluster draft. The current runtime does not load this file yet.
+schema_version = 2
 node_id = "00000000-0000-0000-0000-000000000001"
 agent_uid = 2000
 runtime_dir = "/run/scdn-ban"
@@ -76,3 +76,26 @@ flush_interval_ms = 5
 rotate_bytes = 104857600
 retention_days = 30
 file_mode = "0640"
+
+# Cluster L3 replication is mandatory in v2. This remains a design example.
+[cluster]
+enabled = true
+cluster_id = "00000000-0000-0000-0000-000000001000"
+role = "node"
+master_url = "https://sync.example.com:8443"
+device_id = "node-a"
+mtls_ca = "/etc/scdn-ban/pki/master-ca.crt"
+mtls_certificate = "/etc/scdn-ban/pki/node.crt"
+mtls_key = "/etc/scdn-ban/pki/node.key"
+snapshot_verify_key = "/etc/scdn-ban/trust/authority.pub"
+state_dir = "/var/lib/scdn-ban/cluster"
+mode = "full_snapshot"
+target_nodes = "all_registered"
+coalesce_ms = 100
+poll_ms = 1000
+clock_uncertainty_ms = 1000
+max_proposals_per_batch = 256
+max_snapshot_bytes = 33554432
+snapshot_max_ips = 65536
+ack_requires_kernel = true
+# Authority role additionally requires a private snapshot_signing_key path.

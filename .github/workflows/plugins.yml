@@ -1,4 +1,4 @@
-name: Native Sync Config API Edge and Purge
+name: Native Sync Config API Edge Tier and Purge
 
 on:
   push:
@@ -34,6 +34,10 @@ jobs:
           python -m pip install -r tests/requirements.txt
       - name: Verify implementation checksums
         run: sha256sum -c SOURCE-SHA256SUMS
+      - name: Ban cluster design schema, example and ABI contracts
+        run: |
+          python -m pip install -r native-ban/tests/requirements.txt
+          python native-ban/tests/check-design.py
       - name: Sync core role and identity boundaries
         env:
           PLUGIN_RUNTIME: ${{ matrix.runtime }}
@@ -44,7 +48,7 @@ jobs:
           if [ "$PLUGIN_RUNTIME" = nginx ]; then
             SCDN_NATIVE_SANITIZERS='-fsanitize=address,undefined -fno-omit-frame-pointer' sh native-sync/tests/check-core.sh
           fi
-      - name: Build isolated runtime and all five plugins
+      - name: Build isolated runtime and all six plugins
         env:
           PLUGIN_RUNTIME: ${{ matrix.runtime }}
           PLUGIN_LINKAGE: ${{ matrix.linkage }}
@@ -69,6 +73,15 @@ jobs:
           extra=()
           if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
           python native-sync/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/sync-results.json"
+      - name: Encrypted site and certificate publication, hot apply and recovery
+        env:
+          ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+          PLUGIN_LINKAGE: ${{ matrix.linkage }}
+        run: |
+          extra=()
+          if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
+          python native-sync/tests/distribution.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/distribution-results.json"
       - name: Durable Master Node cache refresh and verified preheat tasks
         env:
           ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
@@ -87,6 +100,15 @@ jobs:
           extra=()
           if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
           python native-edge/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/plugin-results.json"
+      - name: Hot cache response and upstream request headers
+        env:
+          ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+          PLUGIN_LINKAGE: ${{ matrix.linkage }}
+        run: |
+          extra=()
+          if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
+          python native-edge/tests/cache_headers.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/cache-header-results.json"
       - name: Automatic API detection and real streaming proxy integration
         env:
           ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
@@ -105,6 +127,16 @@ jobs:
           extra=()
           if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
           python native-api/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" --purge --sync "${extra[@]}" --report "$RUNNER_TEMP/api-purge-sync-results.json"
+      - name: Native L1 L2 hierarchy, promotion, expiry and Lua-free restart
+        env:
+          ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+          PLUGIN_LINKAGE: ${{ matrix.linkage }}
+        run: |
+          extra=()
+          if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
+          python native-tier/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/tier-results.json"
+          python native-tier/tests/coexist.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/six-module-results.json"
       - name: Exact batch prefix site purge, concurrent writers and recovery
         env:
           ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
@@ -139,8 +171,12 @@ jobs:
           path: |
             ${{ runner.temp }}/startup-results.json
             ${{ runner.temp }}/sync-results.json
+            ${{ runner.temp }}/distribution-results.json
+            ${{ runner.temp }}/tier-results.json
+            ${{ runner.temp }}/six-module-results.json
             ${{ runner.temp }}/cache-task-results.json
             ${{ runner.temp }}/plugin-results.json
+            ${{ runner.temp }}/cache-header-results.json
             ${{ runner.temp }}/api-results.json
             ${{ runner.temp }}/api-purge-sync-results.json
             ${{ runner.temp }}/purge-results.json
