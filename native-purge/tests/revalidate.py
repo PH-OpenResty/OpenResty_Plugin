@@ -18,6 +18,7 @@ import time
 from urllib.parse import urlsplit
 
 from integration import Review
+from nginx_process import dump_runtime_logs
 
 
 class ConditionalOrigin(http.server.BaseHTTPRequestHandler):
@@ -148,7 +149,7 @@ class Revalidation(Review):
 
     def run(self):
         self.start()
-        workers = self.workers()
+        workers = self.started_workers
         path = '/etag/item'
         first = self.fill(path)
         count = len(self.records(path))
@@ -386,8 +387,7 @@ def main():
                 args.report.write_text(json.dumps(dict(passed=len(checks), checks=checks), indent=2) + '\n')
             print(f'{len(checks)} revalidation checks passed', flush=True)
         except Exception:
-            if (review.root / 'error.log').exists():
-                print((review.root / 'error.log').read_text(errors='replace')[-5000:], flush=True)
+            dump_runtime_logs(review.root)
             raise
         finally:
             for state in review.origin.settings.values():

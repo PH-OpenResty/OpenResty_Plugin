@@ -13,9 +13,14 @@ import secrets
 import signal
 import socket
 import subprocess
+import sys
 import tempfile
 import threading
 import time
+
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'tests'))
+from nginx_process import (assert_clean_startup,dump_runtime_logs,
+                           runtime_log_offsets,wait_for_workers,worker_pids)
 
 
 def port():
@@ -162,8 +167,11 @@ http {{
         checked=subprocess.run([str(self.nginx),'-t','-p',str(self.root)+'/', '-c',str(self.path)],capture_output=True,text=True)
         if checked.returncode:raise AssertionError(checked.stderr)
         self.log=(self.root/'stdout.log').open('ab')
+        offsets=runtime_log_offsets(self.root)
         self.process=subprocess.Popen([str(self.nginx),'-p',str(self.root)+'/', '-c',str(self.path),'-g','daemon off;'],stdout=self.log,stderr=self.log,env=self.env)
         self.until(lambda:self.status()['ok'],'startup')
+        self.started_workers=wait_for_workers(self.process)
+        assert_clean_startup(self.root,offsets)
 
     def stop(self):
         if self.process and self.process.poll() is None:
@@ -217,9 +225,7 @@ http {{
         with self.origin.guard:self.origin.version=n
 
     def workers(self):
-        children=Path(f'/proc/{self.process.pid}/task/{self.process.pid}/children').read_text().split()
-        return {int(pid) for pid in children if Path(f'/proc/{pid}/cmdline').exists()
-                and b'nginx: worker process' in Path(f'/proc/{pid}/cmdline').read_bytes()}
+        return worker_pids(self.process.pid)
 
     def fill(self,key,scope='one',second=False,language=None):
         end=time.monotonic()+3
@@ -432,7 +438,7 @@ def main():
                 args.report.write_text(json.dumps(dict(passed=len(checks),checks=checks),indent=2)+'\n')
             print(f'{len(checks)} native purge checks passed',flush=True)
         except Exception:
-            if (review.root/'error.log').exists():print((review.root/'error.log').read_text(errors='replace')[-5000:],flush=True)
+            dump_runtime_logs(review.root)
             raise
         finally:review.close()
 
