@@ -49,7 +49,7 @@ python native-purge/tests/revalidate.py --prefix /tmp/scdn-purge-validation
 
 新增功能共 109 项，加原有回归后每种运行时共 226 项。报告只包含检查名称，不发布测试源站、token、journal 或实际缓存文件。有限后台宽限期结束后的同步并发、锁超时、高基数抑制表冲突不被描述为严格单次回源保证；需要在目标流量下另外压测。
 
-CI 另增加 [6 项 Worker 启动时差检查](../../tests/worker_startup.py)，每种运行时合计 232 项。夹具在两个 Worker 完成初始化后才记录 PID 基线，仍检查后续请求期间进程不重建；错误诊断和故障注入不会因为等待就绪而被忽略。实现及失败原因见 [验证说明](../../docs/VALIDATION.zh-CN.md#worker-启动时差回归)。
+在 API/Sync 引入前，CI 加入 [6 项 Worker 启动时差检查](../../tests/worker_startup.py) 后每种运行时为 232 项。当前五模块矩阵还包含 API 43 项、启用 Sync 的组合 49 项和独立 Sync 50 项，共 374 项；Purge 的独立 70/64/45 项保持。夹具仍检查实际就绪与 PID 保持，说明及当前结果见 [验证记录](../../docs/VALIDATION.zh-CN.md)。
 
 ## 未覆盖的范围
 

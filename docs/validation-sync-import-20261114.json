@@ -1,0 +1,105 @@
+{
+  "date": "2026-11-14",
+  "environment": "isolated WSL2/Alpine x86_64",
+  "source_commit": "62fb61947f4c6d10eca468b7b66979009957de55",
+  "imported_sync_implementation_files": [
+    "native-sync/config",
+    "native-sync/src/ngx_http_scdn_sync_module.c",
+    "native-sync/src/scdn_sync_core.c",
+    "native-sync/src/scdn_sync_core.h"
+  ],
+  "sync_implementation_byte_identical": true,
+  "native_sync_version": "0.1.0",
+  "native_sync_scope": "role/identity and read-only capability endpoints",
+  "unimplemented_capabilities": [
+    "encrypted_distribution",
+    "node_pull",
+    "apply_transactions",
+    "business_health"
+  ],
+  "core_checks": {
+    "strict_c99": true,
+    "ubsan_trap": true
+  },
+  "builds": [
+    {
+      "runtime": "nginx",
+      "linkage": "dynamic",
+      "suite_counts": {
+        "startup": 6,
+        "sync": 50,
+        "edge": 47,
+        "api": 43,
+        "mixed": 49,
+        "purge": 70,
+        "patterns": 64,
+        "revalidate": 45
+      },
+      "total_process_checks": 374
+    },
+    {
+      "runtime": "openresty",
+      "linkage": "dynamic",
+      "suite_counts": {
+        "startup": 6,
+        "sync": 50,
+        "edge": 47,
+        "api": 43,
+        "mixed": 49,
+        "purge": 70,
+        "patterns": 64,
+        "revalidate": 45
+      },
+      "total_process_checks": 374
+    },
+    {
+      "runtime": "openresty",
+      "linkage": "static",
+      "suite_counts": {
+        "startup": 6,
+        "sync": 50,
+        "edge": 47,
+        "api": 43,
+        "mixed": 49,
+        "purge": 70,
+        "patterns": 64,
+        "revalidate": 45
+      },
+      "total_process_checks": 374
+    }
+  ],
+  "secrets_included": false,
+  "production_modified": false,
+  "adapted_example_config_checks": [
+    {
+      "runtime": "nginx",
+      "role": "master",
+      "passed": true
+    },
+    {
+      "runtime": "nginx",
+      "role": "node",
+      "passed": true
+    },
+    {
+      "runtime": "openresty",
+      "role": "master",
+      "passed": true
+    },
+    {
+      "runtime": "openresty",
+      "role": "node",
+      "passed": true
+    },
+    {
+      "runtime": "static",
+      "role": "master",
+      "passed": true
+    },
+    {
+      "runtime": "static",
+      "role": "node",
+      "passed": true
+    }
+  ]
+}

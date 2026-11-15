@@ -1,8 +1,14 @@
 # 验证记录与复现
 
-本页记录 Config/API/Edge；Purge 的一致性、恢复与性能结果见 [清理模块验证](../native-purge/tests/VALIDATION.zh-CN.md)和[基准报告](../native-purge/bench/README.zh-CN.md)。统一构建和 CI 包含四个插件，下面的三模块结果为合入最新主分支前的记录，整合后的验证单独记录。
+统一构建和 CI 包含 Sync、Config、API、Edge、Purge 五个插件。Sync 角色/身份见 [Sync 验证](../native-sync/tests/VALIDATION.zh-CN.md)，Purge 见 [清理模块验证](../native-purge/tests/VALIDATION.zh-CN.md)和[基准报告](../native-purge/bench/README.zh-CN.md)。本页保留历史基线，并单独记录当前整合结果。
 
-## 合入当前 main 后的四模块验证
+## Sync 迁入后的五模块验证
+
+Sync 的来源实现不改动，独立测试补齐静态编入和当前启动就绪/错误诊断。API 组合套件增加 `--purge --sync`：实际启用五个模块，使用不同 Sync/Purge token，检查 Node 身份、不冒报远程 applied、准确能力位及原有代理、缓存和流式行为。结构化结果见 [validation-sync-import-20261114.json](validation-sync-import-20261114.json)。
+
+当前三种构建为 Nginx 动态、OpenResty 动态和 OpenResty 静态。每种执行启动 6 项、Sync 50 项、Config/Edge 47 项、API 43 项、五模块组合 49 项、Purge 70 项、模式 64 项、再验证 45 项，共 374 项；纯 C 核心另行执行。它们验证角色/身份和共存，不证明 JWE/JWS、Node 拉取或事务已经原生化。CI 报告按套件分别上传，不包含运行目录和密钥。
+
+## API 合入时的四模块验证（历史）
 
 基于 `64c9d3c`（包含 Purge 与回源再验证）重新构建纯 Nginx 动态模块和完整 OpenResty 静态模块，两种运行时均通过：Config/Edge 47 项、API 43 项、API＋Purge 共用 44 项、Purge 70 项、模式匹配 64 项、回源再验证 45 项、交付模板 43 项。共用测试开启 API 分类、原生失效 key 和源站再验证，并检查缓存命中后的持久化清理及原有流式/协议行为。
 
@@ -10,9 +16,9 @@
 
 日期：2026-11-14。这份记录区分导入前已有结果和新仓库的独立验证；远程 CI 结果以当前提交的 Actions 记录为准。
 
-## API 扩展的当前验证
+## API 扩展验证（历史基线）
 
-当前实现新增 API 模块，并扩展 Config/Edge 的 HTTPS、IPv6、命名池、origin_host 与自动 profile 接入。当前摘要覆盖 12 个实现/config 文件；下方初始导入记录为历史，不能据此认为源码仍未修改。
+API 引入阶段新增协议识别，并扩展 Config/Edge 的 HTTPS、IPv6、命名池、origin_host 与自动 profile 接入。该阶段摘要覆盖 12 个实现/config 文件；当前清单扩展为五模块 22 个文件，历史记录不作为原始源码未修改的证明。
 
 结构化结果见 [validation-api-20261114.json](validation-api-20261114.json)。本轮没有替换线上 Node 二进制或配置，没有调用真实模型厂商。
 
@@ -33,7 +39,7 @@ API 测试覆盖路径/头部/有界 JSON 判定、响应 JSON/SSE 补判、混�
 
 [sanitizer-cc.sh](../tools/sanitizer-cc.sh) 仅对上游 `src/http/v2/*.c`、`ngx_http_grpc_module.c`、`ngx_http_proxy_v2_module.c` 关闭 alignment 插桩，其余 UBSan 及全部原生插件的 alignment 检查保持。采用该测试编译设置后两套测试均通过，没有修改 Nginx 核心源码或线上参数。
 
-本地 Alpine 缺少 ASan 运行库，本轮未执行本地 ASan。CI 已配置 Nginx 的 ASan/UBSan、普通完整 OpenResty 和静态 OpenResty；当前工作区没有推送，不能声称本次远程 CI 已通过。
+该阶段本地 Alpine 缺少 ASan 运行库，未执行本地 ASan。CI 保留 Nginx 的 ASan/UBSan、普通完整 OpenResty 和静态 OpenResty，远端结果按相应提交的 Actions 判读；下方本地基线不替代当前 CI。
 
 ```sh
 python native-api/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
@@ -46,7 +52,7 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
 
 初始实现来自原仓库提交 62fb619。当时的无 Lua Nginx 和完整 OpenResty 各通过 47 项 Config/Edge 检查，初次整理未修改实现；后续 API 扩展已修改 Config/Edge 并新增模块，当前摘要见 [SOURCE-SHA256SUMS](../SOURCE-SHA256SUMS)。
 
-原仓库同时验证的 Sync 角色和 Lua 协议测试不属于这两个插件的新仓库测试数量，不作为本仓库具备远程同步的证据。
+原仓库的 Sync 角色与 Lua 协议结果不混入历史 Config/Edge 47 项。现在原生 Sync 有本仓库自己的 50 项套件；旧 Lua 端到端同步结果仍不作为原生传输完成的证据。
 
 ## 初始独立仓库验证（API 扩展前）
 
@@ -86,7 +92,7 @@ python native-edge/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
 
 ## Sanitizer 设置
 
-CI 的 nginx 构建为整个运行时和两个动态模块启用 `-fsanitize=address,undefined -fno-omit-frame-pointer`，UBSan 遇错中止；OpenResty 额外做普通严格编译及真实进程检查。完整测试关闭 leak detection，因为测试中 Nginx fork/退出生命周期与进程级分配不用于此项泄漏验收。
+CI 的 nginx 构建为运行时和五个动态模块启用 `-fsanitize=address,undefined -fno-omit-frame-pointer`，UBSan 遇错中止；OpenResty 做普通严格编译及动态/静态真实进程检查。上游协议解析的窄 alignment 设置仍按 sanitizer-cc.sh 说明，原生模块不取消该检查。完整测试关闭 leak detection，因为测试中 Nginx fork/退出生命周期与进程级分配不用于此项泄漏验收。
 
 [tests/asan.supp](../tests/asan.supp)仅排除 Nginx 按 dlsym 设计同时从可执行文件与动态模块导出的 `ngx_modules`、`ngx_module_names`、`ngx_module_order` 注册表 ODR 报告，不排除模块缓冲区、释放后访问或其他全局数据诊断。
 
@@ -100,11 +106,11 @@ Config/Edge 和 Purge 测试夹具现在都等待实际的两个 Worker（最多
 
 [worker_startup.py](../tests/worker_startup.py) 增加 6 项真实进程检查：测试专用 fork 夹具暂停第二个子进程，证明首个 HTTP 响应早于全部 Worker 就绪；验证有限等待、释放后返回完整集合、崩溃重建仍失败，以及 master 退出时立即失败。夹具只在临时目录编译并通过 LD_PRELOAD 注入，不链接进生产模块。两种运行时均执行这组检查；Nginx CI 仍启用 ASan/UBSan，未增加诊断抑制或失败重试。
 
-当前每种运行时共 232 项：6 项启动回归、47 项 Config/Edge、70 项原有 Purge、64 项模式清理、45 项源站校验/过时复用。失败时同时输出有长度限制的 error.log 和 stdout.log，已产生的检查报告也会上传；报告不包含 token、证书或 journal。
+该次启动修复的基线每种运行时共 232 项：6 项启动回归、47 项 Config/Edge、70 项原有 Purge、64 项模式、45 项源站/stale。当前五模块完整矩阵为本页顶部的 374 项。失败诊断与报告仍保留，报告不包含 token、证书或 journal。
 
 ## 文档与发布验证
 
-独立发布前检查模块摘要、相对文档链接、示例所需文件、脚本语法、实际待提交文件和凭据扫描。源码仅包含通用模板，实际运行配置和二进制不进入 Git。新仓库 Actions 分别执行源码摘要核对、两种运行时的 47 项测试及公开内容检查。
+独立发布前检查五模块摘要、相对文档链接、示例所需文件、脚本语法、实际待提交文件和凭据扫描。源码仅包含通用模板，实际运行配置和二进制不进入 Git。Actions 执行当前完整矩阵及公开内容检查，历史 47 项仍属于其中 Config/Edge 的独立套件。
 
 ## 未验证范围
 

@@ -43,6 +43,7 @@ esac
   "$native_addon=$native_root/native-config" \
   "$native_addon=$native_root/native-api" \
   "$native_addon=$native_root/native-edge" \
-  "$native_addon=$native_root/native-purge"
+  "$native_addon=$native_root/native-purge" \
+  "$native_addon=$native_root/native-sync"
 make -j"${SCDN_NATIVE_BUILD_JOBS:-2}"
 make install

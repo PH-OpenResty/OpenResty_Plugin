@@ -12,8 +12,9 @@
 | `lib.metrics` | Edge 本机指标 | 指标名与标签需更新仪表盘，不能假定兼容旧面板 |
 | `tier.lua` | cache auto + tier | 有界固定窗口，按站点/Host/URI 隔离，不是严格滑动窗口 |
 | sitectl、panel/admin、旧集群 Agent | 外部发布者原子交付完整数据文件 | 不提供等价文件写入 API 或自动生成工具 |
+| Sync Master/Node 角色、身份登记 | native-sync | 仅角色/鉴权/能力发现；完整旧同步仍保留 |
 | 缓存复制/reload 辅助脚本 | Nginx 管理各 cache zone | 不复制 L1/L2 文件，不实施多层 miss 回退 |
-| Lua WAF、限速和连接字段 | 不在这两个插件内迁移 | 需要时独立配置 Nginx 或外部能力，不能以字段保留冒充功能已实现 |
+| Lua WAF、限速和连接字段 | 不由这些原生模块迁移 | 需要时独立配置 Nginx 或外部能力，不能以字段保留冒充功能已实现 |
 
 ## 2. 字段转换
 
@@ -36,7 +37,7 @@
 ## 3. 推荐迁移步骤
 
 1. 记录现有 Nginx 构建、模块、业务配置、站点集合、证书和可验证的回退点。
-2. 在独立目录与端口构建两个插件；先验证 Config/Edge 的测试和完整示例。
+2. 在独立目录与端口使用统一五模块构建，先验证需要启用的业务模块；Sync 单独验证角色/mTLS，Purge 单独验证持久失效。
 3. 从可信配置来源导出完整站点文件，逐个核对 Host、回源、root、缓存和证书；不要执行不可信 Lua 来转换数据。
 4. 使用真实 Worker 账户核对全部文件和父目录可读，缓存/运行目录可写，消除旧证书 symlink 路径依赖。
 5. 在隔离实例观察状态、业务 HTTP/TLS、缓存与指标；对照启停、删除、证书轮换及回退行为。
@@ -47,7 +48,7 @@
 
 ## 4. 与 Sync 的关系
 
-本仓库没有包含 Master/Node 身份模块、Node 拉取、JWE/JWS、HTTP 请求签名、journal、ACK 报告或发布编排。外部 Sync 可以在完成自身认证/验证之后交付站点文件，但端到端协议安全、持久化、远程失败报告和回退由该系统负责。
+本仓库已包含 native-sync 的 Master/Node 身份基础；Node 拉取、JWE/JWS、请求签名、Sync journal、ACK 报告和发布编排仍未迁入原生实现。完整旧服务的保留、独立监听接入与切换条件见 [Sync 迁移](SYNC-MIGRATION.zh-CN.md)和[路线图](SYNC-ROADMAP.zh-CN.md)。外部 Sync 仍负责远程协议、持久化、失败报告和回退，再将受信数据交给本机 Config。
 
 Config 的 generation/revision 用于本机内存版本选择，不能代替 Sync 的单调序号、防重放或节点授权。业务 health 与本机 ready 也需分别观察。
 

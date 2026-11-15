@@ -77,6 +77,12 @@ generation/revision 表示共享活动版本；ready、sites、last_error 还反
 
 ready=true 只表示该 Worker 可用的配置版本匹配共享活动摘要。即使源站已经停止，配置仍可能正常应用，业务请求返回 502；业务健康检测应使用真实业务路径和明确预期。指标也不提供完整源站健康或发布审计服务。
 
+### Sync 角色接口
+
+Sync 使用独立的 `/__scdn_sync/v1/status` 与 `/__scdn_sync/v1/capabilities`，不能与 Config 的 `/status` 混读。本机查询同时需要真实 Unix/loopback 连接与私有 Bearer token；Master exchange 还要求真实 mTLS 身份登记。使用受限 curl 配置文件承载 token，路径与命令见 [Sync 迁移](SYNC-MIGRATION.zh-CN.md)。
+
+0.1.0 的 Sync 状态固定为 `not_started`、`applied_revision=null`、`business_health=unknown`，表示传输/应用事务尚未迁移。Config ready/revision、Purge journal 与 Sync 角色可同时正常，但不共同构成一次远程同步成功的证明。现有 Lua Sync 工作入口与凭据继续独立保留。
+
 ## 5. 错误处理
 
 | 现象/错误 | 先检查什么 |
@@ -88,6 +94,9 @@ ready=true 只表示该 Worker 可用的配置版本匹配共享活动摘要。�
 | `empty_configuration` | 是否误发布空集合、是否确实需要 allow_empty |
 | `reader_task_unavailable` | 是否声明专用线程池，队列是否被占用，线程任务是否异常 |
 | status 403 | 请求是否来自真实本机/Unix 传输，是否另有 Nginx 访问规则 |
+| Sync control 401 | 是否为该实例独立 token；不要使用 Purge token、旧 Lua 头或查询串凭据 |
+| Sync exchange 403 | mTLS 验证、CA、客户端叶 DER 指纹登记、Node/scope 是否正确 |
+| Sync desired/stage 等不成功 | 当前角色模块尚未实现传输或事务；核对 capabilities，保留旧服务 |
 | 业务 403 | Host 未登记或站点停用；也可能由用户自行配置的其他访问模块返回 |
 | 业务 503 | Worker 尚未装入活动摘要；检查就绪、源文件与后台任务 |
 | 业务 502/504 | 源站、DNS resolver、端口、网络与原生 proxy 超时；不代表 watcher 解析失败 |
@@ -123,4 +132,4 @@ Worker 异常退出后，Nginx 拉起新 Worker；新进程继承启动快照，
 
 Config 的共享活动代际在手工 reload 后属于新配置周期；Edge 指标区可在兼容结构下复用。升级到不同数据结构时规划新共享区名称。没有把 `.so` 文件替换当作在线更新程序的保证。
 
-本仓库不自带 systemd 管理器、磁盘历史 GC、源站探测调度器或跨主机同步服务。保留必要监控和备份，实际静态内容与缓存容量仍按 Nginx/存储层管理。
+本仓库不自带 systemd 管理器、源站探测调度器或完整原生跨主机同步服务。Sync role/id/peer/token 和模块程序属于启动配置，按 Nginx reload/重启流程处理；后续原生化范围见 [路线图](SYNC-ROADMAP.zh-CN.md)。保留必要监控和备份，静态内容、缓存和各组件私有日志按其手册管理。
