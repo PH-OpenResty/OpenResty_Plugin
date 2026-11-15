@@ -1,0 +1,4 @@
+{"v":1,"source_seq":"2","action":"BANNED","ban_id":"00000000-0000-0000-0000-000000000001","ip":"198.51.100.23","family":4,"scope":"site:alpha","layer":7,"source":"waf_deny","fixed_duration_s":600,"expires_boot_ns":"10000600000000000"}
+{"v":1,"source_seq":"4","action":"UPGRADED","ban_id":"00000000-0000-0000-0000-000000000002","ip":"198.51.100.23","family":4,"scope":"node_web_lb","layer":3,"source":"waf_escalation","fixed_duration_s":3600,"expires_boot_ns":"10003619000000000"}
+{"v":1,"source_seq":"5","action":"SUPERSEDED","ban_id":"00000000-0000-0000-0000-000000000001","ip":"198.51.100.23","family":4,"scope":"site:alpha","successor_ban_id":"00000000-0000-0000-0000-000000000002"}
+{"v":1,"source_seq":"6","action":"EXPIRED","ban_id":"00000000-0000-0000-0000-000000000002","ip":"198.51.100.23","family":4,"scope":"node_web_lb","layer":0,"effective_boot_ns":"10003619000000000"}
