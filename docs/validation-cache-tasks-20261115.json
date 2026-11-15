@@ -1,0 +1,69 @@
+{
+  "date": "2026-11-15",
+  "environment": "isolated WSL2 Alpine Linux x86_64",
+  "native_sync_version": "0.2.0",
+  "native_purge_version": "0.3.0",
+  "runtimes": {
+    "nginx": {
+      "checks": {
+        "startup": 6,
+        "sync": 50,
+        "tasks": 99,
+        "edge": 47,
+        "api": 44,
+        "mixed": 50,
+        "purge": 70,
+        "patterns": 64,
+        "revalidate": 45
+      },
+      "total": 475,
+      "passed": true
+    },
+    "openresty": {
+      "checks": {
+        "startup": 6,
+        "sync": 50,
+        "tasks": 99,
+        "edge": 47,
+        "api": 44,
+        "mixed": 50,
+        "purge": 70,
+        "patterns": 64,
+        "revalidate": 45
+      },
+      "total": 475,
+      "passed": true
+    },
+    "static": {
+      "checks": {
+        "startup": 6,
+        "sync": 50,
+        "tasks": 99,
+        "edge": 47,
+        "api": 44,
+        "mixed": 50,
+        "purge": 70,
+        "patterns": 64,
+        "revalidate": 45
+      },
+      "total": 475,
+      "passed": true
+    }
+  },
+  "core_checks": [
+    "strict C99",
+    "UBSan trap"
+  ],
+  "public_checks": [
+    "24 implementation checksums",
+    "Markdown relative links and fences",
+    "Python and shell syntax",
+    "publication staging index",
+    "Gitleaks worktree and history"
+  ],
+  "ci": "Refer to the matching commit Actions checks; sanitizer execution is configured in CI.",
+  "production_modified": false,
+  "performance_or_production_capacity_claimed": false,
+  "configuration_snapshot_sync_implemented": false,
+  "cache_task_delivery": "at least once; durable terminal receipts replay results after lost ACK"
+}

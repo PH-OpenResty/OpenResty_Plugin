@@ -48,7 +48,7 @@
 
 ## 4. 与 Sync 的关系
 
-本仓库已包含 native-sync 的 Master/Node 身份基础；Node 拉取、JWE/JWS、请求签名、Sync journal、ACK 报告和发布编排仍未迁入原生实现。完整旧服务的保留、独立监听接入与切换条件见 [Sync 迁移](SYNC-MIGRATION.zh-CN.md)和[路线图](SYNC-ROADMAP.zh-CN.md)。外部 Sync 仍负责远程协议、持久化、失败报告和回退，再将受信数据交给本机 Config。
+本仓库已包含 native-sync 的 Master/Node 身份基础；配置快照的 Node 拉取、JWE/JWS、请求签名、journal、ACK 报告和发布编排仍未迁入原生实现。完整旧服务的保留、独立监听接入与切换条件见 [Sync 迁移](SYNC-MIGRATION.zh-CN.md)和[路线图](SYNC-ROADMAP.zh-CN.md)。外部 Sync 仍负责远程协议、持久化、失败报告和回退，再将受信数据交给本机 Config。
 
 Config 的 generation/revision 用于本机内存版本选择，不能代替 Sync 的单调序号、防重放或节点授权。业务 health 与本机 ready 也需分别观察。
 
@@ -57,3 +57,7 @@ Config 的 generation/revision 用于本机内存版本选择，不能代替 Syn
 站点文件支持的字段可在 Worker 不重建的情况下切换；Nginx 启动参数和模块程序仍需 reload/重启。旧缓存对象按原策略淘汰，新版本 cache key 可能隔离旧数据。现有 TLS 连接不会强制断开，完全重启必须有磁盘有效输入。
 
 完成迁移应以实际站点和目标运行时验收为准，不把测试环境的 47 项检查推导为生产容量、所有协议或全部业务配置已覆盖。
+
+## 缓存任务及 HTTP 头升级
+
+Sync 0.2.0 的持久化缓存任务投递、状态、删除、Node 后台执行及故障恢复见 [缓存任务手册](CACHE-TASKS.zh-CN.md)。刷新成功再提交预热，不能假定队列顺序。配置快照的旧同步流程仍需独立保留。代理头采用 `X-Clinet-IP`，Purge 控制调用方同步切换为 `X-Purge-Mode` / `X-Purge-Scope`，见 [HTTP 头约定](HTTP-HEADERS.zh-CN.md)。

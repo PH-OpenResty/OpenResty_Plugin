@@ -178,3 +178,7 @@ prefix /api/private/ {
 插件本身没有远程同步、Master/Node 角色、HTTP 编辑器、WAF、限速、程序升级和持久化发布历史。外部发布者可以交付该文件，但应保证只有一套权威配置来源。
 
 同仓库 [native-sync](../native-sync/README.zh-CN.md)独立提供 Master/Node 角色与身份基础；其 0.1.0 尚不发布/拉取或提交本站点文件。安装、共存与后续切换见 [Sync 迁移说明](../docs/SYNC-MIGRATION.zh-CN.md)，Config 的代际不能替代远程同步序号。
+
+## HTTP 头与缓存任务联动
+
+自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.2.0 的缓存刷新/预热任务及原生配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。

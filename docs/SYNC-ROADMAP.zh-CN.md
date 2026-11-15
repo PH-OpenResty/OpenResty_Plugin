@@ -1,6 +1,6 @@
 # Sync 原生化路线与完成标准
 
-当前版本：native-sync 0.1.0。本页记录仍需迁移的合同，与本仓库已经提供的角色/身份模块分开判读。实现来源为 [OpenResty_Lua 62fb619](https://github.com/PH-OpenResty/OpenResty_Lua/tree/62fb61947f4c6d10eca468b7b66979009957de55/native-sync)；历史协议/缺口依据见[原生设计](https://github.com/PH-OpenResty/OpenResty_Lua/blob/62fb61947f4c6d10eca468b7b66979009957de55/doc/NATIVE-SYNC-PLUGIN-DESIGN.zh-CN.md)和[完整性审查](https://github.com/PH-OpenResty/OpenResty_Lua/blob/62fb61947f4c6d10eca468b7b66979009957de55/doc/SYNC-GAP-REVIEW.zh-CN.md)。
+当前版本：native-sync 0.2.0。本页记录仍需迁移的合同，与本仓库已经提供的角色/身份模块分开判读。实现来源为 [OpenResty_Lua 62fb619](https://github.com/PH-OpenResty/OpenResty_Lua/tree/62fb61947f4c6d10eca468b7b66979009957de55/native-sync)；历史协议/缺口依据见[原生设计](https://github.com/PH-OpenResty/OpenResty_Lua/blob/62fb61947f4c6d10eca468b7b66979009957de55/doc/NATIVE-SYNC-PLUGIN-DESIGN.zh-CN.md)和[完整性审查](https://github.com/PH-OpenResty/OpenResty_Lua/blob/62fb61947f4c6d10eca468b7b66979009957de55/doc/SYNC-GAP-REVIEW.zh-CN.md)。
 
 ## 已实现
 
@@ -9,6 +9,8 @@
 - Master 的 mTLS 客户端证书验证与叶 DER 指纹登记。
 - 只读 status/capabilities/peers、原生变量、路径/方法/正文边界。
 - 纯 C 核心、独立动态加载和统一静态编入入口。
+
+- 缓存任务持久队列、mTLS Node 拉取、Purge 刷新、本机预热及结果恢复，见 [任务合同](CACHE-TASKS.zh-CN.md)。这些能力与下表配置快照协议分开。
 
 ## 后续阶段
 

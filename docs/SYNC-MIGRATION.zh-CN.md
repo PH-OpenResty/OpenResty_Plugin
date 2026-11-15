@@ -1,6 +1,6 @@
 # 原生 Sync 安装、共存与迁移
 
-本仓库包含 `native-sync` 0.1.0 的角色/身份基础，与 Config、API、Edge、Purge 统一构建。它提供实际可加载的原生模块及只读鉴权接口；完整 Master→Node 加密同步仍由原 Lua Sync 部署承担。
+本仓库包含 `native-sync` 0.2.0 的角色/身份基础及缓存任务通道，与 Config、API、Edge、Purge 统一构建。它提供实际可加载的原生模块、鉴权查询与缓存任务接口；完整 Master→Node 加密同步仍由原 Lua Sync 部署承担。
 
 ## 1. 能力对应
 
@@ -10,8 +10,10 @@
 | 本机控制认证、Master mTLS 节点登记 | Sync | 使用独立凭据、Socket 和监听端口 |
 | 文件内容变更与本机站点热更新 | Config + Edge/API | 与 Sync 角色接口分开，不代表远程同步 |
 | 按节点加密发布、对象下载、签名/防重放 | 原 Lua Sync | 继续保留既有服务，原生能力位仍为 false |
-| Node 拉取、stage/commit/rollback/finalize、报告队列 | 原 Lua Sync | 不把原生只读 location 接到旧生产路由 |
+| 配置快照拉取、stage/commit/rollback/finalize、报告队列 | 原 Lua Sync | 不把原生任务或角色 location 接到旧配置同步路由 |
 | Sync journal、发布历史与业务探测 | 原 Lua Sync / 外部控制面 | 不复用 Purge journal 或 Config generation 冒充 |
+
+缓存任务已经原生实现，配置快照同步仍独立保留。缓存任务的 Master URL、mTLS 拉取、Purge/预热执行和结果恢复见 [完整手册](CACHE-TASKS.zh-CN.md)。
 
 ## 2. 独立构建与测试
 
@@ -37,7 +39,7 @@ python native-api/tests/integration.py --prefix /tmp/scdn-sync-static --static \
 
 Master 为 exchange 准备受信服务端证书、私钥和 Node CA，配置 `ssl_verify_client on`，再以 Node 客户端叶证书 DER 的 SHA-256 登记节点。未登记证书、客户端自报 Node ID 或控制 token 不能授权 exchange。指纹提取可用 `openssl x509 -in node.crt -outform DER | openssl dgst -sha256`，登记时仅填写 64 个小写十六进制字符。
 
-Node 当前配置自己的角色/ID/scope 和本机 token，没有已实现的 Master URL、自动轮询或发布应用事务。完整模板见 [Master](../native-sync/examples/master.nginx.conf) 与 [Node](../native-sync/examples/node.nginx.conf)。
+Node 可选择配置缓存任务的 Master URL、自动轮询与本机执行；这些不提供配置快照发布应用事务。完整模板见 [Master](../native-sync/examples/master.nginx.conf) 与 [Node](../native-sync/examples/node.nginx.conf)。
 
 ## 4. 查询与判读
 
@@ -45,7 +47,7 @@ Node 当前配置自己的角色/ID/scope 和本机 token，没有已实现的 M
 
 - control 接口同时检查真实 Unix/loopback 连接和独立 Bearer token。
 - exchange 只允许 Master，并核对实际 TLS 验证结果及登记指纹。
-- 只读方法为 GET/HEAD；修改方法为 405，带正文/查询串或编码路径为 400，认证错误为 401/403。
+- 角色查询方法为 GET/HEAD；角色查询的修改方法为 405，缓存任务使用单独的 POST/GET/DELETE 路由，带正文/查询串或编码路径为 400，认证错误为 401/403。
 - 当前 status 的 `sync_state=not_started`、`applied_revision=null`、`business_health=unknown` 是真实能力边界，不通过 watcher 的 revision 填充这些字段。
 - capabilities 的 `encrypted_distribution/node_pull/apply_transactions/business_health` 仍为 false。查询成功只证明当前角色/身份接口正常。
 

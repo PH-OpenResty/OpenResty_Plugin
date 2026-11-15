@@ -81,7 +81,7 @@ ready=true 只表示该 Worker 可用的配置版本匹配共享活动摘要。�
 
 Sync 使用独立的 `/__scdn_sync/v1/status` 与 `/__scdn_sync/v1/capabilities`，不能与 Config 的 `/status` 混读。本机查询同时需要真实 Unix/loopback 连接与私有 Bearer token；Master exchange 还要求真实 mTLS 身份登记。使用受限 curl 配置文件承载 token，路径与命令见 [Sync 迁移](SYNC-MIGRATION.zh-CN.md)。
 
-0.1.0 的 Sync 状态固定为 `not_started`、`applied_revision=null`、`business_health=unknown`，表示传输/应用事务尚未迁移。Config ready/revision、Purge journal 与 Sync 角色可同时正常，但不共同构成一次远程同步成功的证明。现有 Lua Sync 工作入口与凭据继续独立保留。
+0.2.0 的配置同步状态仍为 `not_started`、`applied_revision=null`、`business_health=unknown`，表示传输/应用事务尚未迁移。Config ready/revision、Purge journal 与 Sync 角色可同时正常，但不共同构成一次远程同步成功的证明。现有 Lua Sync 工作入口与凭据继续独立保留。
 
 ## 5. 错误处理
 
@@ -133,3 +133,7 @@ Worker 异常退出后，Nginx 拉起新 Worker；新进程继承启动快照，
 Config 的共享活动代际在手工 reload 后属于新配置周期；Edge 指标区可在兼容结构下复用。升级到不同数据结构时规划新共享区名称。没有把 `.so` 文件替换当作在线更新程序的保证。
 
 本仓库不自带 systemd 管理器、源站探测调度器或完整原生跨主机同步服务。Sync role/id/peer/token 和模块程序属于启动配置，按 Nginx reload/重启流程处理；后续原生化范围见 [路线图](SYNC-ROADMAP.zh-CN.md)。保留必要监控和备份，静态内容、缓存和各组件私有日志按其手册管理。
+
+## 缓存任务及 HTTP 头升级
+
+Sync 0.2.0 的持久化缓存任务投递、状态、删除、Node 后台执行及故障恢复见 [缓存任务手册](CACHE-TASKS.zh-CN.md)。刷新成功再提交预热，不能假定队列顺序。配置快照的旧同步流程仍需独立保留。代理头采用 `X-Clinet-IP`，Purge 控制调用方同步切换为 `X-Purge-Mode` / `X-Purge-Scope`，见 [HTTP 头约定](HTTP-HEADERS.zh-CN.md)。

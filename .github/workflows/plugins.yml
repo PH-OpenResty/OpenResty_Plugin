@@ -30,7 +30,7 @@ jobs:
       - name: Install build and test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential perl libpcre2-dev libssl-dev zlib1g-dev curl
+          sudo apt-get install -y build-essential perl libpcre2-dev libssl-dev zlib1g-dev libcurl4-openssl-dev curl
           python -m pip install -r tests/requirements.txt
       - name: Verify implementation checksums
         run: sha256sum -c SOURCE-SHA256SUMS
@@ -69,6 +69,15 @@ jobs:
           extra=()
           if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
           python native-sync/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/sync-results.json"
+      - name: Durable Master Node cache refresh and verified preheat tasks
+        env:
+          ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+          PLUGIN_LINKAGE: ${{ matrix.linkage }}
+        run: |
+          extra=()
+          if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
+          python native-sync/tests/cache_tasks.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/cache-task-results.json"
       - name: Configuration, TLS and updates without worker reloads
         env:
           ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
@@ -130,6 +139,7 @@ jobs:
           path: |
             ${{ runner.temp }}/startup-results.json
             ${{ runner.temp }}/sync-results.json
+            ${{ runner.temp }}/cache-task-results.json
             ${{ runner.temp }}/plugin-results.json
             ${{ runner.temp }}/api-results.json
             ${{ runner.temp }}/api-purge-sync-results.json

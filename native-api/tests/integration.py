@@ -137,6 +137,7 @@ class Origin(http.server.BaseHTTPRequestHandler):
         result = json.dumps({'method': self.command, 'path': self.path,
             'body_sha256': hashlib.sha256(body).hexdigest(), 'body_bytes': len(body),
             'host': self.headers.get('Host'), 'profile': self.headers.get('X-Test-Profile'),
+            'client_ip': self.headers.get('X-Clinet-IP'),
             'connection_header': self.headers.get('Connection'),
             'accept_encoding': self.headers.get('Accept-Encoding'),
             'source_port': self.client_address[1]}, sort_keys=True).encode()
@@ -243,6 +244,7 @@ site prefix {{ host prefix.example.test; upstream http://pooled-origin; cache of
  proxy_set_header Upgrade $http_upgrade;
  proxy_set_header Accept-Encoding "";
  proxy_set_header X-Test-Profile {profile};
+ proxy_set_header X-Clinet-IP $remote_addr;
  proxy_ssl_server_name on;
  proxy_ssl_name $scdn_edge_origin_sni;
  proxy_ssl_verify on;
@@ -472,6 +474,9 @@ http {{
         status, headers, data = self.request('/asset?a=1')
         self.check('ordinary content stays in the web profile', status == 200 and headers['x-kind'] == 'web'
             and json.loads(data)['profile'] == 'web')
+        _, _, identity = self.request('/api/client-ip', headers={'X-Clinet-IP': '192.0.2.20'})
+        self.check('X-Clinet-IP is overwritten from the trusted connection',
+                   json.loads(identity)['client_ip'] == '127.0.0.1')
         _, hit, _ = self.request('/asset?a=1')
         self.check('ordinary public GET retains native nginx caching', hit.get('x-cache') == 'HIT')
         if self.purge:
@@ -481,7 +486,7 @@ http {{
             connection.sock.connect(str(self.socket))
             connection.request('POST', '/purge', b'/asset?a=1\n',
                 {'Authorization': 'Bearer ' + self.purge_token, 'Content-Type': 'text/plain',
-                 'X-SCDN-Purge-Mode': 'exact', 'X-SCDN-Purge-Scope': 'plain'})
+                 'X-Purge-Mode': 'exact', 'X-Purge-Scope': 'plain'})
             response = connection.getresponse()
             result = json.loads(response.read())
             connection.close()
