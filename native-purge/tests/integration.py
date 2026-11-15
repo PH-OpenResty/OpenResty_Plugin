@@ -62,8 +62,9 @@ class OriginServer(http.server.ThreadingHTTPServer):
 
 
 class Review:
-    def __init__(self,root,prefix,faults=True):
+    def __init__(self,root,prefix,faults=True,static=False):
         self.root,self.prefix=root,prefix
+        self.static=static
         self.nginx=prefix/'sbin/nginx'
         self.http,self.second=port(),port()
         self.control_socket=root/'control.sock'
@@ -115,7 +116,8 @@ class Review:
             add_header X-Worker $pid always;
         }
 '''.replace('ORIGIN',str(self.origin.server_port))
-        return f'''load_module {self.prefix}/modules/ngx_http_scdn_purge_module.so;
+        module='' if self.static else f'load_module {self.prefix}/modules/ngx_http_scdn_purge_module.so;'
+        return f'''{module}
 {user}
 worker_processes 2;
 thread_pool scdn_cache_purge threads=2 max_queue=128;
@@ -427,10 +429,11 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--prefix',required=True,type=Path)
     parser.add_argument('--report',type=Path)
+    parser.add_argument('--static',action='store_true')
     args=parser.parse_args()
     prefix=args.prefix/'nginx' if (args.prefix/'nginx/sbin/nginx').exists() else args.prefix
     with tempfile.TemporaryDirectory(prefix='scdn-purge-test-') as directory:
-        review=Review(Path(directory),prefix.resolve())
+        review=Review(Path(directory),prefix.resolve(),static=args.static)
         try:
             checks=review.run()
             if args.report:

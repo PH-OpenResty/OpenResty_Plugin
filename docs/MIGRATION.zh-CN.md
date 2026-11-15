@@ -1,6 +1,6 @@
 # 从旧 Lua 配置管理迁移
 
-目标是把业务请求和本机配置检测迁入两个纯 C 插件，直接读取受限的完整站点数据文件；不再依赖 Lua 生成配置、源码写入、LuaJIT 字节码编译或 reload 管理接口。
+目标是把业务请求和本机配置检测迁入纯 C 插件，直接读取受限的完整站点数据文件；新增 API 模块负责动态 API、AI 与流式请求判定。独立部署不依赖 Lua 生成配置；已有 SCDN 的受信冷发布适配器可以继续交付快照。
 
 ## 1. 能力对应
 
@@ -27,10 +27,11 @@
 | `cache.layer` | `cache l1/l2/off;`，auto 另需 tier |
 | `ssl.cert/key` | `certificate ...; certificate_key ...;` 成对填写 |
 | `locations[].prefix/upstream/cache` | `prefix /api/ { upstream ...; cache ...; }` |
+| `origin_host` / `locations[].origin_host` | 站点或 prefix 的 `origin_host auto/NAME;` |
 | 空字符串字段 | 省略对应可选字段，不写空引号占位 |
 | `waf`、`rate_limit`、`port_forward`、`live` | 不复制；新语法会拒绝未知字段 |
 
-每个站点仍需至少一个 Host，以及 root/upstream 至少一个。HTTPS/IPv6 回源、泛域名、多源站池和任意 Nginx 参数不能通过机械替换字段获得支持。
+每个站点仍需至少一个 Host，以及 root/upstream 至少一个。HTTPS/IPv6 URL 可保留；HTTPS 还需配置正确的 Host、SNI、CA 验证。命名池需预先声明，泛域名及任意 Nginx 参数不能通过机械替换字段获得支持。
 
 ## 3. 推荐迁移步骤
 

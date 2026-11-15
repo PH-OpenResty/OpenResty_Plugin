@@ -3,6 +3,12 @@
 set -eu
 native_prefix=${1:?provide an absolute isolated prefix}
 native_runtime=${2:-nginx}
+native_linkage=${3:-dynamic}
+case "$native_linkage" in
+  dynamic) native_addon=--add-dynamic-module;;
+  static) native_addon=--add-module;;
+  *) echo 'linkage must be dynamic or static' >&2; exit 1;;
+esac
 case "$native_prefix" in /*) ;; *) echo 'prefix must be absolute' >&2; exit 1;; esac
 if [ -e "$native_prefix/sbin/nginx" ] || [ -e "$native_prefix/nginx/sbin/nginx" ]; then
     echo 'refusing to overwrite an existing nginx installation' >&2
@@ -31,10 +37,12 @@ case "$native_runtime" in
 esac
 ./configure --prefix="$native_prefix" --with-compat --with-http_ssl_module \
   --with-http_v2_module --with-pcre-jit --with-threads \
+  --with-cc="${SCDN_NATIVE_CC:-cc}" \
   --with-cc-opt="${SCDN_NATIVE_CFLAGS:--Werror}" \
   --with-ld-opt="${SCDN_NATIVE_LDFLAGS:-}" \
-  --add-dynamic-module="$native_root/native-config" \
-  --add-dynamic-module="$native_root/native-edge" \
-  --add-dynamic-module="$native_root/native-purge"
+  "$native_addon=$native_root/native-config" \
+  "$native_addon=$native_root/native-api" \
+  "$native_addon=$native_root/native-edge" \
+  "$native_addon=$native_root/native-purge"
 make -j"${SCDN_NATIVE_BUILD_JOBS:-2}"
 make install

@@ -94,8 +94,8 @@ class ConditionalOrigin(http.server.BaseHTTPRequestHandler):
 
 
 class Revalidation(Review):
-    def __init__(self, root, prefix):
-        super().__init__(root, prefix, faults=False)
+    def __init__(self, root, prefix, static=False):
+        super().__init__(root, prefix, faults=False, static=static)
         self.origin.RequestHandlerClass = ConditionalOrigin
         self.origin.settings = {}
         self.origin.records = []
@@ -377,10 +377,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--prefix', required=True, type=Path)
     parser.add_argument('--report', type=Path)
+    parser.add_argument('--static', action='store_true')
     args = parser.parse_args()
     prefix = args.prefix / 'nginx' if (args.prefix / 'nginx/sbin/nginx').exists() else args.prefix
     with tempfile.TemporaryDirectory(prefix='scdn-revalidate-test-') as directory:
-        review = Revalidation(Path(directory), prefix.resolve())
+        review = Revalidation(Path(directory), prefix.resolve(), static=args.static)
         try:
             checks = review.run()
             if args.report:

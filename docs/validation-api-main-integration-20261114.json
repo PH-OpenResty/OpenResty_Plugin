@@ -1,0 +1,105 @@
+{
+  "date": "2026-11-14",
+  "base_commit": "64c9d3c39d00be5a49fc15f4937a2d405f215e00",
+  "implementation_manifest_sha256": "fe5c55c9d60c92a6c26260b5580af0578606823a46c391585067f80facc6ed8d",
+  "production_modified": false,
+  "real_vendor_api_calls": 0,
+  "builds": [
+    {
+      "runtime": "nginx-dynamic",
+      "linkage": "dynamic",
+      "suites": [
+        {
+          "name": "edge",
+          "passed": true,
+          "checks": 47,
+          "report_sha256": "9e92e8d31e0119ca852a150457154a47413df53298901e0feffacff48c4a0f99"
+        },
+        {
+          "name": "api",
+          "passed": true,
+          "checks": 43,
+          "report_sha256": "76b8aa56e9080cecdf937d75258126406079340a6911d050d17b14ac07d88fc7"
+        },
+        {
+          "name": "api-purge",
+          "passed": true,
+          "checks": 44,
+          "report_sha256": "3c3bfe03a6ea4b2c96ab488abc9cbae62a0188d7cdc3ba7cc17b0b696656ff31"
+        },
+        {
+          "name": "purge",
+          "passed": true,
+          "checks": 70,
+          "report_sha256": "60e09f507cd3b3c84ae26e2fe31e87ffa3fd3826b0f798234234ace60fe8d9ed"
+        },
+        {
+          "name": "patterns",
+          "passed": true,
+          "checks": 64,
+          "report_sha256": "5f407286b6a303cd2f890689f6dcdfab246d3acbf326ee81601def204ca7daaa"
+        },
+        {
+          "name": "revalidation",
+          "passed": true,
+          "checks": 45,
+          "report_sha256": "bca0269462f00a7ab6abb449a1868a832c63d2e9656ebaf9673242212a228b1a"
+        },
+        {
+          "name": "templates",
+          "passed": true,
+          "checks": 43,
+          "report_sha256": "65dd95ced1db487702d4977fce96854bf2cbf1cc13dddafab31f102c0297fdf9"
+        }
+      ]
+    },
+    {
+      "runtime": "openresty-static",
+      "linkage": "static",
+      "suites": [
+        {
+          "name": "edge",
+          "passed": true,
+          "checks": 47,
+          "report_sha256": "9e92e8d31e0119ca852a150457154a47413df53298901e0feffacff48c4a0f99"
+        },
+        {
+          "name": "api",
+          "passed": true,
+          "checks": 43,
+          "report_sha256": "72a1df11c258e8bda72c6c540c328a38cb8bf9fd4d72713461f355130735d8bf"
+        },
+        {
+          "name": "api-purge",
+          "passed": true,
+          "checks": 44,
+          "report_sha256": "78f5c57a57961f229b31b122a2f1e6ac400754e5ba6149537d24ec486346ab09"
+        },
+        {
+          "name": "purge",
+          "passed": true,
+          "checks": 70,
+          "report_sha256": "60e09f507cd3b3c84ae26e2fe31e87ffa3fd3826b0f798234234ace60fe8d9ed"
+        },
+        {
+          "name": "patterns",
+          "passed": true,
+          "checks": 64,
+          "report_sha256": "5f407286b6a303cd2f890689f6dcdfab246d3acbf326ee81601def204ca7daaa"
+        },
+        {
+          "name": "revalidation",
+          "passed": true,
+          "checks": 45,
+          "report_sha256": "bca0269462f00a7ab6abb449a1868a832c63d2e9656ebaf9673242212a228b1a"
+        },
+        {
+          "name": "templates",
+          "passed": true,
+          "checks": 43,
+          "report_sha256": "e2c861b6cf58e9e95d005eff75a6a5faa5f1d0a5967b2d423ec57a11473a5396"
+        }
+      ]
+    }
+  ]
+}

@@ -121,10 +121,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--prefix', required=True, type=Path)
     parser.add_argument('--report', type=Path)
+    parser.add_argument('--static', action='store_true')
     args = parser.parse_args()
     prefix = args.prefix / 'nginx' if (args.prefix / 'nginx/sbin/nginx').exists() else args.prefix
     with tempfile.TemporaryDirectory(prefix='scdn-pattern-test-') as directory:
-        review = Patterns(Path(directory), prefix.resolve(), faults=False)
+        review = Patterns(Path(directory), prefix.resolve(), faults=False, static=args.static)
         try:
             checks = review.run()
             if args.report:

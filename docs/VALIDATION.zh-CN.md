@@ -1,16 +1,54 @@
 # 验证记录与复现
 
-本页主要记录导入的 Config/Edge；新增 Purge 的一致性、恢复与性能结果见 [清理模块验证](../native-purge/tests/VALIDATION.zh-CN.md)和[基准报告](../native-purge/bench/README.zh-CN.md)。统一构建和 CI 现在同时包含三个插件。
+本页记录 Config/API/Edge；Purge 的一致性、恢复与性能结果见 [清理模块验证](../native-purge/tests/VALIDATION.zh-CN.md)和[基准报告](../native-purge/bench/README.zh-CN.md)。统一构建和 CI 包含四个插件，下面的三模块结果为合入最新主分支前的记录，整合后的验证单独记录。
+
+## 合入当前 main 后的四模块验证
+
+基于 `64c9d3c`（包含 Purge 与回源再验证）重新构建纯 Nginx 动态模块和完整 OpenResty 静态模块，两种运行时均通过：Config/Edge 47 项、API 43 项、API＋Purge 共用 44 项、Purge 70 项、模式匹配 64 项、回源再验证 45 项、交付模板 43 项。共用测试开启 API 分类、原生失效 key 和源站再验证，并检查缓存命中后的持久化清理及原有流式/协议行为。
+
+结果与每份报告的摘要见 [validation-api-main-integration-20261114.json](validation-api-main-integration-20261114.json)。Purge 三套测试新增 `--static` 入口，检查内容保持；CI 继续执行所有套件，并保留 Nginx ASan/UBSan 与动态/静态 OpenResty 矩阵。以上为本地隔离结果，远端 CI 结果以 PR 检查记录为准。
 
 日期：2026-11-14。这份记录区分导入前已有结果和新仓库的独立验证；远程 CI 结果以当前提交的 Actions 记录为准。
 
+## API 扩展的当前验证
+
+当前实现新增 API 模块，并扩展 Config/Edge 的 HTTPS、IPv6、命名池、origin_host 与自动 profile 接入。当前摘要覆盖 12 个实现/config 文件；下方初始导入记录为历史，不能据此认为源码仍未修改。
+
+结构化结果见 [validation-api-20261114.json](validation-api-20261114.json)。本轮没有替换线上 Node 二进制或配置，没有调用真实模型厂商。
+
+| 构建或场景 | Config/Edge | 自动 API/代理 | 说明 |
+| --- | --- | --- | --- |
+| 纯 Nginx 核心，三个动态模块 | 47 项通过 | 43 项通过 | 业务不需要 Lua |
+| 完整 OpenResty，三个动态模块 | 47 项通过 | 43 项通过 | 与完整运行时集成 |
+| 完整 OpenResty，三个静态模块 | 47 项通过 | 43 项通过 | 对齐 Node 的静态编入方式 |
+| 实际 profiles/common 模板 | — | 43 项通过 | 使用交付模板执行真实代理测试 |
+| UBSan trap 构建 | 47 项通过 | 43 项通过 | 原生模块的 alignment 等检查保持 |
+| 旧 SCDN Node 结构的隔离接入 | — | 6 项通过 | 预检、HTTP/HTTPS、访问处理、缓存映射和冷导出器 |
+
+这些是同一核心测试在不同构建上的验证次数，不能把重复运行累计成不同能力。Node 接入使用本地夹具，不能描述为目标服务器现场验收。
+
+API 测试覆盖路径/头部/有界 JSON 判定、响应 JSON/SSE 补判、混淆和无效 UTF-8、正文完整性、异步读取、缓存绕过、SSE 首段、HTTP/2 多路复用、gRPC DATA/trailers、WebSocket、取消传播、TCP 复用、HTTPS/SNI 及热更新。
+
+本地环境为隔离 WSL2/Alpine x86_64、GCC 14.2.0。UBSan 使用 `-fsanitize=undefined -fsanitize-undefined-trap-on-error`。首次 HTTP/2 检查在上游 `ngx_http_v2_send_settings` 的 write_sid 触发，调试栈对应固定源码 `ngx_http_v2.c:2837`；Nginx 在支持的架构上用 `NGX_HAVE_NONALIGNED` 选择这种读写。
+
+[sanitizer-cc.sh](../tools/sanitizer-cc.sh) 仅对上游 `src/http/v2/*.c`、`ngx_http_grpc_module.c`、`ngx_http_proxy_v2_module.c` 关闭 alignment 插桩，其余 UBSan 及全部原生插件的 alignment 检查保持。采用该测试编译设置后两套测试均通过，没有修改 Nginx 核心源码或线上参数。
+
+本地 Alpine 缺少 ASan 运行库，本轮未执行本地 ASan。CI 已配置 Nginx 的 ASan/UBSan、普通完整 OpenResty 和静态 OpenResty；当前工作区没有推送，不能声称本次远程 CI 已通过。
+
+```sh
+python native-api/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
+  --report /tmp/scdn-api-results.json
+```
+
+静态构建使用构建脚本第三参数 `static`，两套测试均加 `--static`；测试交付模板增加 `--templates`。本轮缺少 SSH 登录，未执行目标 Node 现场构建或安装。
+
 ## 已有实现基线
 
-导入的实现来自原仓库提交 62fb619。该版本已验证：无 Lua 的 Nginx 1.31.8 和完整 OpenResty 1.31.8.1，各 47 项真实 Config/Edge 检查通过。原生源文件摘要保存在 [SOURCE-SHA256SUMS](../SOURCE-SHA256SUMS)；本次独立整理没有修改 `.c`、`.h` 或模块 `config` 实现。
+初始实现来自原仓库提交 62fb619。当时的无 Lua Nginx 和完整 OpenResty 各通过 47 项 Config/Edge 检查，初次整理未修改实现；后续 API 扩展已修改 Config/Edge 并新增模块，当前摘要见 [SOURCE-SHA256SUMS](../SOURCE-SHA256SUMS)。
 
 原仓库同时验证的 Sync 角色和 Lua 协议测试不属于这两个插件的新仓库测试数量，不作为本仓库具备远程同步的证据。
 
-## 本次独立仓库验证
+## 初始独立仓库验证（API 扩展前）
 
 在全新的测试前缀中，使用本仓库自己的 `tools/build-runtime.sh`，只编译 Config/Edge：
 

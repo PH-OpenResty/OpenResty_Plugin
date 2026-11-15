@@ -45,7 +45,7 @@ typedef struct {
     scdn_config_snapshot_t *snapshot;
     scdn_config_site_t *site;
     scdn_edge_counter_t *counter;
-    ngx_str_t upstream, cache;
+    ngx_str_t upstream, cache, origin_host;
     ngx_flag_t routed, recorded, tier_done, tier_hot;
 } scdn_edge_request_t;
 
