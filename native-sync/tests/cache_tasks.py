@@ -39,7 +39,8 @@ class Origin(http.server.BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header('Content-Length', str(len(body)))
         self.send_header('ETag', f'"v{version}"')
-        self.send_header('Cache-Control', 'private,no-store' if self.path.startswith('/private/') else 'public,max-age=600')
+        cacheable = status == 200 and not self.path.startswith('/private/')
+        self.send_header('Cache-Control', 'public,max-age=600' if cacheable else 'private,no-store')
         if status == 302:
             self.send_header('Location', 'http://redirect.example.test/unused')
         self.end_headers()

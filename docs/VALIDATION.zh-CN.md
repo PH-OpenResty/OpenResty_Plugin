@@ -118,7 +118,7 @@ CI 的 nginx 构建为运行时和五个动态模块启用 `-fsanitize=address,u
 
 [tests/asan.supp](../tests/asan.supp)仅排除 Nginx 按 dlsym 设计同时从可执行文件与动态模块导出的 `ngx_modules`、`ngx_module_names`、`ngx_module_order` 注册表 ODR 报告，不排除模块缓冲区、释放后访问或其他全局数据诊断。
 
-既有本地 UBSan trap 调试发现上游 Nginx 缓存对缺失 ETag 使用 `memcpy(NULL, 0)` 的检查触发点。测试源站提供正常 ETag，插件没有修改该核心路径；不能把当前语料通过描述为 Nginx 全部缓存路径都已通过 UBSan。
+既有本地 UBSan trap 调试发现上游 Nginx 缓存对缺失 ETag 使用 `memcpy(NULL, 0)` 的检查触发点。测试源站对正常 200 响应提供 ETag；新增缓存任务负例的 302/503 和私有响应明确声明 no-store。Nginx 会主动清空非 200/206 缓存响应的内部 ETag，因此只补响应 ETag 不能避免这些负例进入该路径。失败预热断言及 sanitizer 诊断检查继续保留，插件没有修改该核心路径；不能把当前语料通过描述为 Nginx 全部缓存路径都已通过 UBSan。
 
 ## Worker 启动时差回归
 
