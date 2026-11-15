@@ -1,0 +1,102 @@
+{
+  "runtime": "nginx version: openresty/1.31.8.1",
+  "body_bytes": 131,
+  "runs": 3,
+  "seconds": 5,
+  "connections": 128,
+  "workers": 2,
+  "check_interval_seconds": 2,
+  "loader_wait_seconds": 60.07718052197015,
+  "measurements": [
+    {
+      "scenario": "native",
+      "run": 1,
+      "qps": 16687.98,
+      "p99_ms": 15.01,
+      "worker_cpu_us_per_request": 117.44354354707744,
+      "conditional_304": 0
+    },
+    {
+      "scenario": "versioned",
+      "run": 1,
+      "qps": 18403.22,
+      "p99_ms": 14.91,
+      "worker_cpu_us_per_request": 107.93684888841156,
+      "conditional_304": 0
+    },
+    {
+      "scenario": "revalidate",
+      "run": 1,
+      "qps": 21465.71,
+      "p99_ms": 11.41,
+      "worker_cpu_us_per_request": 92.50167475750429,
+      "conditional_304": 2
+    },
+    {
+      "scenario": "revalidate",
+      "run": 2,
+      "qps": 19419.28,
+      "p99_ms": 11.98,
+      "worker_cpu_us_per_request": 102.09777434971025,
+      "conditional_304": 1
+    },
+    {
+      "scenario": "versioned",
+      "run": 2,
+      "qps": 21482.8,
+      "p99_ms": 11.04,
+      "worker_cpu_us_per_request": 92.27040277637511,
+      "conditional_304": 0
+    },
+    {
+      "scenario": "native",
+      "run": 2,
+      "qps": 20151.75,
+      "p99_ms": 15.17,
+      "worker_cpu_us_per_request": 98.112912830826,
+      "conditional_304": 0
+    },
+    {
+      "scenario": "native",
+      "run": 3,
+      "qps": 21052.65,
+      "p99_ms": 12.67,
+      "worker_cpu_us_per_request": 94.04418019837152,
+      "conditional_304": 0
+    },
+    {
+      "scenario": "versioned",
+      "run": 3,
+      "qps": 19070.61,
+      "p99_ms": 14.1,
+      "worker_cpu_us_per_request": 103.77290098076783,
+      "conditional_304": 0
+    },
+    {
+      "scenario": "revalidate",
+      "run": 3,
+      "qps": 19414.18,
+      "p99_ms": 14.14,
+      "worker_cpu_us_per_request": 100.81807242317299,
+      "conditional_304": 1
+    }
+  ],
+  "medians": {
+    "native": {
+      "qps": 20151.75,
+      "p99_ms": 15.01,
+      "worker_cpu_us_per_request": 98.112912830826
+    },
+    "versioned": {
+      "qps": 19070.61,
+      "p99_ms": 14.1,
+      "worker_cpu_us_per_request": 103.77290098076783
+    },
+    "revalidate": {
+      "qps": 19419.28,
+      "p99_ms": 11.98,
+      "worker_cpu_us_per_request": 100.81807242317299
+    }
+  },
+  "notes": "Same-host WSL2/Alpine loopback; per-case freshness warmup; no fault injection; short-run scheduling noise; no regex or idle-burst workload."
+}

@@ -240,7 +240,7 @@ http {{
         self.check('invalid token is rejected',self.control('exact',keys=['/asset'],extra={'Authorization':'Bearer invalid'})[0]==401)
         self.check('unsupported method cannot mutate state',self.control('exact',keys=[],method='GET')[0]==405)
         self.check('scope is required',self.control('exact',scope=None,keys=['/asset'])[0]==400)
-        self.check('unknown mode is rejected',self.control('regex',keys=['/.*'])[0]==400)
+        self.check('unknown mode is rejected',self.control('unknown',keys=['/.*'])[0]==400)
         self.check('empty exact batch is rejected',self.control('exact')[0]==400)
         self.check('empty key cannot become a prefix flush',self.control('prefix',keys=[''])[0]==400)
         self.check('invalid content type is rejected',self.control('exact',keys=['/asset'],extra={'Content-Type':'application/json'})[0]==415)
