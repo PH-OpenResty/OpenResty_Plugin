@@ -63,3 +63,7 @@ Nginx 的 `proxy_cache_use_stale updating/error/...` 是条件开关，不自带
 - [OpenResty 1.31.8.1 归档](https://openresty.org/download/openresty-1.31.8.1.tar.gz)：实际核对 `bundle/nginx-1.31.8/src/http/ngx_http_upstream.c` 中 cache/background_update/test_next/send_response、`ngx_http_file_cache.c` 中 read/update/update_header，以及 `modules/ngx_http_proxy_module.c` 的条件头模板。
 
 验收应覆盖 ETag/仅 Last-Modified/无校验器、304 连续续期、200 更新、Vary、HEAD、并发单次更新、失败重试、宽限期结束、404/不可缓存、显式清理与在途更新，以及新增匹配模式的边界、容量、重启与检查点恢复。原有基准只描述原有失效功能，不自动代表新增校验/正则路径的性能。
+
+## 与 Tier 读取链配合
+
+[Tier](../native-tier/README.zh-CN.md) 的 frontend 再验证请求通过内部验证标记绕过 L2 的普通 HIT 并到达源站；backend 本身也可启用相同 Purge 再验证。晋升使用底层缓存的绝对到期，避免重新赋予整个 max-age。普通 Vary/私有响应及无限流的限制仍适用。

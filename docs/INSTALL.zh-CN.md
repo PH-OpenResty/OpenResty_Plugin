@@ -1,6 +1,6 @@
 # 安装、构建和首次运行
 
-统一构建生成 Sync、Config、API、Edge、Purge 五个插件。Config/API/Edge 需同版本编译，动态加载顺序为 Config → API → Edge；Sync 和 Purge 可独立使用。Purge 的私有日志/token 见 [手册](../native-purge/README.zh-CN.md)，Sync 的独立身份/token/mTLS 接入见 [迁移说明](SYNC-MIGRATION.zh-CN.md)。当前原生模块不依赖 Lua 或 Python；完整远程同步尚由原 Lua Sync 服务承担，不能把安装 Sync 0.2.0 当作替换该服务。
+统一构建生成 Sync、Config、API、Edge、Tier、Purge 六个插件。Config/API/Edge 需同版本编译，全量动态加载顺序建议 Config → Tier → API → Edge → Purge → Sync；Tier、Sync 和 Purge 可按功能独立使用。Purge 的私有日志/token 见 [手册](../native-purge/README.zh-CN.md)，Sync 的独立身份/token/mTLS 接入见 [迁移说明](SYNC-MIGRATION.zh-CN.md)。当前原生模块不依赖 Lua 或 Python；Sync 0.3.0 已提供原生站点/证书发布，旧 Lua 协议交接按独立迁移流程操作。
 
 ## 1. 构建要求
 
@@ -48,7 +48,7 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-openresty --pur
   --report /tmp/scdn-five-modules-results.json
 ```
 
-构建脚本从 OpenResty 官方地址下载固定归档并校验 SHA-256。`nginx` 模式仅解包其中的 Nginx 核心，不编入 Lua；`openresty` 模式构建完整 OpenResty。两种模式都启用 `--with-compat --with-http_ssl_module --with-http_v2_module --with-pcre-jit --with-threads`，默认将五个插件作为动态模块构建。Purge 正则匹配需要 PCRE2，不能使用旧 PCRE1 构建。
+构建脚本从 OpenResty 官方地址下载固定归档并校验 SHA-256。`nginx` 模式仅解包其中的 Nginx 核心，不编入 Lua；`openresty` 模式构建完整 OpenResty。两种模式都启用 `--with-compat --with-http_ssl_module --with-http_v2_module --with-pcre-jit --with-threads`，默认将六个插件作为动态模块构建。Purge 正则匹配需要 PCRE2，不能使用旧 PCRE1 构建。
 
 第三参数设置为 `static` 可静态编入，例如 `sh tools/build-runtime.sh /tmp/scdn-static openresty static`。测试相应增加 `--static`；配置中删除已静态编入模块对应的 load_module。该脚本生成隔离验证运行时，已有生产 Node 仍需保留其原有构建参数、模块及库。
 
@@ -74,7 +74,7 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-openresty --pur
 
 先保存现有二进制、模块、配置、站点源文件及证书，并确认可恢复的版本。通过目标二进制的 `-V` 核对 Nginx/OpenResty 版本、补丁、构建选项、TLS 库和架构。
 
-使用目标的匹配源码和原构建参数，按需指定 `native-sync`、`native-config`、`native-api`、`native-edge`、`native-purge`；统一构建包含全部五个目录。保留目标已有模块、路径和编译参数，并满足 HTTP SSL、线程池、PCRE2 条件。`--with-compat` 不等于跨任意版本或构建的通用 ABI；不能只复制不兼容的 `.so`。
+使用目标的匹配源码和原构建参数，按需指定 `native-sync`、`native-config`、`native-api`、`native-edge`、`native-tier`、`native-purge`；统一构建包含全部六个目录。保留目标已有模块、路径和编译参数，并满足 HTTP SSL、线程池、PCRE2 条件。`--with-compat` 不等于跨任意版本或构建的通用 ABI；不能只复制不兼容的 `.so`。
 
 确认兼容后将三个 `.so` 安装到目标模块目录，在主配置最前面依次加入：
 
@@ -147,3 +147,7 @@ bootstrap 用于让 Nginx 建立 TLS 上下文，实际新握手由模块选择�
 ## 缓存头配置与 Ban 集群材料
 
 Config/Edge 按相同源码版本一起重编译后，可在站点数据启用 [缓存头字段](CACHE-HEADERS.zh-CN.md)；模块升级走现有二进制/模块回退流程，字段后续修改使用热更新。移除同名 X-Cache 等 add_header，防止重复。Ban 的 [全节点同步设计](../native-ban/design/CLUSTER-SYNC.zh-CN.md)仍非可安装组件，policy v2、签名清单 ABI 和示例不能直接启动 Agent 或加载 BPF。
+
+## 原生配置发布与分层缓存
+
+站点/证书同步的额外线程池、私有目录、RSA/Ed25519/mTLS 和受管 bootstrap 见 [发布手册](SYNC-PUBLICATION.zh-CN.md)。L1/L2 缓存读取链和停用 Lua flush 的条件见 [Tier 手册](../native-tier/README.zh-CN.md)。六模块源摘要均在 SOURCE-SHA256SUMS，完整业务共存测试为 native-tier/tests/coexist.py。

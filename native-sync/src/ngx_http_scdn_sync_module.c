@@ -28,6 +28,7 @@ static ngx_int_t ngx_http_scdn_variables(ngx_conf_t *cf);
 static ngx_int_t ngx_http_scdn_variable(ngx_http_request_t *r,
     ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t ngx_http_scdn_handler(ngx_http_request_t *r);
+static ngx_int_t ngx_http_scdn_process(ngx_cycle_t *cycle);
 
 static ngx_command_t ngx_http_scdn_commands[] = {
     { ngx_string("scdn_sync_role"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
@@ -62,6 +63,28 @@ static ngx_command_t ngx_http_scdn_commands[] = {
       scdn_sync_tasks_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
     { ngx_string("scdn_sync_cache_allow_all"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
       scdn_sync_tasks_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_config_state"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      scdn_sync_distribution_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_config_source"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE2,
+      scdn_sync_distribution_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_config_peer_key"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE2,
+      scdn_sync_distribution_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_config_signing_key"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      scdn_sync_distribution_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_config_trust_key"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      scdn_sync_distribution_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_config_decryption_key"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      scdn_sync_distribution_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_config_master"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      scdn_sync_distribution_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_config_mtls"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE3,
+      scdn_sync_distribution_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_config_status_socket"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      scdn_sync_distribution_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_config_probe"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE2,
+      scdn_sync_distribution_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_config_allow_empty"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      scdn_sync_distribution_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
     ngx_null_command
 };
 
@@ -81,9 +104,15 @@ ngx_module_t ngx_http_scdn_sync_module = {
     &ngx_http_scdn_context,
     ngx_http_scdn_commands,
     NGX_HTTP_MODULE,
-    NULL, NULL, scdn_sync_tasks_process, NULL, NULL, NULL, NULL,
+    NULL, NULL, ngx_http_scdn_process, NULL, NULL, NULL, NULL,
     NGX_MODULE_V1_PADDING
 };
+
+static ngx_int_t ngx_http_scdn_process(ngx_cycle_t *cycle)
+{
+    if (scdn_sync_tasks_process(cycle) != NGX_OK) return NGX_ERROR;
+    return scdn_sync_distribution_process(cycle);
+}
 
 static void *
 ngx_http_scdn_create_main(ngx_conf_t *cf)
@@ -320,6 +349,7 @@ ngx_http_scdn_configure(ngx_conf_t *cf)
     if (scdn_sync_tasks_configure(cf, conf) != NGX_OK) {
         return NGX_ERROR;
     }
+    if (scdn_sync_distribution_configure(cf, conf) != NGX_OK) return NGX_ERROR;
     if (conf->role == SCDN_SYNC_OFF) {
         if (conf->endpoints.nelts != 0 || conf->peers.nelts != 0
             || conf->id.data != NULL || conf->scope.data != NULL
@@ -593,12 +623,16 @@ ngx_http_scdn_capabilities(ngx_http_request_t *r,
         SCDN_SYNC_NATIVE_VERSION "\",\"protocol\":\"" SCDN_SYNC_PROTOCOL
         "\",\"role\":\"%s\",\"instance_id\":\"%V\","
         "\"features\":{\"role_isolation\":true,\"authenticated_control\":true,"
-        "\"mtls_peer_registry\":%s,\"encrypted_distribution\":false,"
-        "\"node_pull\":false,\"apply_transactions\":false,"
-        "\"business_health\":false,\"cache_tasks\":%s,"
+        "\"mtls_peer_registry\":%s,\"encrypted_distribution\":%s,"
+        "\"node_pull\":%s,\"apply_transactions\":%s,"
+        "\"business_health\":%s,\"cache_tasks\":%s,"
         "\"cache_refresh\":%s,\"cache_preheat\":%s}",
         scdn_sync_role_name(conf->role), &conf->id,
         conf->role == SCDN_SYNC_MASTER ? "true" : "false",
+        conf->distribution ? "true" : "false",
+        conf->distribution && conf->role == SCDN_SYNC_NODE ? "true" : "false",
+        conf->distribution && conf->role == SCDN_SYNC_NODE ? "true" : "false",
+        scdn_sync_distribution_health(conf) ? "true" : "false",
         conf->cache.directory.len ? "true" : "false",
         conf->cache.directory.len ? "true" : "false",
         conf->cache.directory.len ? "true" : "false");
@@ -713,6 +747,8 @@ ngx_http_scdn_handler(ngx_http_request_t *r)
             return ngx_http_scdn_error(r, NGX_HTTP_FORBIDDEN, "node_forbidden");
         }
     }
+    rc = scdn_sync_distribution_handler(r, conf, peer, location->mode == SCDN_API_EXCHANGE);
+    if (rc != NGX_DECLINED) return rc;
     rc = scdn_sync_tasks_handler(r, conf, peer,
                                 location->mode == SCDN_API_EXCHANGE);
     if (rc != NGX_DECLINED) {

@@ -181,8 +181,14 @@ prefix /api/private/ {
 
 ## HTTP 头与缓存任务联动
 
-自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.2.0 的缓存刷新/预热任务及原生配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。
+自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.3.0 保留的缓存刷新/预热任务及配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。
 
 ## 缓存规则 HTTP 头
 
 site/prefix 可设置 `cache_headers on|off;`（站点默认 on、前缀继承），以及至多 8 个 `cache_request_header X-Name "literal-value";`。前缀自定义列表替换站点列表，`cache_request_headers off;` 可禁用继承；字段名、重复、控制字符和身份/协议保留头均严格校验。它们属于热更新数据，值不执行变量替换。完整语法、安全边界、缓存 key 版本要求和诊断头见 [缓存头手册](../docs/CACHE-HEADERS.zh-CN.md)。
+
+## Sync 受管配置与启动回退
+
+普通 scdn_config_watch 仍只读源文件。使用 `scdn_config_managed /private/state;` 时，文件固定为 state/active.conf，与 Sync 0.3.0 的持久事务配合；启动会校验并恢复未完成 apply.pending 对应的 previous.conf，然后才加载 bootstrap。两种指令互斥，真实目录需 Worker 所有 0700。状态接口增加 X-Config-Revision、X-Config-Ready（全 Worker 确认）及受管目录摘要；完整协议见 [发布手册](../docs/SYNC-PUBLICATION.zh-CN.md)。
+
+完整站点快照会携带 cache/tier 及请求/响应头字段；L1/L2 读取链使用 [Tier](../native-tier/README.zh-CN.md)，源站正文和缓存文件不通过配置 Sync 发布。

@@ -58,3 +58,5 @@ python native-purge/tests/revalidate.py --prefix /tmp/scdn-purge-validation
 ## 0.3.0 控制头与 Sync 缓存任务
 
 2026-11-15 的三种构建均重跑原 70 项清理检查、64 项模式和 45 项源站/stale 检查。控制头统一为 `X-Purge-Mode` / `X-Purge-Scope`；原生 Sync 还新增 99 项缓存任务链路检查。细项及边界见 [当前验证](../../docs/VALIDATION.zh-CN.md)和 [HTTP 头约定](../../docs/HTTP-HEADERS.zh-CN.md)。
+
+新增 Tier 集成测试验证同一 scope/resource 失效同时覆盖 L1/L2，以及上层条件再验证真正穿透 L2 回源；完整当前矩阵见 [总验证记录](../../docs/VALIDATION.zh-CN.md)。历史性能报告未用于宣称双层代理的吞吐上限。

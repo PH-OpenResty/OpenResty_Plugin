@@ -23,3 +23,5 @@ proxy_set_header X-Clinet-IP $remote_addr;
 Purge 调用方、测试和示例必须同时改用 `X-Purge-Mode`、`X-Purge-Scope`。旧产品前缀头不作为别名接受，缺少新模式头返回 400；升级时同步切换管理端及节点，避免旧调用失效。凭据继续放在独立的 `Authorization: Bearer ...` 中。
 
 缓存配置还可热更新静态回源元数据，并由 Edge 输出 X-Cache、X-Cache-Layer、X-Cache-Policy、X-Cache-Revision；配置语法和继承见 [缓存头手册](CACHE-HEADERS.zh-CN.md)。Ban 的全节点 IP 同步使用独立 mTLS/签名合同，不能从任何 HTTP 自报 IP/节点头授予封禁发布权限，见 [Ban 集群设计](../native-ban/design/CLUSTER-SYNC.zh-CN.md)。
+
+Sync 配置发布新增 X-Config-Sequence/Digest/State/Error/Applied；Config 本机就绪接口提供 X-Config-Revision/Ready/Managed，具体信任边界见 [发布手册](SYNC-PUBLICATION.zh-CN.md)。Tier 使用仅本机 Unix 通道的 X-Tier-*，front 覆盖、backend 剥离，业务侧只显示 X-Cache/X-Cache-Layer；见 [Tier 手册](../native-tier/README.zh-CN.md)。

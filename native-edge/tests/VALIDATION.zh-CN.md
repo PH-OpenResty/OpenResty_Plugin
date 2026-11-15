@@ -7,3 +7,5 @@
 ## 缓存 HTTP 头
 
 新增 32 项 `cache_headers.py` 真实进程检查，验证规则回源头与原生响应诊断、站点/前缀继承、私有绕过、重复字段替换、非法输入、热更新和在途版本。与原 47 项路由/TLS 测试分别执行；三种构建和 CI 的最终状态见 [总验证记录](../../docs/VALIDATION.zh-CN.md)。
+
+配置/证书原生发布的当前端到端证据见 native-sync/tests/distribution.py；多级缓存链和所有六模块共存见 native-tier/tests。历史 47 项只代表独立路由/TLS/热更新套件，不再将它当作全部原生化范围。

@@ -66,5 +66,6 @@ scdn_config_site_t *scdn_config_lookup(scdn_config_snapshot_t *snapshot,
     const ngx_str_t *host);
 ngx_flag_t scdn_config_local(ngx_http_request_t *r);
 ngx_flag_t scdn_config_enabled(ngx_conf_t *cf);
+int scdn_config_recover(const char *directory);
 
 #endif

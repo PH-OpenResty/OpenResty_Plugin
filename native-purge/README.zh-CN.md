@@ -8,7 +8,7 @@
 
 ## 1. 构建与接入
 
-统一构建脚本编译 Sync、Config、API、Edge、Purge 五个插件，也可以只使用本模块目录构建动态模块。Purge 不依赖其他模块加载；需要 Linux 64 位、PCRE2 开发库、HTTP SSL/OpenSSL 和线程池支持，并与目标 Nginx/OpenResty ABI 匹配。新增正则不支持使用旧 PCRE1 构建。
+统一构建脚本编译 Sync、Config、API、Edge、Tier、Purge 六个插件，也可以只使用本模块目录构建动态模块。Purge 不依赖其他模块加载；需要 Linux 64 位、PCRE2 开发库、HTTP SSL/OpenSSL 和线程池支持，并与目标 Nginx/OpenResty ABI 匹配。新增正则不支持使用旧 PCRE1 构建。
 
 ```sh
 sh tools/build-runtime.sh /tmp/scdn-purge nginx
@@ -204,8 +204,10 @@ status 新增 `worker_revalidate`：probes、not_modified、fetched、failures�
 
 ## HTTP 头与缓存任务联动
 
-自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.2.0 的缓存刷新/预热任务及原生配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。
+自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.3.0 保留的缓存刷新/预热任务及配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。
 
 0.3.0 将控制头改为无产品前缀的名称，不接受旧名别名；与 Sync 缓存任务联动时使用独立的 Purge token 和 Unix Socket。
 
 Config/Edge 已支持 [缓存响应头与规则回源头](../docs/CACHE-HEADERS.zh-CN.md)。与 Edge 共用时由原生响应过滤器输出 X-Cache，删除重复 add_header；仅 Purge 独立使用时仍按原模板设置 X-Cache。API/私有/流式绕过优先，配置头不提供缓存权限。
+
+与 [Tier](../native-tier/README.zh-CN.md) 配合时，front/backend 都接入相同 scope、完整基础 key、逻辑 resource 和 `$scdn_purge_key`；一次 epoch 失效覆盖两层。上层再验证使用 Tier 的验证标记穿透 L2，保留原有 ETag/Last-Modified 和有限 stale 语义。

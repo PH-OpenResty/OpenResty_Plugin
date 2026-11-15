@@ -1,6 +1,6 @@
 # IP 封禁与 eBPF 联动：详细设计 v2
 
-状态：**设计草案**，尚无可加载的 Ban 模块、Agent 或 BPF 执行程序。此目录提供实现契约，不加入当前五个运行模块的构建或加载流程。
+状态：**设计草案**，尚无可加载的 Ban 模块、Agent 或 BPF 执行程序。此目录提供实现契约，不加入当前六个运行模块的构建或加载流程。
 
 已确认：客户端直连节点；业务范围是 Web 与负载均衡入口；确认 CC 直接申请 L3；WAF 确认拦截先 L7，频繁时升级 L3；时长固定配置；保留指定文件中的封禁事件与 IP 历史。
 
@@ -22,7 +22,7 @@
 
 普通请求只读本机内存视图；控制事件才通过非阻塞 Unix Socket 交给 Agent。Agent 先持久化意图再发布正式封禁；XDP 自行判断 BOOTTIME 到期，流量命中不延长 TTL。L7 的站点级封禁与 L3 的节点业务入口作用域分开记录。
 
-原生 [Sync](../native-sync/README.zh-CN.md) 已收录在本仓库，当前已提供角色/身份与缓存任务，来源见 SOURCE。Ban 的本机执行不以尚未完成原生化的加密发布/拉取能力为前提；v2 要求任意登记设备产生的 L3 IP 进入 Master 权威集合，所有节点按完整快照收敛；这部分仍是待实现的合同，见 [全节点同步](design/CLUSTER-SYNC.zh-CN.md)。日志保留在指定文件，不直接用日志文件互相覆盖。
+原生 [Sync](../native-sync/README.zh-CN.md) 已收录在本仓库，当前已提供角色/身份、站点/证书发布与缓存任务，来源见 SOURCE。Ban 的本机执行与配置发布独立；v2 要求任意登记设备产生的 L3 IP 进入 Master 权威集合，所有节点按完整快照收敛；这部分仍是待实现的合同，见 [全节点同步](design/CLUSTER-SYNC.zh-CN.md)。日志保留在指定文件，不直接用日志文件互相覆盖。
 
 集群日志合成示例见 [事件日志](examples/ban-cluster-events.jsonl.example)与 [IP 台账](examples/ban-cluster-ips.jsonl.example)，展示来源设备、全局 ban_id、revision、相同绝对期限和非循环导入。
 
@@ -46,6 +46,6 @@ C
 
 ## HTTP 头与缓存任务联动
 
-自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.2.0 的缓存刷新/预热任务及原生配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。
+自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.3.0 保留的缓存刷新/预热任务及配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。
 
 结构和四个 ABI 可使用 `python -m pip install -r native-ban/tests/requirements.txt` 后运行 `python native-ban/tests/check-design.py` 验证；它只验证设计材料，不证明多机同步或内核 DROP 已实现。

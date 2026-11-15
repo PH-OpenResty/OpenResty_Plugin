@@ -37,7 +37,7 @@
 ## 3. 推荐迁移步骤
 
 1. 记录现有 Nginx 构建、模块、业务配置、站点集合、证书和可验证的回退点。
-2. 在独立目录与端口使用统一五模块构建，先验证需要启用的业务模块；Sync 单独验证角色/mTLS，Purge 单独验证持久失效。
+2. 在独立目录与端口使用统一六模块构建，先验证需要启用的业务模块；Sync 单独验证角色/mTLS，Purge 单独验证持久失效。
 3. 从可信配置来源导出完整站点文件，逐个核对 Host、回源、root、缓存和证书；不要执行不可信 Lua 来转换数据。
 4. 使用真实 Worker 账户核对全部文件和父目录可读，缓存/运行目录可写，消除旧证书 symlink 路径依赖。
 5. 在隔离实例观察状态、业务 HTTP/TLS、缓存与指标；对照启停、删除、证书轮换及回退行为。
@@ -48,7 +48,7 @@
 
 ## 4. 与 Sync 的关系
 
-本仓库已包含 native-sync 的 Master/Node 身份基础；配置快照的 Node 拉取、JWE/JWS、请求签名、journal、ACK 报告和发布编排仍未迁入原生实现。完整旧服务的保留、独立监听接入与切换条件见 [Sync 迁移](SYNC-MIGRATION.zh-CN.md)和[路线图](SYNC-ROADMAP.zh-CN.md)。外部 Sync 仍负责远程协议、持久化、失败报告和回退，再将受信数据交给本机 Config。
+Sync 0.3.0 已提供站点/证书的原生加密发布、Node 拉取、受管热应用和回退。它使用独立 native.snapshot.v2，不直接兼容旧 Lua JWE/JWS/HTTP nonce 协议；按 [Sync 迁移](SYNC-MIGRATION.zh-CN.md)在独立目录验收后交接唯一配置写入权。
 
 Config 的 generation/revision 用于本机内存版本选择，不能代替 Sync 的单调序号、防重放或节点授权。业务 health 与本机 ready 也需分别观察。
 
@@ -60,8 +60,10 @@ Config 的 generation/revision 用于本机内存版本选择，不能代替 Syn
 
 ## 缓存任务及 HTTP 头升级
 
-Sync 0.2.0 的持久化缓存任务投递、状态、删除、Node 后台执行及故障恢复见 [缓存任务手册](CACHE-TASKS.zh-CN.md)。刷新成功再提交预热，不能假定队列顺序。配置快照的旧同步流程仍需独立保留。代理头采用 `X-Clinet-IP`，Purge 控制调用方同步切换为 `X-Purge-Mode` / `X-Purge-Scope`，见 [HTTP 头约定](HTTP-HEADERS.zh-CN.md)。
+Sync 0.3.0 保留的持久化缓存任务投递、状态、删除、Node 后台执行及故障恢复见 [缓存任务手册](CACHE-TASKS.zh-CN.md)。刷新成功再提交预热，不能假定队列顺序。原生配置发布按独立协议交接，不能与旧流程同时写入受管目录。代理头采用 `X-Clinet-IP`，Purge 控制调用方同步切换为 `X-Purge-Mode` / `X-Purge-Scope`，见 [HTTP 头约定](HTTP-HEADERS.zh-CN.md)。
 
 ## 缓存头升级
 
 站点/前缀缓存策略可增加 cache_headers、cache_request_header，继承和优先级见 [手册](CACHE-HEADERS.zh-CN.md)。删除旧 X-Cache 等重复 add_header，缓存 key 保留配置 revision；错误候选仍保留旧活动版本。Ban 的节点本地设计已改为 [全节点完整有效表合同](../native-ban/design/CLUSTER-SYNC.zh-CN.md)，跨机运行实现仍待对应 Agent/执行器完成。
+
+旧 tier.lua 和 flush_l1_to_l2.lua 的原生替代是 [Tier](../native-tier/README.zh-CN.md)：L1 miss 读取 L2、L2 miss 回源、热对象晋升、冷层副本保留；不再需要维护时扫描拷贝活动缓存文件。

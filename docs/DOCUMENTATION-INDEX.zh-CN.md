@@ -1,0 +1,20 @@
+# 当前文档与能力核对
+
+当前运行模块为六个：Sync 0.3.0、Config、API、Edge、Tier 0.1.0、Purge 0.3.0。下面各入口描述当前实现；历史验证 JSON、带版本/日期的基线和研究报告保留其当时的结果，不将历史数字改成新版本证据。
+
+| 范围 | 当前入口 | 核对结论 |
+| --- | --- | --- |
+| 总览/构建 | [README](../README.md)、[安装](INSTALL.zh-CN.md) | 六模块、目标 ABI/依赖、动态/静态、独立与组合运行 |
+| Sync | [模块手册](../native-sync/README.zh-CN.md)、[配置/证书发布](SYNC-PUBLICATION.zh-CN.md) | 已实现原生 v2 发布/拉取/热应用/回退，按启用状态报告 |
+| Sync 迁移/路线 | [迁移](SYNC-MIGRATION.zh-CN.md)、[路线](SYNC-ROADMAP.zh-CN.md) | 不与旧 Lua JWE/JWS 直接互通，写入权交接和剩余能力明确 |
+| 缓存任务 | [任务手册](CACHE-TASKS.zh-CN.md) | 独立刷新/预热，与配置发布分开，支持 Tier 业务入口 |
+| Config/Edge | [Config](../native-config/README.zh-CN.md)、[Edge](../native-edge/README.zh-CN.md) | 普通只读 watcher、Sync managed 恢复、路由/TLS/请求版本 |
+| API | [API](../native-api/README.zh-CN.md) | 私有/API/流式绕过和代理行为，六模块真实共存测试 |
+| 分层缓存 | [Tier](../native-tier/README.zh-CN.md) | Lua 选层/flush 对应、L1/L2 读取链、晋升/降温/绝对到期和恢复 |
+| 缓存清理 | [Purge](../native-purge/README.zh-CN.md)、[机制](CACHE-MECHANISM.zh-CN.md)、[再验证研究](CACHE-REVALIDATION-RESEARCH.zh-CN.md) | 两层共同失效、原生回收、穿透 L2 的条件校验与边界 |
+| HTTP 头 | [约定](HTTP-HEADERS.zh-CN.md)、[缓存头](CACHE-HEADERS.zh-CN.md) | X-Clinet-IP、缓存诊断/回源头、私有 X-Tier 和 X-Config 控制元数据 |
+| 运维和 Lua 迁移 | [运维](OPERATIONS.zh-CN.md)、[迁移](MIGRATION.zh-CN.md) | 单写者、备份/回退、停止旧 tier/flush 的前提、受管事务 |
+| Ban/eBPF | [Ban](../native-ban/README.zh-CN.md)、[集群合同](../native-ban/design/CLUSTER-SYNC.zh-CN.md) | 仍是设计，未宣称 Agent、BPF 或全节点运行同步已经实现 |
+| 验证/来源/隐私 | [验证](VALIDATION.zh-CN.md)、[来源](../SOURCE.md)、[发布规则](../PUBLISHING.md) | 当前测试与历史证据分开，源码清单、文档和实际索引检查 |
+
+公开配置仅使用保留域名/本机地址和通用目录。更新过的例子包括 Sync 发布片段、Tier front/backend/完整配置、Config 站点模板和 API/Edge 代理模板。真实源站、私钥、token、运行对象、状态和日志不进入仓库。

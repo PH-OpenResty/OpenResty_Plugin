@@ -6,7 +6,7 @@
 
 ## 接入方式
 
-与同一源码版本的 Config、Edge 一起构建。动态加载顺序为 Config → API → Edge；静态编入时无需 `load_module`。统一构建还包含独立的 Purge 和 [Sync](../native-sync/README.zh-CN.md)，共五个模块，支持纯 Nginx 和完整 OpenResty。Sync 角色与其本机鉴权不参与 API/AI 分类。
+与同一源码版本的 Config、Edge 一起构建。动态加载顺序为 Config → API → Edge；静态编入时无需 `load_module`。统一构建还包含独立的 Tier、Purge 和 [Sync](../native-sync/README.zh-CN.md)，共六个模块，支持纯 Nginx 和完整 OpenResty。Sync 角色与其本机鉴权不参与 API/AI 分类。
 
 ```nginx
 load_module modules/ngx_http_scdn_config_module.so;
@@ -168,6 +168,8 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
 
 ## HTTP 头与缓存任务联动
 
-自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.2.0 的缓存刷新/预热任务及原生配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。
+自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.3.0 保留的缓存刷新/预热任务及配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。
 
 Config/Edge 已支持 [缓存响应头与规则回源头](../docs/CACHE-HEADERS.zh-CN.md)。与 Edge 共用时由原生响应过滤器输出 X-Cache，删除重复 add_header；仅 Purge 独立使用时仍按原模板设置 X-Cache。API/私有/流式绕过优先，配置头不提供缓存权限。
+
+六模块完整共存测试为 `python native-tier/tests/coexist.py --prefix /isolated/runtime --report /tmp/six.json`，实际启用 L1/L2 层级缓存和原有 API/流式路径。站点/证书加密发布的独立端到端测试为 native-sync/tests/distribution.py。

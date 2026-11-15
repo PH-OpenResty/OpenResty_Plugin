@@ -22,3 +22,5 @@ gitleaks git --redact --log-opts=--all .
 Sync 缓存任务的队列、Node 收据、目标 URL/缓存键列表和运行锁均属于私有运行数据，不进入 Git。公开示例只保留合成目标；CI 仅上传检查名及数量，不上传任务目录、mTLS 材料或请求正文。
 
 Ban 集群的真实 IP 集合、来源设备、签名私钥、快照和 outbox/收据属于私有运行材料；公开日志例子只用保留 IP 和合成 UUID。缓存规则头只展示非敏感合成值，不上传真实源站业务头或凭据。
+
+原生配置发布的 source、desired.bundle、releases、active/previous.conf、highest/applied/rejected/reported 状态及 Node RSA/签名私钥均属于私有运行材料。测试仅生成临时身份/合成站点，报告不保存明文快照。Tier 实例令牌只存在共享内存和受限 Unix 请求，不进入文档、报告或正常访问日志。

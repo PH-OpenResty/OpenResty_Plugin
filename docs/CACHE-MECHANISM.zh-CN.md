@@ -78,3 +78,7 @@
 - [open_file_cache](https://nginx.org/en/docs/http/ngx_http_core_module.html#open_file_cache)
 
 这些文档描述 Nginx 功能；当前模块的能力、配置和实测以本仓库源码、[使用手册](../native-purge/README.zh-CN.md)和测试为准。
+
+## 原生层级缓存补充
+
+新增 [Tier](../native-tier/README.zh-CN.md) 通过 Nginx 原生 L1→本机 L2→源站的代理链获得上下层副本；不扫描/拷贝活动缓存文件。L1 晋升保留 L2 的原始绝对到期，Purge 两端使用同一逻辑 scope/resource。旧 Lua flush 的存在不代表两级共享索引，本实现保留每个 zone 自己的 Nginx 生命周期。
