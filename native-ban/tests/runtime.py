@@ -377,6 +377,9 @@ except OSError:print('blocked')
             self.check(node+' has both durable ordered audit projections',len(by_seq)==len(events) and len({r['seq'] for r in ips})==len(ips)
                        and all(r.get('ip')==by_seq[r['seq']].get('ip') and r['action']==by_seq[r['seq']]['action'] for r in ips))
             self.check(node+' imported cluster records do not originate local events',any(r.get('origin')=='cluster' for r in events))
+        diagnostics=''.join(path.read_text(errors='replace') for path in self.root.rglob('*.txt'))
+        self.check('Agent and Nginx event paths finish without sanitizer diagnostics',
+                   'AddressSanitizer' not in diagnostics and 'runtime error:' not in diagnostics)
         return self.checks
 
     def close(self):
