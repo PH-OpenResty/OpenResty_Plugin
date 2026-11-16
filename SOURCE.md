@@ -22,7 +22,7 @@ sha256sum -c SOURCE-SHA256SUMS
 
 2026-11-15 增加 Config/Edge 的站点/前缀缓存头解析和原生请求/响应处理，SOURCE-SHA256SUMS 已按当时 24 个实现文件生成。Ban v2 集群快照头文件和策略仍是设计材料，未混入运行模块清单。
 
-Sync 0.3.0 的原生配置封装、RSA-OAEP/AES-GCM/Ed25519 处理、发布/应用/回退和 Tier 0.1.0 均为本仓库新增实现。Sync 通过私有符号编译同一份 Config 数据解析器和恢复代码，防止独立加载时引入第二套较弱语法；不复制第三方分层缓存模块源码。Tier 对旧 Lua tier/flush 行为的迁移说明见 [手册](native-tier/README.zh-CN.md)。
+Sync 0.3.0 的原生配置封装、RSA-OAEP/AES-GCM/Ed25519 处理、发布/应用/回退和 Tier 0.1.1 均为本仓库新增实现。Sync 通过私有符号编译同一份 Config 数据解析器和恢复代码，防止独立加载时引入第二套较弱语法；不复制第三方分层缓存模块源码。Tier 对旧 Lua tier/flush 行为的迁移、304 续期及缓存格式升级说明见 [手册](native-tier/README.zh-CN.md)。
 
 Ban 0.1.0 的 IPC/共享视图、Agent、内核解析/Map 和 Sync 桥为本仓库实现，使用系统 libbpf/SQLite/json-c/OpenSSL/libcurl。Agent 为 C++17，Nginx 和 BPF 为 C。源码摘要包含实际运行文件，设计 ABI 不混算为已验收执行实现。
 

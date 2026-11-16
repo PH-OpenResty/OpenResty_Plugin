@@ -10,7 +10,7 @@
 | 缓存任务 | [任务手册](CACHE-TASKS.zh-CN.md) | 独立刷新/预热，与配置发布分开，支持 Tier 业务入口 |
 | Config/Edge | [Config](../native-config/README.zh-CN.md)、[Edge](../native-edge/README.zh-CN.md) | 普通只读 watcher、Sync managed 恢复、路由/TLS/请求版本 |
 | API | [API](../native-api/README.zh-CN.md) | 私有/API/流式绕过和代理行为，六模块真实共存测试 |
-| 分层缓存 | [Tier](../native-tier/README.zh-CN.md) | Lua 选层/flush 对应、L1/L2 读取链、晋升/降温/绝对到期和恢复 |
+| 分层缓存 | [Tier](../native-tier/README.zh-CN.md) | 0.1.1；Lua 选层/flush 对应、晋升/降温、304 续期、两层限额/隔离、预热恢复和升级 |
 | 缓存清理 | [Purge](../native-purge/README.zh-CN.md)、[机制](CACHE-MECHANISM.zh-CN.md)、[再验证研究](CACHE-REVALIDATION-RESEARCH.zh-CN.md) | 两层共同失效、原生回收、穿透 L2 的条件校验与边界 |
 | HTTP 头 | [约定](HTTP-HEADERS.zh-CN.md)、[缓存头](CACHE-HEADERS.zh-CN.md) | X-Clinet-IP、缓存诊断/回源头、私有 X-Tier 和 X-Config 控制元数据 |
 | 原生/Lua 交接 | [迁移工具与安全桥接](LUA-HANDOFF.zh-CN.md) | 仅退役模块已接管的脚本，保留 WAF/限流，统一请求策略与证书来源 |

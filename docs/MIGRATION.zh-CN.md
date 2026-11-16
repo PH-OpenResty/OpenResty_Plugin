@@ -12,8 +12,8 @@
 | `lib.metrics` | Edge 本机指标 | 指标名与标签需更新仪表盘，不能假定兼容旧面板 |
 | `tier.lua` | cache auto + tier | 有界固定窗口，按站点/Host/URI 隔离，不是严格滑动窗口 |
 | sitectl、panel/admin、旧集群 Agent | 外部发布者原子交付完整数据文件 | 不提供等价文件写入 API 或自动生成工具 |
-| Sync Master/Node 角色、身份登记 | native-sync | 仅角色/鉴权/能力发现；完整旧同步仍保留 |
-| 缓存复制/reload 辅助脚本 | Nginx 管理各 cache zone | 不复制 L1/L2 文件，不实施多层 miss 回退 |
+| Sync Master/Node 角色、身份登记 | native-sync | 原生站点/证书发布、热应用和缓存任务使用独立协议；迁移时交接唯一写者 |
+| 缓存复制/reload 辅助脚本 | Tier + Nginx 各 cache zone | L1 miss 读 L2、L2 miss 回源；正常填充保留 L2 副本，不复制活动文件 |
 | Lua WAF、限速和连接字段 | 不由这些原生模块迁移 | 需要时独立配置 Nginx 或外部能力，不能以字段保留冒充功能已实现 |
 
 ## 2. 字段转换
@@ -67,6 +67,8 @@ Sync 0.3.0 保留的持久化缓存任务投递、状态、删除、Node 后台�
 站点/前缀缓存策略可增加 cache_headers、cache_request_header，继承和优先级见 [手册](CACHE-HEADERS.zh-CN.md)。删除旧 X-Cache 等重复 add_header，缓存 key 保留配置 revision；错误候选仍保留旧活动版本。Ban 的节点本地设计已改为 [全节点完整有效表合同](../native-ban/design/CLUSTER-SYNC.zh-CN.md)，运行入口为 Ban 0.1.0 的 JSON 配置、原生 Agent/eBPF 和 Sync 桥。
 
 旧 tier.lua 和 flush_l1_to_l2.lua 的原生替代是 [Tier](../native-tier/README.zh-CN.md)：L1 miss 读取 L2、L2 miss 回源、热对象晋升、冷层副本保留；不再需要维护时扫描拷贝活动缓存文件。
+
+Tier 0.1.0 升级到 0.1.1 需一起更新模块和两端模板，使用独立 Socket/新缓存路径验证后切换。新版默认长度编码键及入库到期协议与旧元数据不能混用；新实例可先通过 Sync 受控预热。不要直接复制旧缓存文件作为升级步骤。
 
 Ban 0.1.0 的当前配置、事件/权限、全量同步、日志持久化与运行验收见 [运行手册](../native-ban/RUNTIME.zh-CN.md)，历史设计字段不直接用于启动。
 

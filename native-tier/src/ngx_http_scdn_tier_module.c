@@ -26,6 +26,7 @@ typedef struct {
     tier_shared *shared;
     ngx_uint_t hits;
     ngx_msec_t window;
+    ngx_int_t etag_index, modified_index;
 } tier_main;
 typedef struct {
     ngx_uint_t mode;
@@ -36,8 +37,9 @@ typedef struct {
 typedef struct {
     ngx_http_request_t *owner;
     ngx_uint_t mode;
-    ngx_flag_t skip, hot, recorded;
-    ngx_str_t selector, origin, fields[TIER_FIELDS - 1], wire[TIER_FIELDS];
+    ngx_flag_t skip, hot, recorded, validate;
+    ngx_str_t selector, origin, fields[TIER_FIELDS - 1], wire[TIER_FIELDS], cache_key;
+    off_t l2_limit;
     ngx_http_upstream_t *upstream;
     ngx_int_t (*process_header)(ngx_http_request_t *r);
     time_t stored_expiry;
@@ -208,6 +210,42 @@ static ngx_str_t *find_header(ngx_list_t *list, const char *name)
 { return find_header_value(list, name, 1); }
 static ngx_str_t *private_header(ngx_http_request_t *r, const char *name)
 { return find_header_value(&r->headers_in.headers, name, 0); }
+static void strip_protocol(ngx_list_t *list)
+{
+    ngx_list_part_t *part = &list->part;
+    ngx_table_elt_t *h = part->elts;
+    ngx_uint_t i;
+    for (i = 0; ; i++) {
+        if (i >= part->nelts) { if (!part->next) break; part = part->next; h = part->elts; i = 0; }
+        if (h[i].key.len >= 7 && !ngx_strncasecmp(h[i].key.data, (u_char *) "X-Tier-", 7)) h[i].hash = 0;
+    }
+}
+static ngx_int_t strip_request_protocol(ngx_http_request_t *r)
+{
+    ngx_list_part_t *part = &r->headers_in.headers.part;
+    ngx_table_elt_t *h = part->elts, *out;
+    ngx_list_t filtered;
+    ngx_uint_t i;
+    ngx_flag_t found = 0;
+    for (i = 0; ; i++) {
+        if (i >= part->nelts) { if (!part->next) break; part = part->next; h = part->elts; i = 0; }
+        if (h[i].key.len >= 7 && !ngx_strncasecmp(h[i].key.data, (u_char *) "X-Tier-", 7)) { found = 1; break; }
+    }
+    if (!found) return NGX_OK;
+    /* Proxy serializes even hash=0 input entries. Remove the entries from
+     * the list while keeping core's pointers to ordinary headers valid. */
+    if (ngx_list_init(&filtered, r->pool, 20, sizeof(ngx_table_elt_t)) != NGX_OK) return NGX_ERROR;
+    part = &r->headers_in.headers.part; h = part->elts;
+    for (i = 0; ; i++) {
+        if (i >= part->nelts) { if (!part->next) break; part = part->next; h = part->elts; i = 0; }
+        if (h[i].key.len >= 7 && !ngx_strncasecmp(h[i].key.data, (u_char *) "X-Tier-", 7)) continue;
+        out = ngx_list_push(&filtered); if (!out) return NGX_ERROR;
+        *out = h[i];
+    }
+    r->headers_in.headers = filtered;
+    if (filtered.last == &filtered.part) r->headers_in.headers.last = &r->headers_in.headers.part;
+    return NGX_OK;
+}
 static ngx_flag_t local_socket(ngx_http_request_t *r)
 {
     struct sockaddr_storage peer; socklen_t size = sizeof(peer);
@@ -262,7 +300,7 @@ static tier_request *request_context(ngx_http_request_t *r)
     if (ctx && ctx->owner == r) return ctx;
     if (!conf->mode || !main->shared) return NULL;
     ctx = ngx_pcalloc(r->pool, sizeof(*ctx)); if (!ctx) return NULL;
-    ctx->owner = r; ctx->mode = conf->mode;
+    ctx->owner = r; ctx->mode = conf->mode; ctx->l2_limit = conf->l2_limit;
     if (conf->mode == TIER_FRONT) {
         if (ngx_http_complex_value(r, &conf->selector, &ctx->selector) != NGX_OK
             || ngx_http_complex_value(r, &conf->origin, &ctx->origin) != NGX_OK) return NULL;
@@ -284,6 +322,11 @@ static tier_request *request_context(ngx_http_request_t *r)
     } else {
         value = find_header(&r->headers_in.headers, "X-Tier-Token");
         if (!local_socket(r) || !value || value->len != 64 || CRYPTO_memcmp(value->data, main->shared->token, 64)) return NULL;
+        value = find_header(&r->headers_in.headers, "X-Tier-L2-Limit");
+        if (!value || value->len > NGX_OFF_T_LEN || (ctx->l2_limit = ngx_atoof(value->data, value->len)) <= 0) return NULL;
+        ctx->l2_limit = ngx_min(ctx->l2_limit, conf->l2_limit);
+        value = find_header(&r->headers_in.headers, "X-Tier-Validate");
+        ctx->validate = value && same(*value, "1");
         for (i = 0; i < TIER_FIELDS; i++) {
             value = find_header(&r->headers_in.headers, names[i]);
             if (!value || value->len > ngx_base64_encoded_length(TIER_KEY_MAX)) return NULL;
@@ -294,6 +337,9 @@ static tier_request *request_context(ngx_http_request_t *r)
         ngx_str_set(&ctx->selector, "l2"); ctx->skip = private_request(r);
     }
     if (ctx->origin.len < 8 || (memcmp(ctx->origin.data, "http://", 7) && memcmp(ctx->origin.data, "https://", 8))) return NULL;
+    /* Capture the authenticated fields before removing the entire reserved
+     * namespace. Proxy must never forward unknown client or tier metadata. */
+    if (strip_request_protocol(r) != NGX_OK) return NULL;
     ngx_http_set_ctx(r, ctx, ngx_http_scdn_tier_module); return ctx;
 }
 static ngx_int_t access_handler(ngx_http_request_t *r)
@@ -317,7 +363,9 @@ static ngx_int_t variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, u
     tier_main *main = ngx_http_get_module_main_conf(r, ngx_http_scdn_tier_module);
     tier_location *conf = ngx_http_get_module_loc_conf(r, ngx_http_scdn_tier_module);
     ngx_str_t value = ngx_null_string, *fresh;
+    ngx_http_variable_value_t *native;
     ngx_flag_t no_store;
+    time_t expiry;
     if (!ctx) { v->not_found = 1; return NGX_OK; }
     if (r->upstream && r->upstream->process_header && ctx->upstream != r->upstream) {
         ctx->upstream = r->upstream; ctx->process_header = r->upstream->process_header;
@@ -336,19 +384,50 @@ static ngx_int_t variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, u
         if (ctx->mode == TIER_FRONT && !ctx->skip) value = ctx->wire[data - 9];
     } else if (data == 15) {
         no_store = ctx->skip;
-        if (r->upstream && (r->upstream->headers_in.content_length_n < 0
-            || r->upstream->headers_in.content_length_n > (ctx->mode == TIER_FRONT ? conf->l1_limit : conf->l2_limit))) no_store = 1;
+        if (r->upstream && (r->upstream->headers_in.status_n != NGX_HTTP_OK
+            || r->upstream->headers_in.content_length_n < 0
+            || r->upstream->headers_in.content_length_n > (ctx->mode == TIER_FRONT ? conf->l1_limit : ctx->l2_limit))) no_store = 1;
         if (ctx->mode == TIER_FRONT && !ctx->skip && r->upstream) {
             fresh = find_header(&r->upstream->headers_in.headers, "X-Tier-Store");
             if (!fresh || !same(*fresh, "1")) no_store = 1;
+            fresh = find_header(&r->upstream->headers_in.headers, "X-Tier-Expires");
+            expiry = fresh && fresh->len <= NGX_TIME_T_LEN ? ngx_atotm(fresh->data, fresh->len) : NGX_ERROR;
+            if (expiry <= ngx_time()) no_store = 1;
+            /* Apply the lower deadline only on admission, before native cache
+             * persistence. A stored absolute X-Accel-Expires would be reparsed
+             * after every future 304 and resurrect its already-past deadline. */
+            if (!no_store && r->cache && (!r->cache->valid_sec || expiry < r->cache->valid_sec))
+                r->cache->valid_sec = expiry;
         }
         if (no_store) { ngx_str_set(&value, "1"); } else { ngx_str_set(&value, "0"); }
     } else if (data == 16) {
         if (ctx->mode == TIER_FRONT) {
             if (r->upstream && r->upstream->cache_status == NGX_HTTP_CACHE_EXPIRED) { ngx_str_set(&value, "1"); }
+        } else if (ctx->validate) { ngx_str_set(&value, "1"); }
+    } else if (data == 17) {
+        if (ctx->mode == TIER_FRONT && !ctx->skip) {
+            value.data = ngx_pnalloc(r->pool, NGX_OFF_T_LEN);
+            if (!value.data) return NGX_ERROR;
+            value.len = ngx_sprintf(value.data, "%O", ctx->l2_limit) - value.data;
+        }
+    } else if (data == 18) {
+        if (!ctx->cache_key.data) {
+            ctx->cache_key.data = ngx_pnalloc(r->pool, ctx->fields[2].len + ctx->fields[3].len + 2 * NGX_SIZE_T_LEN + 8);
+            if (!ctx->cache_key.data) return NGX_ERROR;
+            ctx->cache_key.len = ngx_sprintf(ctx->cache_key.data, "T1|%uz:%V|%uz:%V",
+                ctx->fields[2].len, &ctx->fields[2], ctx->fields[3].len, &ctx->fields[3]) - ctx->cache_key.data;
+        }
+        value = ctx->cache_key;
+    } else if (data == 19 || data == 20) {
+        if (ctx->mode == TIER_BACK && ctx->validate) {
+            fresh = find_header(&r->headers_in.headers, data == 19 ? "If-None-Match" : "If-Modified-Since");
+            if (fresh) value = *fresh;
         } else {
-            fresh = find_header(&r->headers_in.headers, "X-Tier-Validate");
-            if (fresh && same(*fresh, "1")) { ngx_str_set(&value, "1"); }
+            /* Ordinary L2 expiry validates L2's own object. Upper validation
+             * explicitly bypasses L2 and must forward the upper validators. */
+            native = ngx_http_get_flushed_variable(r, data == 19 ? main->etag_index : main->modified_index);
+            if (!native) return NGX_ERROR;
+            if (!native->not_found) { value.data = native->data; value.len = native->len; }
         }
     }
     /* Core script copies a valid value even at length zero. An absent wire
@@ -359,7 +438,7 @@ static ngx_int_t variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, u
 }
 static ngx_int_t variables(ngx_conf_t *cf)
 {
-    static const char *names[] = { "scdn_tier_upstream", "scdn_tier_cache", "scdn_tier_host", "scdn_tier_sni", "scdn_tier_scope", "scdn_tier_key", "scdn_tier_resource", "scdn_tier_origin", "scdn_tier_token", "scdn_tier_wire_origin", "scdn_tier_wire_host", "scdn_tier_wire_sni", "scdn_tier_wire_scope", "scdn_tier_wire_key", "scdn_tier_wire_resource", "scdn_tier_no_store", "scdn_tier_validate" };
+    static const char *names[] = { "scdn_tier_upstream", "scdn_tier_cache", "scdn_tier_host", "scdn_tier_sni", "scdn_tier_scope", "scdn_tier_key", "scdn_tier_resource", "scdn_tier_origin", "scdn_tier_token", "scdn_tier_wire_origin", "scdn_tier_wire_host", "scdn_tier_wire_sni", "scdn_tier_wire_scope", "scdn_tier_wire_key", "scdn_tier_wire_resource", "scdn_tier_no_store", "scdn_tier_validate", "scdn_tier_wire_l2_limit", "scdn_tier_cache_key", "scdn_tier_if_none_match", "scdn_tier_if_modified_since" };
     ngx_http_variable_t *v; ngx_str_t name; ngx_uint_t i;
     for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
         name.data = (u_char *) names[i]; name.len = strlen(names[i]);
@@ -395,12 +474,16 @@ static ngx_int_t header_filter(ngx_http_request_t *r)
     ctx = request_context(r); if (!ctx) return tier_next_header(r);
     main = ngx_http_get_module_main_conf(r, ngx_http_scdn_tier_module);
     code = r->upstream ? r->upstream->cache_status : 0;
+    strip_protocol(&r->headers_out.headers);
     if (ctx->mode == TIER_BACK) {
         if (code == NGX_HTTP_CACHE_HIT || code == NGX_HTTP_CACHE_STALE || code == NGX_HTTP_CACHE_UPDATING || code == NGX_HTTP_CACHE_REVALIDATED) { ngx_str_set(&source, "l2"); }
         if (set_header(r, "X-Tier-Source", source) != NGX_OK) return NGX_ERROR;
+        if (code > 0 && code <= NGX_HTTP_CACHE_HIT) {
+            if (set_header(r, "X-Tier-Cache", ngx_http_cache_status[code - 1]) != NGX_OK) return NGX_ERROR;
+        }
         store = !ctx->skip && r->upstream && r->cache && r->headers_out.status == 200
             && r->upstream->cacheable && r->headers_out.content_length_n >= 0
-            && r->headers_out.content_length_n <= conf->l2_limit;
+            && r->headers_out.content_length_n <= ctx->l2_limit;
         if (store) {
             expiry = r->cache->valid_sec;
             if (ctx->stored_expiry && (!expiry || ctx->stored_expiry < expiry)) expiry = ctx->stored_expiry;
@@ -409,10 +492,23 @@ static ngx_int_t header_filter(ngx_http_request_t *r)
         }
         if (store) { ngx_str_set(&value, "1"); } else { ngx_str_set(&value, "0"); }
         if (set_header(r, "X-Tier-Store", value) != NGX_OK) return NGX_ERROR;
+        /* A real origin 304 renews the upper representation. Synthesizing
+         * X-Accel-Expires: 0 here turns a valid 304 into a no-store response,
+         * which Purge correctly rejects. Preserve the origin's 304 policy. */
+        if (r->headers_out.status == NGX_HTTP_NOT_MODIFIED) {
+            if (r->upstream && r->upstream->headers_in.status_n == NGX_HTTP_NOT_MODIFIED
+                && (!r->upstream->cacheable || r->upstream->headers_in.no_cache || r->upstream->headers_in.expired)) {
+                ngx_str_set(&value, "0");
+                if (set_header(r, "X-Accel-Expires", value) != NGX_OK) return NGX_ERROR;
+            } else if (r->upstream && (inner = find_header(&r->upstream->headers_in.headers, "X-Accel-Expires"))) {
+                if (set_header(r, "X-Accel-Expires", *inner) != NGX_OK) return NGX_ERROR;
+            }
+            return tier_next_header(r);
+        }
         value.data = ngx_pnalloc(r->pool, 32); if (!value.data) return NGX_ERROR;
-        if (store) value.len = ngx_sprintf(value.data, "@%T", expiry) - value.data;
+        if (store) value.len = ngx_sprintf(value.data, "%T", expiry) - value.data;
         else { value.data[0] = '0'; value.len = 1; }
-        if (set_header(r, "X-Accel-Expires", value) != NGX_OK) return NGX_ERROR;
+        if (set_header(r, "X-Tier-Expires", value) != NGX_OK) return NGX_ERROR;
     } else {
         if (ctx->skip) { ngx_str_set(&source, "off"); }
         else if (code == NGX_HTTP_CACHE_HIT || code == NGX_HTTP_CACHE_STALE || code == NGX_HTTP_CACHE_UPDATING || code == NGX_HTTP_CACHE_REVALIDATED) { ngx_str_set(&source, "l1"); }
@@ -426,7 +522,11 @@ static ngx_int_t header_filter(ngx_http_request_t *r)
         }
         if (set_header(r, "X-Cache-Layer", source) != NGX_OK) return NGX_ERROR;
         if (ctx->skip) { ngx_str_set(&value, "BYPASS"); }
-        else if (same(source, "l2")) { ngx_str_set(&value, "HIT"); }
+        else if (same(source, "l2")) {
+            ngx_str_set(&value, "HIT");
+            inner = find_header(&r->upstream->headers_in.headers, "X-Tier-Cache");
+            if (inner && (same(*inner, "STALE") || same(*inner, "UPDATING") || same(*inner, "REVALIDATED"))) value = *inner;
+        }
         else if (code > 0 && code <= 7) value = ngx_http_cache_status[code - 1];
         else { ngx_str_set(&value, "MISS"); }
         if (set_header(r, "X-Cache", value) != NGX_OK) return NGX_ERROR;
@@ -446,7 +546,7 @@ static ngx_int_t status_handler(ngx_http_request_t *r)
     if (!main->shared) return NGX_HTTP_SERVICE_UNAVAILABLE;
     buffer = ngx_create_temp_buf(r->pool, 512); if (!buffer) return NGX_HTTP_INTERNAL_SERVER_ERROR;
     buffer->last = ngx_snprintf(buffer->last, 512,
-        "{\"version\":\"0.1.0\",\"l1_hits\":%uA,\"l2_hits\":%uA,\"origin_reads\":%uA,\"bypasses\":%uA,\"lua_required\":false}\n",
+        "{\"version\":\"0.1.1\",\"l1_hits\":%uA,\"l2_hits\":%uA,\"origin_reads\":%uA,\"bypasses\":%uA,\"lua_required\":false}\n",
         main->shared->l1_hits, main->shared->l2_hits, main->shared->origin_reads, main->shared->bypasses);
     r->headers_out.status = 200; r->headers_out.content_length_n = buffer->last - buffer->pos;
     ngx_str_set(&r->headers_out.content_type, "application/json");
@@ -456,8 +556,14 @@ static ngx_int_t status_handler(ngx_http_request_t *r)
 }
 static ngx_int_t configure(ngx_conf_t *cf)
 {
+    ngx_str_t etag = ngx_string("upstream_cache_etag"), modified = ngx_string("upstream_cache_last_modified");
+    tier_main *main = ngx_http_conf_get_module_main_conf(cf, ngx_http_scdn_tier_module);
     ngx_http_core_main_conf_t *core = ngx_http_conf_get_module_main_conf(cf, ngx_http_core_module);
     ngx_http_handler_pt *handler = ngx_array_push(&core->phases[NGX_HTTP_PREACCESS_PHASE].handlers);
+    /* Core validator variables are NOHASH: obtain their configured indexes. */
+    main->etag_index = ngx_http_get_variable_index(cf, &etag);
+    main->modified_index = ngx_http_get_variable_index(cf, &modified);
+    if (main->etag_index == NGX_ERROR || main->modified_index == NGX_ERROR) return NGX_ERROR;
     if (!handler) return NGX_ERROR;
     *handler = access_handler;
     tier_next_header = ngx_http_top_header_filter; ngx_http_top_header_filter = header_filter;

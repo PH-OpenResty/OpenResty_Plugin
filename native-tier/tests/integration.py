@@ -64,7 +64,7 @@ class Review(fixture.Review):
         template = ROOT / 'native-tier/examples'
         front = (template / 'front.conf').read_text()
         backend = (template / 'backend.conf').read_text()
-        old = 'proxy_cache_key "$scdn_tier_scope|$scdn_tier_key";'
+        old = 'proxy_cache_key $scdn_tier_cache_key;'
         key = 'scdn_purge_key $scdn_tier_scope $scdn_tier_key $scdn_tier_resource;\nproxy_cache_key $scdn_purge_key;'
         front = front.replace(old, key)
         backend = backend.replace(old, key)

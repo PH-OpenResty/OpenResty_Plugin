@@ -58,9 +58,10 @@ class OriginServer(http.server.ThreadingHTTPServer):
 
 
 class CacheReview(Review):
-    def __init__(self, root, prefix, static):
+    def __init__(self, root, prefix, static, tier=False):
         super().__init__(root, prefix, None if static else prefix / 'modules/ngx_http_scdn_sync_module.so')
         self.static = static
+        self.tier = tier
         self.http, self.https = free_port(), free_port()
         self.purge_socket = root / 'purge.sock'
         self.purge_token = secrets.token_urlsafe(32)
@@ -86,6 +87,8 @@ class CacheReview(Review):
         if not self.static:
             text = text.replace('worker_processes 2;',
                 f'load_module {self.prefix}/modules/ngx_http_scdn_purge_module.so;\nworker_processes 2;')
+            if self.tier:
+                text = f'load_module {self.prefix}/modules/ngx_http_scdn_tier_module.so;\n' + text
         return text.replace('worker_processes 2;', 'worker_processes 2;\n'
             'thread_pool scdn_sync_tasks threads=1 max_queue=16;\n'
             'thread_pool scdn_cache_purge threads=1 max_queue=16;')
@@ -188,13 +191,30 @@ class CacheReview(Review):
             proxy_buffer_size 16k; proxy_buffers 8 16k;
             add_header X-Cache $upstream_cache_status always;
         }}'''
+        backend = ''
+        if self.tier:
+            templates = Path(__file__).resolve().parents[2] / 'native-tier/examples'
+            key = 'scdn_purge_key $scdn_tier_scope $scdn_tier_key $scdn_tier_resource; proxy_cache_key $scdn_purge_key;'
+            front = (templates / 'front.conf').read_text().replace('proxy_cache_key $scdn_tier_cache_key;', key)
+            back = (templates / 'backend.conf').read_text().replace('proxy_cache_key $scdn_tier_cache_key;', key)
+            node += f'''scdn_tier_zone heat 1m; scdn_tier_socket {self.root}/tier.sock;
+                proxy_cache_path {self.root}/tier-l1 levels=1:2 keys_zone=l1:4m;
+                proxy_cache_path {self.root}/tier-l2 levels=1:2 keys_zone=l2:4m;'''
+            business = f'''location / {{
+                scdn_tier_front l1 http://127.0.0.1:{self.origin.server_port};
+                scdn_tier_identity $host localhost one $request_uri $request_uri;
+                {front}
+            }}'''
+            backend = f'server {{ listen unix:{self.root}/tier.sock; location / {{ {back} }} }}'
+        secure_business = business.replace('scdn_purge_key one', 'scdn_purge_key secure').replace(
+            'scdn_tier_identity $host localhost one', 'scdn_tier_identity $host localhost secure')
         node_servers = f'''server {{ listen unix:{self.node_socket}; {control} }}
             server {{ listen unix:{self.purge_socket}; location = /purge {{ scdn_purge_api; }} }}
             server {{ listen 127.0.0.1:{self.http}; server_name localhost; {business} }}
             server {{ listen 127.0.0.1:{self.https} ssl; server_name localhost;
                 ssl_certificate {self.root}/master.crt; ssl_certificate_key {self.root}/master.key;
-                {business.replace('scdn_purge_key one', 'scdn_purge_key secure')}
-            }}'''
+                {secure_business}
+            }} {backend}'''
         examples = Path(__file__).resolve().parents[1] / 'examples'
         template = (examples / 'cache-master.conf').read_text().replace(
             '/var/lib/scdn-sync-native/master/cache-tasks', str(self.root / 'master-tasks'))
@@ -275,6 +295,8 @@ class CacheReview(Review):
         self.check('native Node pulls and acknowledges persisted warmup', result['state'] == 'succeeded' and result['completed'] == 1)
         value = self.asset('/warm?x=1%202')
         self.check('unvisited resource is already a cache HIT', value[1].get('X-Cache') == 'HIT')
+        if self.tier:
+            self.check('distributed preheat fills the real L1 through L2', value[1].get('X-Cache-Layer') == 'l1')
         self.fill()
         with self.origin.guard:
             self.origin.version = 2
@@ -341,8 +363,18 @@ class CacheReview(Review):
         before = len([record for record in self.origin.records if record[0] == '/concurrent'])
         node_process = self.processes[-1]
         node_process.terminate(); node_process.wait(timeout=10)
+        if self.tier:
+            import shutil
+            shutil.rmtree(self.root / 'tier-l1')  # Disposable fixture, Node is stopped.
         self.launch('node', self.node_config)
         self.check('terminal Master result survives Node restart', self.status('concurrent')[1]['state'] == 'succeeded')
+        if self.tier:
+            restored = self.asset('/concurrent')
+            self.check('preheated persistent L2 survives loss of L1 and Node restart',
+                restored[0] == 200 and restored[1].get('X-Cache-Layer') == 'l2')
+            self.check('persistent preheat promotes back to L1 without origin traffic',
+                self.asset('/concurrent')[1].get('X-Cache-Layer') == 'l1'
+                and before == len([record for record in self.origin.records if record[0] == '/concurrent']))
         time.sleep(.3)
         self.check('acknowledged task is not executed again after restart',
                    before == len([record for record in self.origin.records if record[0] == '/concurrent']))
@@ -403,11 +435,12 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--prefix', type=Path, required=True)
     parser.add_argument('--static', action='store_true')
+    parser.add_argument('--tier', action='store_true', help='Exercise preheat and refresh through both native cache layers')
     parser.add_argument('--report', type=Path)
     args = parser.parse_args()
     prefix = args.prefix / 'nginx' if (args.prefix / 'nginx/sbin/nginx').exists() else args.prefix
     with tempfile.TemporaryDirectory(prefix='scdn-cache-task-test-') as directory:
-        review = CacheReview(Path(directory), prefix, args.static)
+        review = CacheReview(Path(directory), prefix, args.static, tier=args.tier)
         try:
             checks = review.run()
             if args.report:

@@ -174,6 +174,8 @@ jobs:
           extra=()
           if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
           python native-tier/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/tier-results.json"
+          python native-tier/tests/boundaries.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/tier-boundary-results.json"
+          python native-sync/tests/cache_tasks.py --prefix "$RUNNER_TEMP/scdn-plugin" --tier "${extra[@]}" --report "$RUNNER_TEMP/tier-task-results.json"
           python native-tier/tests/coexist.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/six-module-results.json"
       - name: Exact batch prefix site purge, concurrent writers and recovery
         env:
@@ -216,6 +218,8 @@ jobs:
             ${{ runner.temp }}/receipt-recovery-results.json
             ${{ runner.temp }}/lua-handoff-results.json
             ${{ runner.temp }}/tier-results.json
+            ${{ runner.temp }}/tier-boundary-results.json
+            ${{ runner.temp }}/tier-task-results.json
             ${{ runner.temp }}/six-module-results.json
             ${{ runner.temp }}/cache-task-results.json
             ${{ runner.temp }}/plugin-results.json

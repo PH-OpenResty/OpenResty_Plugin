@@ -26,4 +26,6 @@ Purge 调用方、测试和示例必须同时改用 `X-Purge-Mode`、`X-Purge-Sc
 
 Sync 配置发布新增 X-Config-Sequence/Digest/State/Error/Applied；Config 本机就绪接口提供 X-Config-Revision/Ready/Managed，具体信任边界见 [发布手册](SYNC-PUBLICATION.zh-CN.md)。Tier 使用仅本机 Unix 通道的 X-Tier-*，front 覆盖、backend 剥离，业务侧只显示 X-Cache/X-Cache-Layer；见 [Tier 手册](../native-tier/README.zh-CN.md)。
 
+Tier 0.1.1 删除整个 X-Tier-* 请求/响应命名空间中的外来字段，仅在受信通道生成实例令牌、路由身份、校验标记和 L2 大小上限；后端提供来源、实际缓存状态及入库到期。不要把这些内部头用于业务配置、浏览器输出或日志。模板与模块需同步升级。
+
 Ban 运行时不采用客户端头部决定封禁 IP、规则或来源。Nginx 从真实 socket 对端取地址，trusted detector 通过 C API/受控变量上报；Sync 在 mTLS 校验后向本机 Agent 传递已绑定 Node ID。实际接入见 [Ban 运行手册](../native-ban/RUNTIME.zh-CN.md)。
