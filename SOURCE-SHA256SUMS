@@ -9,7 +9,7 @@
 6fa01121ad3fba125a2a64cd738dc1f8f5a7eaf117d53d8acfeb7310138e1c21  native-ban/agent/config.cpp
 fdcb1576d1b5d708344bfb1a6aba7060273af2393039cb689e3fba9bc4c33fdb  native-ban/agent/engine.cpp
 cc7c42969750be97f5265ffd544c06ed66fe50429b518111f9ddc0e39ced1057  native-ban/agent/kernel.cpp
-db4cebf232ff00c0c2b7c4c22204956ee5b68f558cf947fb3dfa0c813637d86c  native-ban/agent/main.cpp
+c0d82c8fcd645fa6b19a42adf1c3b0d69231d4d21c0e4d6c13158b749eb059bc  native-ban/agent/main.cpp
 272dcccdcb96f43404a983849c1bb958f2a3e802a1e662cbdc5f049cb3590ecc  native-ban/agent/server.cpp
 171597312f871cf2b381820cdf87762fdd80615cd7a937e567d90aea12337b50  native-ban/agent/util.cpp
 e9a15eb84d9ee47ab4200e260a4d11467f0e12c47aae4953c773ec3c15c2dd1b  native-ban/bpf/ban.bpf.c

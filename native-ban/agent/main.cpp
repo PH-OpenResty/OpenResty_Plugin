@@ -12,7 +12,7 @@ static std::atomic<bool> reload_policy{false};
 static void signal_stop(int) { stop = true; }
 static void signal_reload(int) { reload_policy = true; }
 int main(int argc, char **argv) {
-  int lock = -1;
+  int lock = -1, runtime_lock=-1;
   try {
     ban::require(argc == 3 || argc == 4,
                  "usage: scdn-ban-agent --config /absolute/policy.json "
@@ -54,6 +54,8 @@ int main(int argc, char **argv) {
     lock = ban::safe_open(conf.state + "/agent.lock", O_RDWR | O_CREAT, 0600);
     ban::require(lock >= 0 && !flock(lock, LOCK_EX | LOCK_NB),
                  "agent_already_running");
+    runtime_lock=ban::safe_open(conf.runtime+"/agent.lock",O_RDWR|O_CREAT,0600);
+    ban::require(runtime_lock>=0&&!flock(runtime_lock,LOCK_EX|LOCK_NB),"runtime_already_owned");
     ban::Engine engine(conf);
     if (argc == 4) {
       ban::require(std::string(argv[3]) == "--detach", "unknown_argument");
@@ -67,11 +69,13 @@ int main(int argc, char **argv) {
     signal(SIGHUP, signal_reload);
     ban::serve(engine, stop, reload_policy, argv[2]);
     close(lock);
+    close(runtime_lock);
     return 0;
   } catch (const std::exception &e) {
     std::cerr << "scdn-ban-agent: " << e.what() << "\n";
     if (lock >= 0)
       close(lock);
+    if(runtime_lock>=0)close(runtime_lock);
     return 1;
   }
 }

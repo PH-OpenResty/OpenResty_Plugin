@@ -116,7 +116,7 @@ event_log 保存决策/应用/解除/过期/策略变更；ip_log 保存对应 I
 
 同 boot 重启重用同一 view inode 和 pinned Maps/links，核对实例配置摘要、程序 tag、接口、Map 布局及执行水位。数据库落后于内核/视图水位时拒绝启动，避免旧备份使已执行决策倒退。SQLite 文件、WAL 和所有状态/日志需一致备份；不能只复制在线数据库主文件。整机重启 tmpfs/bpffs 重建后按受信时间恢复剩余期限，禁止重置完整 TTL。
 
-SIGHUP 只热更新 policy 的 TTL/窗口/阈值/事件时效，保留现有封禁期限并切换策略代际；不重建 Nginx Worker。身份、members、allowlist、服务/接口、Map ABI 或路径变化会返回 reload_requires_maintenance，必须走停服务、受控撤销/重建和验收流程。本版没有多 Master 自动选主，禁止两个权威写者；固定 epoch 和单实例锁用于防止意外共享状态。
+SIGHUP 只热更新 policy 的 TTL/窗口/阈值/事件时效，保留现有封禁期限并切换策略代际；不重建 Nginx Worker。身份、members、allowlist、服务/接口、Map ABI 或路径变化会返回 reload_requires_maintenance，必须走停服务、受控撤销/重建和验收流程。本版没有多 Master 自动选主，禁止两个权威写者；固定 epoch、state 锁和 runtime 锁用于防止意外共享状态/视图/Socket。
 
 初版容量明确有界：4096 活动记录、8192 共享槽/最多 64 次探测、4096 内核封禁、1024 服务元组、128 VIP、128 事件连接、16 并发 RPC、1024 规则队列/Worker、16384 producer 和未确认 outbox 上限、200000 审计/来源回执上限、4MiB 快照/RPC。达到上限明确背压，不能驱逐有效封禁；当前不提供在线扩容或自动压缩回执/审计表，容量规划与离线归档是运维责任。
 
