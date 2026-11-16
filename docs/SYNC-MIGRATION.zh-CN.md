@@ -40,3 +40,7 @@ python native-tier/tests/coexist.py --prefix /tmp/scdn-native --report /tmp/scdn
 Node applied 与业务健康分开。未配置 probe 时 health=unknown，配置了 probe 也只证明相应 URL/状态。Master 离线不会删除已应用的路由/证书；恢复按持久序号续发。不要单独回滚 highest.state、desired 或证书目录。
 
 Sync 身份、线程池、监听/模块更新仍需要 Nginx 启动配置流程；站点、证书和缓存规则数据应用无需重建 Worker。真实线上切换未由本仓库测试自动执行。
+
+## 原生模块与 Lua 的功能交接
+
+只让已由模块接管的 Lua 实现退出运行路径；保留 WAF/限流及未被替代的其他 Lua。新的类型化策略、security_guard 桥接器、一次性转换和暂存清理工具见 [Lua 交接](LUA-HANDOFF.zh-CN.md)。必须同时退出旧 registry/native_export 的启动写入与 Lua SNI 回调，不能只停 timer。

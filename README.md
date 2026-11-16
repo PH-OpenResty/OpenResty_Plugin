@@ -98,3 +98,5 @@ flowchart LR
 本仓库独立提供 Sync、Config、API、Edge、Tier、Purge 源码、模板、测试与构建工具。Config 的普通 watcher 保持只读；启用 scdn_config_managed 后与 Sync 的持久事务及启动回退配合。Sync 0.3.0 已负责原生 v2 站点/证书分发，Tier 负责原生层级缓存；Ban 全节点 L3 同步仍是设计，尚无运行 Agent/BPF。自动证书签发和程序自动升级不属于本次实现。
 
 仓库示例只使用保留域名、本机地址和通用路径。运行配置、站点数据、证书、私钥、token、日志及构建二进制应保存在受限的部署目录或忽略目录中。
+
+当前修复把配置与应用记录纳入同一恢复事务，补充真实 I/O 故障和进程中断回归；原生模块与剩余 Lua 按功能交接，保留 WAF/限流执行，见 [Lua 交接](docs/LUA-HANDOFF.zh-CN.md)。

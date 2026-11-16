@@ -153,3 +153,9 @@ python native-edge/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
 Edge 按当前请求持有的配置版本生成 `X-Cache`、`X-Cache-Layer`、`X-Cache-Policy` 和 `X-Cache-Revision`，站点/prefix 的 `cache_headers off;` 可关闭。删除已有同名 add_header，避免重复。规则的静态回源头在 proxy_pass 前替换客户端全部同名值；站点/前缀继承、私有绕过、Nginx 固定 proxy_set_header 的优先级及 HTTP/gRPC 边界见 [缓存头手册](../docs/CACHE-HEADERS.zh-CN.md)。
 
 Edge 现在以 HTTP_FILTER 类型注册，确保静态和动态构建均在 Nginx 基础 header filter 之后接入原生缓存诊断；动态加载仍保持 Config → API → Edge，三个模块需同源码版本一起编译。
+
+## 原生策略与保留 Lua 的衔接
+
+`$scdn_edge_security` 从当前请求持有的原生快照提供安全策略，`$scdn_edge_security_checked` 由已配置的安全处理器成功检查后置 1。策略开启但未经过处理器时，内容阶段返回 503。新桥接器不查询旧 Lua registry；详见 [Lua 交接](../docs/LUA-HANDOFF.zh-CN.md)。
+
+`scdn_edge_tls_fallback on` 可显式保留未知/无 SNI 的 bootstrap 证书行为，默认 off。它要求 `scdn_edge_tls on`；HTTP Host 仍由 Edge 检查，已配置站点的过期或不可用证书不会降级。迁移后移除 Lua SSL 回调。

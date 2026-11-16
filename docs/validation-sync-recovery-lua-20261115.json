@@ -1,0 +1,25 @@
+{
+  "date": "2026-11-15",
+  "environment": "isolated WSL2 Alpine x86_64",
+  "runtime": "OpenResty 1.31.8.1 static, six native modules",
+  "checks": {
+    "existing_matrix": 646,
+    "receipt_recovery": 47,
+    "native_lua_handoff": 27
+  },
+  "total": 720,
+  "passed": true,
+  "production_modified": false,
+  "cases": [
+    "receipt write, fsync and rename failure",
+    "directory fsync after receipt rename",
+    "pending unlink and directory fsync failure",
+    "real process kill before commit marker removal",
+    "old marker compatibility and corrupt marker rejection",
+    "bootstrap receipt rollback and state ownership",
+    "retained Lua WAF/rate execution from native policies",
+    "native Host and TLS without legacy registry or SNI",
+    "scoped staging preserves unknown and security files"
+  ],
+  "ci": "PR workflow runs all three runtime modes; Lua handoff runs on the two OpenResty modes."
+}
