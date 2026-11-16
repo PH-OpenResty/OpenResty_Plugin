@@ -1,0 +1,434 @@
+{
+  "date": "2026-11-16",
+  "base": "4b2811e3313805c5321039342b5552ac4b4c4118",
+  "component": "Ban Store 0.1.0 / Ban Agent 0.2.0",
+  "environment": "WSL2 Linux x86_64, 20 vCPU; Linux /tmp filesystem",
+  "production_modified": false,
+  "sqlite_linked": false,
+  "passed": true,
+  "runtimes": [
+    {
+      "runtime": "nginx",
+      "linkage": "dynamic",
+      "passed": 1054,
+      "suites": [
+        {
+          "suite": "custom-cache",
+          "passed": 4
+        },
+        {
+          "suite": "identity",
+          "passed": 8
+        },
+        {
+          "suite": "capacity",
+          "passed": 6
+        },
+        {
+          "suite": "edge-audit",
+          "passed": 13
+        },
+        {
+          "suite": "edge",
+          "passed": 47
+        },
+        {
+          "suite": "api",
+          "passed": 47
+        },
+        {
+          "suite": "roles",
+          "passed": 50
+        },
+        {
+          "suite": "distribution",
+          "passed": 40
+        },
+        {
+          "suite": "recovery",
+          "passed": 47
+        },
+        {
+          "suite": "tasks",
+          "passed": 99
+        },
+        {
+          "suite": "tier-tasks",
+          "passed": 102
+        },
+        {
+          "suite": "tier",
+          "passed": 48
+        },
+        {
+          "suite": "tier-boundaries",
+          "passed": 73
+        },
+        {
+          "suite": "coexist",
+          "passed": 54
+        },
+        {
+          "suite": "purge",
+          "passed": 70
+        },
+        {
+          "suite": "patterns",
+          "passed": 64
+        },
+        {
+          "suite": "regex-cache",
+          "passed": 2
+        },
+        {
+          "suite": "revalidate",
+          "passed": 45
+        },
+        {
+          "suite": "headers",
+          "passed": 32
+        },
+        {
+          "suite": "startup",
+          "passed": 6
+        },
+        {
+          "suite": "mixed",
+          "passed": 53
+        },
+        {
+          "suite": "ban",
+          "passed": 64
+        },
+        {
+          "suite": "ban-memory",
+          "passed": 16
+        },
+        {
+          "suite": "ban-xdp",
+          "passed": 64
+        }
+      ]
+    },
+    {
+      "runtime": "openresty",
+      "linkage": "dynamic",
+      "passed": 1021,
+      "suites": [
+        {
+          "suite": "custom-cache",
+          "passed": 4
+        },
+        {
+          "suite": "identity",
+          "passed": 8
+        },
+        {
+          "suite": "capacity",
+          "passed": 6
+        },
+        {
+          "suite": "edge-audit",
+          "passed": 13
+        },
+        {
+          "suite": "edge",
+          "passed": 47
+        },
+        {
+          "suite": "api",
+          "passed": 47
+        },
+        {
+          "suite": "roles",
+          "passed": 50
+        },
+        {
+          "suite": "distribution",
+          "passed": 40
+        },
+        {
+          "suite": "recovery",
+          "passed": 47
+        },
+        {
+          "suite": "tasks",
+          "passed": 99
+        },
+        {
+          "suite": "tier-tasks",
+          "passed": 102
+        },
+        {
+          "suite": "tier",
+          "passed": 48
+        },
+        {
+          "suite": "tier-boundaries",
+          "passed": 73
+        },
+        {
+          "suite": "coexist",
+          "passed": 54
+        },
+        {
+          "suite": "purge",
+          "passed": 70
+        },
+        {
+          "suite": "patterns",
+          "passed": 64
+        },
+        {
+          "suite": "regex-cache",
+          "passed": 2
+        },
+        {
+          "suite": "revalidate",
+          "passed": 45
+        },
+        {
+          "suite": "headers",
+          "passed": 32
+        },
+        {
+          "suite": "startup",
+          "passed": 6
+        },
+        {
+          "suite": "mixed",
+          "passed": 53
+        },
+        {
+          "suite": "ban",
+          "passed": 64
+        },
+        {
+          "suite": "ban-memory",
+          "passed": 16
+        },
+        {
+          "suite": "lua-handoff",
+          "passed": 27
+        },
+        {
+          "suite": "ban-lua",
+          "passed": 4
+        }
+      ]
+    },
+    {
+      "runtime": "static",
+      "linkage": "static",
+      "passed": 1021,
+      "suites": [
+        {
+          "suite": "custom-cache",
+          "passed": 4
+        },
+        {
+          "suite": "identity",
+          "passed": 8
+        },
+        {
+          "suite": "capacity",
+          "passed": 6
+        },
+        {
+          "suite": "edge-audit",
+          "passed": 13
+        },
+        {
+          "suite": "edge",
+          "passed": 47
+        },
+        {
+          "suite": "api",
+          "passed": 47
+        },
+        {
+          "suite": "roles",
+          "passed": 50
+        },
+        {
+          "suite": "distribution",
+          "passed": 40
+        },
+        {
+          "suite": "recovery",
+          "passed": 47
+        },
+        {
+          "suite": "tasks",
+          "passed": 99
+        },
+        {
+          "suite": "tier-tasks",
+          "passed": 102
+        },
+        {
+          "suite": "tier",
+          "passed": 48
+        },
+        {
+          "suite": "tier-boundaries",
+          "passed": 73
+        },
+        {
+          "suite": "coexist",
+          "passed": 54
+        },
+        {
+          "suite": "purge",
+          "passed": 70
+        },
+        {
+          "suite": "patterns",
+          "passed": 64
+        },
+        {
+          "suite": "regex-cache",
+          "passed": 2
+        },
+        {
+          "suite": "revalidate",
+          "passed": 45
+        },
+        {
+          "suite": "headers",
+          "passed": 32
+        },
+        {
+          "suite": "startup",
+          "passed": 6
+        },
+        {
+          "suite": "mixed",
+          "passed": 53
+        },
+        {
+          "suite": "ban",
+          "passed": 64
+        },
+        {
+          "suite": "ban-memory",
+          "passed": 16
+        },
+        {
+          "suite": "lua-handoff",
+          "passed": 27
+        },
+        {
+          "suite": "ban-lua",
+          "passed": 4
+        }
+      ]
+    }
+  ],
+  "standalone": [
+    {
+      "suite": "ban-store",
+      "passed": 44
+    },
+    {
+      "suite": "ban-recovery",
+      "passed": 7
+    }
+  ],
+  "total": 3147,
+  "benchmarks": [
+    {
+      "mode": "memory",
+      "ips": 1000000,
+      "batch": 1024,
+      "insert_ms": 1851.39,
+      "lookup_100k_ms": 133.317,
+      "erase_half_ms": 1177.41,
+      "checkpoint_ms": 0.0057,
+      "recovery_ms": 0,
+      "transactions": 1954,
+      "data_syncs": 0,
+      "checkpoints": 0,
+      "accounted_live_bytes": 145430104,
+      "peak_rss_kib": 276548,
+      "checksum": 10993025
+    },
+    {
+      "mode": "persistent",
+      "ips": 1000000,
+      "batch": 1024,
+      "insert_ms": 10422.2,
+      "lookup_100k_ms": 126.552,
+      "erase_half_ms": 6921.31,
+      "checkpoint_ms": 549.468,
+      "recovery_ms": 1914.47,
+      "transactions": 1954,
+      "data_syncs": 1958,
+      "checkpoints": 4,
+      "accounted_live_bytes": 145430104,
+      "peak_rss_kib": 276696,
+      "checksum": 10993025
+    }
+  ],
+  "tested_failures": [
+    "hash lookup returns original IP value",
+    "rollback changes only the current transaction",
+    "outer rollback includes a committed savepoint",
+    "savepoint rollback preserves its parent",
+    "ordered range merges deletes and updates before applying a limit",
+    "key limits reject oversized identities",
+    "memory mode does not open state files or synchronize storage",
+    "new memory instance starts without IP state",
+    "capacity rejects a whole transaction",
+    "rejected transaction publishes no partial state",
+    "pending allocation respects the memory budget before commit",
+    "pending memory rejection leaves the live index intact",
+    "batch commit uses one data synchronization",
+    "unchanged value avoids journal and synchronization work",
+    "writer lock rejects a second store owner",
+    "restart recovers atomic inserts updates and deletes",
+    "uncommitted torn tail is removed at cut 1",
+    "uncommitted torn tail is removed at cut 95",
+    "uncommitted torn tail is removed at cut 96",
+    "uncommitted torn tail is removed at cut 158",
+    "complete frame checksum corruption is rejected instead of discarded",
+    "corrupted transaction length cannot masquerade as an incomplete tail",
+    "snapshot header sequence corruption fails validation",
+    "automatic checkpoints compact a growing append log",
+    "checkpoint preserves all live IPs and high watermarks",
+    "batch deletion remains valid after checkpoint",
+    "public state file permissions are rejected",
+    "state file symlink is rejected",
+    "parent directory symlink is rejected",
+    "short journal write cannot report commit success",
+    "I/O failure poisons the writer until recovery",
+    "poisoned writer rejects additional changes",
+    "restart truncates only the incomplete transaction",
+    "data sync failure cannot return a durable receipt",
+    "failed data synchronization requires a reopen",
+    "unacknowledged full transaction recovers atomically",
+    "checkpoint rename failure is visible",
+    "failure before rename keeps the original journal usable",
+    "writes after failed checkpoint recover from the original journal",
+    "directory synchronization failure is visible",
+    "failure after checkpoint rename stops future writes to the old inode",
+    "checkpoint selected after reopen contains the committed state",
+    "memory large IP workload verifies values and deletes",
+    "persistent large IP workload verifies values and deletes",
+    "remote-fence",
+    "reboot-fence",
+    "reboot-clock",
+    "batch",
+    "projection",
+    "quota",
+    "backlog"
+  ],
+  "validation_notes": [
+    "Local nginx uses UBSan traps. GitHub nginx additionally requires ASan/UBSan for runtime, Agent, store and recovery helpers.",
+    "Common seven-module suites passed on all rebuilt runtimes. Ban suites were repeated after the final Agent changes.",
+    "The one-million-IP workload measures storage only; lookup workload has 100000 operations; delete and restart contain 500000 surviving IPs.",
+    "Peak RSS is a process high-water mark, not the configured live allocation counter.",
+    "Whole-Agent/BPF active capacity remains 4096; volatile mode is supported for Nodes and requires a persistent authority.",
+    "No SQLite migration, production rollout, physical power-loss or network-filesystem qualification was performed."
+  ]
+}

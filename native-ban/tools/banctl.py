@@ -7,7 +7,7 @@ import struct
 
 parser=argparse.ArgumentParser()
 parser.add_argument('--socket',required=True)
-parser.add_argument('operation',choices=('status','list','unban'))
+parser.add_argument('operation',choices=('status','list','unban','snapshot','checkpoint'))
 parser.add_argument('--ip')
 parser.add_argument('--ban-id')
 args=parser.parse_args()

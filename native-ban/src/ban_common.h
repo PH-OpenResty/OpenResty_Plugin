@@ -6,6 +6,7 @@
 #error "native-ban shared ABI requires little endian"
 #endif
 #define BAN_CAPACITY 4096u
+#define BAN_ACK_MEMORY_RESET 8u
 #define BAN_SLOTS 8192u
 #define BAN_MAX_FRAME (4u * 1024u * 1024u)
 #define BAN_VIEW_MAGIC UINT64_C(0x31574549564e4142)

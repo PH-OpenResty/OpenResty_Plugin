@@ -18,7 +18,6 @@ import time
 import uuid
 import grp
 import ipaddress
-import sqlite3
 
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'native-sync/tests'))
@@ -78,6 +77,10 @@ class Test:
     def ns(self,name,*args):return command('ip','netns','exec',name,*args)
 
     def setup(self):
+        runtime=subprocess.run([str(self.prefix/'sbin/nginx'),'-V'],capture_output=True,text=True,check=True).stderr
+        flags=['-fsanitize=address,undefined','-fno-omit-frame-pointer'] if '-fsanitize=address' in runtime else []
+        command('c++','-std=c++17','-O1','-Wall','-Wextra','-Werror',*flags,'-I',str(ROOT/'native-ban-store/include'),
+            str(ROOT/'native-ban-store/tests/fixture.cpp'),str(self.build/'libscdn-ban-store.a'),'-lcrypto','-o',str(self.root/'store-fixture'))
         command('cc','-std=c11','-Wall','-Wextra','-Werror','-I',str(ROOT/'native-ban/src'),
                 str(ROOT/'native-ban/tests/producer.c'),str(ROOT/'native-ban/src/ban_common.c'),'-o',str(self.root/'producer'))
         command('cc','-std=c11','-Wall','-Wextra','-Werror',str(ROOT/'native-ban/tests/packet-test.c'),'-lbpf','-o',str(self.root/'packet-test'))
@@ -139,6 +142,11 @@ class Test:
         process=subprocess.Popen(['ip','netns','exec',ns,str(self.build/'scdn-ban-agent'),'--config',str(root/'policy.json')],stdout=log,stderr=log)
         self.processes.append(process);self.agents[node]=process
         self.until(lambda: process.poll() is None and self.status(node).get('kernel_ready')==1,'Agent '+node)
+
+    def replace_snapshot(self,value):
+        process=self.agents['authority'];process.terminate();process.wait(timeout=8)
+        command(str(self.root/'store-fixture'),str(self.root/'authority/state'),input=value)
+        self.launch_agent('authority')
 
     def launch_nginx(self,node):
         ns,conf=self.configs[node];root=self.root/node
@@ -247,8 +255,7 @@ except OSError:print('blocked')
         self.until(lambda:all(self.status(n)['cluster_revision']!='0' for n in self.configs),'initial complete snapshots')
         self.until(lambda:self.status('authority')['cluster_state']=='ALL_APPLIED','initial kernel result acknowledgements')
         self.check('three real Agents and registered Nodes apply the initial full snapshot',self.status('authority')['cluster_state']=='ALL_APPLIED')
-        with sqlite3.connect(self.root/'authority/state/state.sqlite') as db:
-            initial_snapshot=db.execute("SELECT value FROM meta WHERE key='snapshot'").fetchone()[0]
+        initial_snapshot=json.dumps(rpc(self.configs['authority'][1]['admin_socket'],{'operation':'snapshot'})[1])
         self.until(lambda:all(self.request(n)[0]==200 for n in self.configs),'public requests')
         self.check('unbanned clients reach all three protected HTTP endpoints',all(self.request(n)[0]==200 for n in self.configs))
         # IPv6 addresses are tentative until duplicate-address detection and
@@ -294,18 +301,15 @@ except OSError:print('blocked')
         self.packet_tests()
         self.check('eBPF blocks the configured UDP load-balancing port',self.udp('node-a',9090)=='blocked')
         self.check('unprotected UDP port continues to work',self.udp('node-a',9091)=='fixture')
-        with sqlite3.connect(self.root/'authority/state/state.sqlite') as db:
-            current_snapshot=db.execute("SELECT value FROM meta WHERE key='snapshot'").fetchone()[0]
-            tampered=json.loads(current_snapshot);sig=tampered['signature'];tampered['signature']=('A' if sig[0]!='A' else 'B')+sig[1:]
-            db.execute("UPDATE meta SET value=? WHERE key='snapshot'",(json.dumps(tampered),))
+        current_snapshot=json.dumps(rpc(self.configs['authority'][1]['admin_socket'],{'operation':'snapshot'})[1])
+        tampered=json.loads(current_snapshot);sig=tampered['signature'];tampered['signature']=('A' if sig[0]!='A' else 'B')+sig[1:]
+        self.replace_snapshot(json.dumps(tampered))
         self.until(lambda:self.status('node-a')['sync_error']=='signature_invalid','snapshot signature rejection')
         self.check('tampered full snapshot cannot clear existing kernel bans',self.request('node-a')[0]==0)
-        with sqlite3.connect(self.root/'authority/state/state.sqlite') as db:
-            db.execute("UPDATE meta SET value=? WHERE key='snapshot'",(initial_snapshot,))
+        self.replace_snapshot(initial_snapshot)
         self.until(lambda:self.status('node-a')['sync_error']=='snapshot_high_watermark','snapshot replay rejection')
         self.check('older authentic full snapshot cannot roll back an active ban',self.request('node-a')[0]==0)
-        with sqlite3.connect(self.root/'authority/state/state.sqlite') as db:
-            db.execute("UPDATE meta SET value=? WHERE key='snapshot'",(current_snapshot,))
+        self.replace_snapshot(current_snapshot)
         self.until(lambda:not self.status('node-a')['sync_error'],'snapshot recovery')
         record=next(r for r in self.records('node-b') if r['layer']==3)
         code,_=rpc(self.configs['node-b'][1]['admin_socket'],{'operation':'unban','ip':record['ip'],'ban_id':record['ban_id']})
@@ -362,7 +366,7 @@ except OSError:print('blocked')
         self.until(lambda:self.status('node-a')['policy_error']=='fixed_expiry_required','invalid policy rejected')
         self.check('invalid policy leaves the active generation unchanged',self.status('node-a')['policy_generation']=='2')
         # A missing projection must keep the Agent visibly non-durable until
-        # it can replay that file from the SQLite transaction history.
+        # it can replay that file from the Ban Store transaction history.
         conf=self.configs['node-b'][1];log_path=Path(conf['ip_log']);saved=log_path.with_suffix('.saved')
         log_path.rename(saved);log_path.mkdir()
         self.request('node-b','/variable-waf')

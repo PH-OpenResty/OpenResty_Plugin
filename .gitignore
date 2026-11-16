@@ -31,6 +31,10 @@ id_ed25519*
 *.log.checkpoint
 *.journal
 *.journal.*
+*.aof
+*.sqlite*
+ban-store.lock
+.ban-store-*.tmp
 *.checkpoint
 *.owner
 *.pid

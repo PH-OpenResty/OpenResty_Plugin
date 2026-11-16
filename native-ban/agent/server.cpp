@@ -74,7 +74,13 @@ struct Client {
   bool hello = false;
   std::string producer, instance;
 };
-static bool handle_event(Engine &e, Client &client) {
+struct ReceivedEvent {
+  int fd;
+  ban_event event;
+  uint32_t uid;
+};
+static bool handle_event(Engine &e, Client &client,
+                         std::vector<ReceivedEvent> &batch) {
   ban_event event{};
   char control[CMSG_SPACE(sizeof(int) * 8)] = {0};
   iovec io{&event, sizeof(event)};
@@ -118,19 +124,19 @@ static bool handle_event(Engine &e, Client &client) {
       client.producer = hex(event.producer, 16);
       client.instance = hex(event.instance, 16);
       client.hello = true;
-      int64_t sequence = 0;
-      Statement q(e.db, "SELECT seq FROM producers WHERE id=?");
-      q.bind(1, client.producer);
-      if (q.row())
-        sequence = q.integer(0);
-      ban_ack ack{BAN_VERSION, 0, (uint64_t)sequence, 1};
+      auto sequence = e.producer_sequence(client.producer);
+      ban_ack ack{BAN_VERSION,
+                  !e.conf.storage.persistent && sequence == 0
+                      ? BAN_ACK_MEMORY_RESET
+                      : 0u,
+                  sequence, 1};
       reply(client.fd, ack, e.view->readonly);
     } else {
       require(client.hello && fds.empty() &&
                   client.producer == hex(event.producer, 16) &&
                   client.instance == hex(event.instance, 16),
               "event_connection_identity");
-      reply(client.fd, e.event(event, client.uid));
+      batch.push_back({client.fd, event, client.uid});
     }
     for (int fd : fds)
       close(fd);
@@ -200,7 +206,10 @@ void serve(Engine &e, std::atomic<bool> &stop, std::atomic<bool> &reload,
           listener(e.conf.cluster_socket, SOCK_STREAM, 0660, e.conf.worker_gid);
   std::vector<Client> clients;
   std::atomic<unsigned> connections{0};
-  struct RpcThread {std::thread thread;std::shared_ptr<std::atomic<bool>>done;};
+  struct RpcThread {
+    std::thread thread;
+    std::shared_ptr<std::atomic<bool>> done;
+  };
   std::vector<RpcThread> threads;
   std::thread network([&] {
     while (!stop) {
@@ -229,13 +238,44 @@ void serve(Engine &e, std::atomic<bool> &stop, std::atomic<bool> &reload,
     if (n < 0 && errno == EINTR)
       continue;
     require(n >= 0, "poll_failed");
+    std::vector<ReceivedEvent> batch;
     for (size_t i = clients.size(); i > 0; i--) {
       auto index = i - 1;
       if (polls[index + 3].revents &&
           (polls[index + 3].revents & (POLLHUP | POLLERR) ||
-           !handle_event(e, clients[index]))) {
+           !handle_event(e, clients[index], batch))) {
         close(clients[index].fd);
         clients.erase(clients.begin() + (long)index);
+      }
+    }
+    if (!batch.empty()) {
+      std::vector<std::optional<ban_ack>> acks(batch.size());
+      try {
+        std::vector<std::pair<ban_event, uint32_t>> inputs;
+        inputs.reserve(batch.size());
+        for (auto &item : batch)
+          inputs.push_back({item.event, item.uid});
+        std::lock_guard<std::mutex> guard(e.mutex);
+        acks = e.events(inputs);
+      } catch (const std::exception &error) {
+        std::lock_guard<std::mutex> guard(e.mutex);
+        e.sync_error = error.what();
+      }
+      for (size_t i = 0; i < batch.size(); i++) {
+        bool ok = acks[i].has_value();
+        if (ok)
+          try {
+            reply(batch[i].fd, *acks[i]);
+          } catch (...) {
+            ok = false;
+          }
+        if (!ok)
+          for (auto it = clients.begin(); it != clients.end(); ++it)
+            if (it->fd == batch[i].fd) {
+              close(it->fd);
+              clients.erase(it);
+              break;
+            }
       }
     }
     for (unsigned kind = 0; kind < 3; kind++)
@@ -255,12 +295,13 @@ void serve(Engine &e, std::atomic<bool> &stop, std::atomic<bool> &reload,
           close(fd);
         } else {
           connections++;
-          auto done=std::make_shared<std::atomic<bool>>(false);
-          threads.push_back({std::thread([&, fd, kind,done] {
-            stream_client(e, fd, kind == 1);
-            connections--;
-            *done=true;
-          }),done});
+          auto done = std::make_shared<std::atomic<bool>>(false);
+          threads.push_back({std::thread([&, fd, kind, done] {
+                               stream_client(e, fd, kind == 1);
+                               connections--;
+                               *done = true;
+                             }),
+                             done});
         }
       }
     if (ban_now() - last >= 1000000000u) {
@@ -274,7 +315,13 @@ void serve(Engine &e, std::atomic<bool> &stop, std::atomic<bool> &reload,
       }
     }
     // Bound thread objects as well as concurrent connections.
-    for(auto it=threads.begin();it!=threads.end();){if(*it->done){it->thread.join();it=threads.erase(it);}else ++it;}
+    for (auto it = threads.begin(); it != threads.end();) {
+      if (*it->done) {
+        it->thread.join();
+        it = threads.erase(it);
+      } else
+        ++it;
+    }
   }
   network.join();
   for (auto &t : threads)

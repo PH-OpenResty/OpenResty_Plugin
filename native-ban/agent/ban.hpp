@@ -1,6 +1,7 @@
 #ifndef SCDN_BAN_AGENT_HPP
 #define SCDN_BAN_AGENT_HPP
 #include "ban_common.h"
+#include "ban_store.hpp"
 #include <array>
 #include <atomic>
 #include <bpf/bpf.h>
@@ -12,11 +13,11 @@
 #include <mutex>
 #include <openssl/evp.h>
 #include <set>
-#include <sqlite3.h>
 #include <stdexcept>
 #include <string>
 #include <vector>
 namespace ban {
+using Table = ban_store::Table;
 using J = std::shared_ptr<json_object>;
 inline J own(json_object *p) { return J(p, json_object_put); }
 J object();
@@ -58,20 +59,10 @@ struct Config {
   std::set<std::string> members;
   int64_t poll_ms, skew_ms;
   std::string immutable;
+  ban_store::Options storage;
 };
 Config config_read(const std::string &path);
 bool exempt(const Config &conf, const ban_address &address);
-struct Statement {
-  sqlite3_stmt *p = nullptr;
-  Statement(sqlite3 *d, const char *sql);
-  ~Statement();
-  void bind(int index, const std::string &v);
-  void bind(int index, int64_t v);
-  bool row();
-  void done();
-  std::string text(int col);
-  int64_t integer(int col);
-};
 struct Kernel {
   bpf_object *object = nullptr;
   std::vector<bpf_link *> links;
@@ -98,7 +89,7 @@ struct View {
 };
 struct Engine {
   Config conf;
-  sqlite3 *db = nullptr;
+  ban_store::Store db;
   std::unique_ptr<Kernel> kernel;
   std::unique_ptr<View> view;
   std::mutex mutex;
@@ -111,7 +102,10 @@ struct Engine {
   bool enforcement_pending = true;
   explicit Engine(Config c);
   ~Engine();
-  void sql(const char *s);
+  J data(ban_store::Table table, const std::string &key);
+  void save(ban_store::Table table, const std::string &key, const J &value);
+  uint64_t audit_sequence();
+  uint64_t producer_sequence(const std::string &producer);
   std::string meta(const std::string &key, const std::string &fallback = "");
   void meta_set(const std::string &key, const std::string &value);
   void audit(const std::string &action, const J &record);
@@ -119,6 +113,8 @@ struct Engine {
   void reconcile();
   void tick();
   ban_ack event(const ban_event &e, uint32_t uid);
+  std::vector<std::optional<ban_ack>>
+  events(const std::vector<std::pair<ban_event, uint32_t>> &batch);
   J query(const J &request);
   J status();
   J bridge(const std::string &node, const std::string &operation,

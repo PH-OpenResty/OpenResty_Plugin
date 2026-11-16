@@ -10,10 +10,18 @@
   "worker_uid": 1001,
   "worker_gid": 1001,
   "sync_uid": 1001,
-  "instances": ["00000000-0000-0000-0000-000000000100"],
+  "instances": [
+    "00000000-0000-0000-0000-000000000100"
+  ],
   "trusted_rules": [
-    {"source": "waf", "reason": "942100"},
-    {"source": "cc", "reason": "cc:confirmed-rate"}
+    {
+      "source": "waf",
+      "reason": "942100"
+    },
+    {
+      "source": "cc",
+      "reason": "cc:confirmed-rate"
+    }
   ],
   "policy": {
     "l7_seconds": 600,
@@ -25,18 +33,43 @@
   },
   "datapath": {
     "mode": "tcx_ingress",
-    "interfaces": ["eth0"],
+    "interfaces": [
+      "eth0"
+    ],
     "object_file": "/usr/local/lib/scdn-ban/ban.bpf.o",
     "pin_root": "/sys/fs/bpf/scdn-ban-node-a"
   },
   "services": [
-    {"ip": "192.0.2.10", "protocol": "tcp", "port": 80},
-    {"ip": "192.0.2.10", "protocol": "tcp", "port": 443},
-    {"ip": "192.0.2.10", "protocol": "udp", "port": 443},
-    {"ip": "192.0.2.10", "protocol": "tcp", "port": 9000},
-    {"ip": "2001:db8::10", "protocol": "tcp", "port": 443}
+    {
+      "ip": "192.0.2.10",
+      "protocol": "tcp",
+      "port": 80
+    },
+    {
+      "ip": "192.0.2.10",
+      "protocol": "tcp",
+      "port": 443
+    },
+    {
+      "ip": "192.0.2.10",
+      "protocol": "udp",
+      "port": 443
+    },
+    {
+      "ip": "192.0.2.10",
+      "protocol": "tcp",
+      "port": 9000
+    },
+    {
+      "ip": "2001:db8::10",
+      "protocol": "tcp",
+      "port": 443
+    }
   ],
-  "allowlist": ["203.0.113.0/28", "2001:db8:ffff::/64"],
+  "allowlist": [
+    "203.0.113.0/28",
+    "2001:db8:ffff::/64"
+  ],
   "cluster": {
     "role": "node",
     "cluster_id": "00000000-0000-0000-0000-000000001000",
@@ -48,8 +81,18 @@
     "signing_key": "",
     "verify_key": "/etc/scdn-ban/trust/authority.pub",
     "socket": "/run/scdn-ban/sync.sock",
-    "members": ["master-a", "node-a", "node-b"],
+    "members": [
+      "master-a",
+      "node-a",
+      "node-b"
+    ],
     "poll_ms": 1000,
     "clock_uncertainty_ms": 1000
+  },
+  "storage": {
+    "mode": "persistent",
+    "max_entries": 1048576,
+    "max_memory_mb": 512,
+    "checkpoint_mb": 64
   }
 }

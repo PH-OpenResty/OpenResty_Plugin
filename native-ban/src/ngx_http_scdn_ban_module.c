@@ -464,6 +464,12 @@ static void tick(ngx_event_t *event) {
       if (view)
         munmap(view, sizeof(*view));
       view = next;
+      if(ack.result==BAN_ACK_MEMORY_RESET) {
+        /* Volatile Node state was intentionally reset. Preserve observation
+         * times/generations so queued old evidence cannot revive old bans. */
+        sequence=0;
+        for(unsigned i=0;i<count;i++)queue[(first+i)%QUEUE].sequence=++sequence;
+      }
       while (count && queue[first].sequence <= ack.sequence) {
         first = (first + 1) % QUEUE;
         count--;
