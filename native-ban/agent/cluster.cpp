@@ -286,22 +286,32 @@ void Engine::apply_snapshot(const std::string &envelope) {
       auto ip = ip_text(ip_parse(str(f, "ip")));
       auto time = integer(f, "time");
       require(time <= utc() + conf.skew_ms, "fence_clock");
-      Statement q(db, "INSERT INTO fences VALUES(?,?,0) ON CONFLICT(ip) DO "
-                      "UPDATE SET utc=MAX(utc,excluded.utc)");
+      auto age = std::max<int64_t>(0, utc() - time - conf.skew_ms);
+      auto now = (int64_t)ban_now();
+      auto cutoff = age >= now / 1000000 ? 0 : now - age * 1000000;
+      Statement q(db, "INSERT INTO fences VALUES(?,?,?) ON CONFLICT(ip) DO "
+                      "UPDATE SET boot=CASE WHEN excluded.utc>utc THEN "
+                      "MAX(boot,excluded.boot) ELSE boot END,utc=MAX(utc,excluded.utc)");
       q.bind(1, ip);
       q.bind(2, time);
+      q.bind(3, cutoff);
       q.done();
+      Statement evidence(db, "DELETE FROM evidence WHERE ip=? AND observed<=?");
+      evidence.bind(1, ip); evidence.bind(2, cutoff); evidence.done();
     }
     std::vector<std::string> remove;
     Statement q(db, "SELECT key,value FROM records");
     while (q.row()) {
       auto r = parse(q.text(1));
       auto ip = str(r, "ip");
-      if (num(r, "layer") != 3)
+      Statement fence(db, "SELECT utc FROM fences WHERE ip=?");
+      fence.bind(1, ip);
+      bool fenced = fence.row() && integer(r, "decided") <= fence.integer(0);
+      if (num(r, "layer") != 3 && !fenced)
         continue;
       bool global = str(r, "origin") == "cluster";
       int64_t accepted = integer(r, "accepted");
-      if (global || (accepted && accepted <= revision))
+      if (global || fenced || (accepted && accepted <= revision))
         remove.push_back(q.text(0));
     }
     for (auto &key : remove) {
@@ -316,7 +326,8 @@ void Engine::apply_snapshot(const std::string &envelope) {
     for (auto &entry : incoming) {
       auto r = parse(dump(entry.second));
       int64_t remaining =
-          std::max<int64_t>(0, integer(r, "expires") - utc() - conf.skew_ms);
+          std::max<int64_t>(0, std::min(integer(r, "expires") - integer(r, "decided"),
+                                      integer(r, "expires") - utc() - conf.skew_ms));
       if (!remaining)
         continue;
       auto old = previous.count(entry.first) ? previous[entry.first] : J{};

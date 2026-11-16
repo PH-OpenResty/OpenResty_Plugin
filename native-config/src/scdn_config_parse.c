@@ -48,7 +48,7 @@ scdn_open(const char *path, int directory)
 }
 
 static u_char *
-scdn_read(const char *path, size_t maximum, size_t *length)
+scdn_read(const char *path, size_t maximum, size_t *length, int private_file)
 {
     int fd;
     struct stat before, after;
@@ -59,7 +59,8 @@ scdn_read(const char *path, size_t maximum, size_t *length)
     fd = scdn_open(path, 0);
     if (fd < 0) { return NULL; }
     if (fstat(fd, &before) != 0 || !S_ISREG(before.st_mode)
-        || before.st_size <= 0 || (uint64_t) before.st_size > maximum)
+        || before.st_size <= 0 || (uint64_t) before.st_size > maximum
+        || (before.st_mode & (private_file ? 077 : 022)))
     {
         close(fd);
         return NULL;
@@ -243,7 +244,7 @@ scdn_path(ngx_str_t *value)
 }
 
 static char *
-scdn_string(ngx_str_t *value)
+scdn_string(const ngx_str_t *value)
 {
     char *copy = malloc(value->len + 1);
     if (copy != NULL) { memcpy(copy, value->data, value->len); copy[value->len] = 0; }
@@ -461,10 +462,10 @@ scdn_certificates(scdn_config_site_t *site, EVP_MD_CTX *digest, size_t *total,
 
     if (site->certificate.len == 0 || !site->enabled) { return 1; }
     path = scdn_string(&site->certificate);
-    bytes = path != NULL ? scdn_read(path, 262144, &length) : NULL;
+    bytes = path != NULL ? scdn_read(path, 262144, &length, 0) : NULL;
     free(path);
     path = scdn_string(&site->certificate_key);
-    private = path != NULL ? scdn_read(path, 65536, &private_length) : NULL;
+    private = path != NULL ? scdn_read(path, 65536, &private_length, 1) : NULL;
     free(path);
     if (bytes == NULL || private == NULL) { free(bytes); free(private); return 0; }
     *total += length + private_length;
@@ -541,6 +542,65 @@ done:
     return valid;
 }
 
+static int
+scdn_host_compare(const void *a, const void *b)
+{
+    const scdn_config_host_t *left = a, *right = b;
+    size_t length = ngx_min(left->host.len, right->host.len);
+    ngx_int_t order = ngx_strncasecmp(left->host.data, right->host.data, length);
+    if (order) return order < 0 ? -1 : 1;
+    return left->host.len < right->host.len ? -1 : left->host.len != right->host.len;
+}
+
+/* Re-read and hash contents, including same-size/mtime certificate rotations.
+ * Only parsing and immutable object construction may be skipped. */
+int
+scdn_config_matches(const char *path, const scdn_config_snapshot_t *cache)
+{
+    EVP_MD_CTX *digest;
+    u_char *bytes, hash[32];
+    size_t length;
+    unsigned int n;
+    ngx_uint_t i;
+    int fd, valid = 0;
+    char *name;
+    const scdn_config_site_t *site;
+    if (cache == NULL) return 0;
+    bytes = scdn_read(path, SCDN_CONFIG_BYTES, &length, 0);
+    if (bytes == NULL) return 0;
+    if (EVP_Digest(bytes, length, hash, &n, EVP_sha256(), NULL) != 1
+        || n != 32 || memcmp(hash, cache->source_digest, 32)) { free(bytes); return 0; }
+    digest = EVP_MD_CTX_new();
+    if (digest == NULL) { free(bytes); return 0; }
+    EVP_DigestInit_ex(digest, EVP_sha256(), NULL);
+    EVP_DigestUpdate(digest, bytes, length); free(bytes);
+    for (i = 0; i < cache->count; i++) {
+        site = &cache->sites[i];
+        if (!site->enabled) continue;
+        if (site->root.len) {
+            name = scdn_string(&site->root);
+            fd = name ? scdn_open(name, 1) : -1; free(name);
+            if (fd < 0) goto done;
+            close(fd);
+        }
+        if (!site->certificate.len) continue;
+        if (X509_cmp_current_time(X509_get0_notBefore(site->leaf)) > 0
+            || X509_cmp_current_time(X509_get0_notAfter(site->leaf)) <= 0) goto done;
+        name = scdn_string(&site->certificate);
+        bytes = name ? scdn_read(name, 262144, &length, 0) : NULL; free(name);
+        if (!bytes) goto done;
+        EVP_DigestUpdate(digest, bytes, length); free(bytes);
+        name = scdn_string(&site->certificate_key);
+        bytes = name ? scdn_read(name, 65536, &length, 1) : NULL; free(name);
+        if (!bytes) goto done;
+        EVP_DigestUpdate(digest, bytes, length);
+        OPENSSL_cleanse(bytes, length); free(bytes);
+    }
+    valid = EVP_DigestFinal_ex(digest, hash, &n) == 1 && n == 32 && !memcmp(hash, cache->digest, 32);
+done:
+    EVP_MD_CTX_free(digest); return valid;
+}
+
 scdn_config_snapshot_t *
 scdn_config_load_cached(const char *path, const char **error,
     const scdn_config_snapshot_t *cache)
@@ -554,14 +614,18 @@ scdn_config_load_cached(const char *path, const char **error,
     size_t total;
     char *root;
     int fd;
+    scdn_config_site_t *sites;
+    ngx_uint_t capacity = 0;
 
     *error = "configuration_unavailable";
     snapshot = calloc(1, sizeof(*snapshot));
     digest = EVP_MD_CTX_new();
     if (snapshot == NULL || digest == NULL) { free(snapshot); EVP_MD_CTX_free(digest); return NULL; }
     snapshot->refs = 1;
-    snapshot->source = scdn_read(path, SCDN_CONFIG_BYTES, &snapshot->source_size);
+    snapshot->source = scdn_read(path, SCDN_CONFIG_BYTES, &snapshot->source_size, 0);
     if (snapshot->source == NULL) { goto failed; }
+    if (EVP_Digest(snapshot->source, snapshot->source_size, snapshot->source_digest,
+                   &length, EVP_sha256(), NULL) != 1 || length != 32) goto failed;
     EVP_DigestInit_ex(digest, EVP_sha256(), NULL);
     EVP_DigestUpdate(digest, snapshot->source, snapshot->source_size);
     total = snapshot->source_size;
@@ -572,6 +636,13 @@ scdn_config_load_cached(const char *path, const char **error,
     *error = "invalid_site_configuration";
     while (scdn_next(&parser) && parser.symbol == 0) {
         if (!scdn_is(&parser.token, "site") || snapshot->count == SCDN_CONFIG_SITES) { goto failed; }
+        if (snapshot->count == capacity) {
+            capacity = capacity ? capacity * 2 : 1;
+            sites = realloc(snapshot->sites, capacity * sizeof(*sites));
+            if (sites == NULL) goto failed;
+            memset(sites + snapshot->count, 0, (capacity - snapshot->count) * sizeof(*sites));
+            snapshot->sites = sites;
+        }
         site = &snapshot->sites[snapshot->count++];
         if (!scdn_site(&parser, site)) { goto failed; }
         for (i = 0; i < snapshot->count; i++) {
@@ -604,6 +675,19 @@ scdn_config_load_cached(const char *path, const char **error,
         }
     }
     if (parser.symbol != '}' || !scdn_next(&parser) || parser.symbol != -1) { goto failed; }
+    for (i = 0; i < snapshot->count; i++) snapshot->host_count += snapshot->sites[i].host_count;
+    if (snapshot->host_count) {
+        snapshot->hosts = malloc(snapshot->host_count * sizeof(*snapshot->hosts));
+        if (snapshot->hosts == NULL) goto failed;
+        k = 0;
+        for (i = 0; i < snapshot->count; i++) {
+            for (h = 0; h < snapshot->sites[i].host_count; h++) {
+                snapshot->hosts[k].host = snapshot->sites[i].hosts[h];
+                snapshot->hosts[k++].site = i;
+            }
+        }
+        qsort(snapshot->hosts, snapshot->host_count, sizeof(*snapshot->hosts), scdn_host_compare);
+    }
     EVP_DigestFinal_ex(digest, snapshot->digest, &length);
     EVP_MD_CTX_free(digest);
     for (i = 0; i < 32; i++) {
@@ -634,23 +718,18 @@ scdn_config_destroy(scdn_config_snapshot_t *snapshot)
         EVP_PKEY_free(snapshot->sites[i].key);
     }
     free(snapshot->source);
+    free(snapshot->hosts);
+    free(snapshot->sites);
     free(snapshot);
 }
 
 scdn_config_site_t *
 scdn_config_lookup(scdn_config_snapshot_t *snapshot, const ngx_str_t *host)
 {
-    ngx_uint_t i, j;
-    if (snapshot == NULL) { return NULL; }
-    for (i = 0; i < snapshot->count; i++) {
-        for (j = 0; j < snapshot->sites[i].host_count; j++) {
-            if (snapshot->sites[i].hosts[j].len == host->len
-                && ngx_strncasecmp(snapshot->sites[i].hosts[j].data,
-                                   host->data, host->len) == 0)
-            {
-                return &snapshot->sites[i];
-            }
-        }
-    }
-    return NULL;
+    scdn_config_host_t key, *found;
+    if (snapshot == NULL || snapshot->host_count == 0) return NULL;
+    key.host = *host; key.site = 0;
+    found = bsearch(&key, snapshot->hosts, snapshot->host_count,
+                    sizeof(*snapshot->hosts), scdn_host_compare);
+    return found ? &snapshot->sites[found->site] : NULL;
 }

@@ -198,3 +198,11 @@ site/prefix 可设置 `cache_headers on|off;`（站点默认 on、前缀继承�
 ## 保留 Lua 安全策略
 
 site 可配置 `waf on|off`、`waf_threshold`、最多 16 个 `waf_group` 和 `rate_limit off|RATE BURST`。它们是原生快照中的有类型数据，随 Sync 发布；WAF/限流执行仍使用现有 Lua 引擎。语法、fail-closed 处理和退出旧 registry/发布路径的方法见 [Lua 交接](../docs/LUA-HANDOFF.zh-CN.md)。
+
+## 本次复审后的运行与升级约束
+
+站点数组按实际数量分配，Host 在准备阶段建立排序索引。稳定 generation 的请求直接引用 Worker 本地快照，切换才进入共享区核对；旧快照与证书对象在共享锁外释放。源文件/证书内容相同则复用不可变快照，但仍完整读取、哈希并检查目录和证书期限，保留同大小/mtime 内容替换检测。Worker 新鲜度阈值为 max(5s, 3×interval)。
+
+配置/证书文件不得让 group/other 写入；私钥不得有任何 group/other 权限（通常为 0600）。权限或读取失败拒绝候选版本并保留已有服务。命名 upstream 必须写成 http://pool_name 或 https://pool_name，池在 Nginx http 中预先声明；裸池名不是 URL。
+
+本次改变了快照 C 布局，必须统一重编译同一提交的全部模块，停止旧进程后启动；不要混用旧 Edge/Sync 动态模块。完整结论见[独立复审](../docs/AUDIT-REVIEW-2026-11-16.zh-CN.md)。

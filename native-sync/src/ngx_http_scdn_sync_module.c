@@ -85,6 +85,8 @@ static ngx_command_t ngx_http_scdn_commands[] = {
       scdn_sync_distribution_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
     { ngx_string("scdn_sync_config_probe"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE2,
       scdn_sync_distribution_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
+    { ngx_string("scdn_sync_config_apply_timeout"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      scdn_sync_distribution_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
     { ngx_string("scdn_sync_config_allow_empty"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
       scdn_sync_distribution_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
     ngx_null_command

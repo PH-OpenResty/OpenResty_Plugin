@@ -559,6 +559,19 @@ http {{
         self.check('asynchronous fragmented JSON resumes phases and preserves the body',
             b'X-Kind: ai' in wire and hashlib.sha256(payload).hexdigest().encode() in wire)
 
+        for name, values, expected_field, expected in [
+            ('Cache-Control', ('public', 'no-store'), 'x-skip', '1'),
+            ('Pragma', ('ignored', 'no-cache'), 'x-skip', '1'),
+            ('Accept', ('text/html', 'application/json'), 'x-kind', 'api')]:
+            connection = http.client.HTTPConnection('127.0.0.1', self.http, timeout=5)
+            connection.putrequest('GET', '/opaque', skip_host=True)
+            connection.putheader('Host', 'www.example.test')
+            for value in values: connection.putheader(name, value)
+            connection.endheaders(); response = connection.getresponse(); response.read()
+            self.check('every duplicate ' + name + ' field participates in classification',
+                response.status == 200 and response.getheader(expected_field) == expected)
+            connection.close()
+
         for path, accept, expected in [('/events', True, 'stream'), ('/opaque-events', False, 'stream'),
                                        ('/v1/chat/completions', True, 'ai')]:
             connection = http.client.HTTPConnection('127.0.0.1', self.http, timeout=5)

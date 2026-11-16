@@ -1,5 +1,11 @@
 #include "scdn_edge.h"
 
+typedef struct {
+    scdn_edge_shared_t *shared;
+    scdn_edge_counter_t *counter;
+} edge_counter_cache_t;
+static edge_counter_cache_t edge_counter_cache[256];
+
 ngx_int_t
 scdn_edge_zone_init(ngx_shm_zone_t *zone, void *old)
 {
@@ -20,8 +26,13 @@ scdn_edge_counter(ngx_http_request_t *r, ngx_str_t *id)
     scdn_edge_main_t *main;
     scdn_edge_counter_t *counter = NULL;
     ngx_uint_t i;
+    edge_counter_cache_t *cached;
     main = ngx_http_get_module_main_conf(r, ngx_http_scdn_edge_module);
-    if (main->shared == NULL) { return NULL; }
+    if (main->shared == NULL || !id->len || id->len > sizeof(main->shared->counters[0].id)) return NULL;
+    cached = &edge_counter_cache[ngx_hash_key(id->data, id->len) % 256];
+    if (cached->shared == main->shared && cached->counter != NULL
+        && cached->counter->length == id->len && !ngx_memcmp(cached->counter->id, id->data, id->len))
+        return cached->counter;
     ngx_shmtx_lock(&main->slab->mutex);
     for (i = 0; i < main->shared->count; i++) {
         if (main->shared->counters[i].length == id->len
@@ -29,11 +40,13 @@ scdn_edge_counter(ngx_http_request_t *r, ngx_str_t *id)
         { counter = &main->shared->counters[i]; break; }
     }
     if (counter == NULL && main->shared->count < SCDN_EDGE_COUNTERS) {
-        counter = &main->shared->counters[main->shared->count++];
-        counter->length = id->len;
+        counter = &main->shared->counters[main->shared->count];
         ngx_memcpy(counter->id, id->data, id->len);
+        counter->length = id->len;
+        main->shared->count++;
     }
     ngx_shmtx_unlock(&main->slab->mutex);
+    cached->shared = main->shared; cached->counter = counter;
     return counter;
 }
 
@@ -73,6 +86,8 @@ scdn_edge_metrics(ngx_http_request_t *r)
     ngx_str_t id;
     ngx_int_t rc;
     ngx_uint_t i, j, count;
+    ngx_table_elt_t *header;
+    size_t capacity = 1024;
     if (!scdn_config_local(r)) { return NGX_HTTP_FORBIDDEN; }
     if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD))) { return NGX_HTTP_NOT_ALLOWED; }
     if (r->args.len != 0 || r->headers_in.content_length_n > 0 || r->headers_in.chunked) {
@@ -80,8 +95,13 @@ scdn_edge_metrics(ngx_http_request_t *r)
     }
     main = ngx_http_get_module_main_conf(r, ngx_http_scdn_edge_module);
     if (main->shared == NULL) { return NGX_HTTP_SERVICE_UNAVAILABLE; }
+    header = ngx_list_push(&r->headers_out.headers);
+    if (!header) return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    ngx_memzero(header, sizeof(*header)); header->hash = 1;
+    ngx_str_set(&header->key, "Cache-Control"); ngx_str_set(&header->value, "no-store");
     ngx_shmtx_lock(&main->slab->mutex); count = main->shared->count; ngx_shmtx_unlock(&main->slab->mutex);
-    buffer = ngx_create_temp_buf(r->pool, 1024 + count * 4096);
+    for (i = 0; i < count; i++) capacity += 2048 + 16 * main->shared->counters[i].length;
+    buffer = ngx_create_temp_buf(r->pool, capacity);
     if (buffer == NULL) { return NGX_HTTP_INTERNAL_SERVER_ERROR; }
     buffer->last = ngx_snprintf(buffer->last, buffer->end - buffer->last,
         "# TYPE scdn_edge_requests_total counter\n# TYPE scdn_edge_bytes_total counter\n"

@@ -1,0 +1,327 @@
+{
+  "date": "2026-11-16",
+  "base": "e90a0c87eb0c6d8e2d9248ee99d50999fbd551a4",
+  "environment": "isolated WSL2 Alpine x86_64; Nginx 1.31.8 / OpenResty 1.31.8.1",
+  "production_modified": false,
+  "passed": true,
+  "runtimes": [
+    {
+      "runtime": "nginx",
+      "linkage": "dynamic",
+      "passed": 1038,
+      "suites": [
+        {
+          "suite": "identity",
+          "passed": 8
+        },
+        {
+          "suite": "capacity",
+          "passed": 6
+        },
+        {
+          "suite": "edge-audit",
+          "passed": 13
+        },
+        {
+          "suite": "edge",
+          "passed": 47
+        },
+        {
+          "suite": "api",
+          "passed": 47
+        },
+        {
+          "suite": "roles",
+          "passed": 50
+        },
+        {
+          "suite": "distribution",
+          "passed": 40
+        },
+        {
+          "suite": "recovery",
+          "passed": 47
+        },
+        {
+          "suite": "tasks",
+          "passed": 99
+        },
+        {
+          "suite": "tier-tasks",
+          "passed": 102
+        },
+        {
+          "suite": "tier",
+          "passed": 48
+        },
+        {
+          "suite": "tier-boundaries",
+          "passed": 73
+        },
+        {
+          "suite": "coexist",
+          "passed": 54
+        },
+        {
+          "suite": "purge",
+          "passed": 70
+        },
+        {
+          "suite": "patterns",
+          "passed": 64
+        },
+        {
+          "suite": "regex-cache",
+          "passed": 2
+        },
+        {
+          "suite": "revalidate",
+          "passed": 45
+        },
+        {
+          "suite": "headers",
+          "passed": 32
+        },
+        {
+          "suite": "startup",
+          "passed": 6
+        },
+        {
+          "suite": "mixed",
+          "passed": 53
+        },
+        {
+          "suite": "ban",
+          "passed": 64
+        },
+        {
+          "suite": "custom-cache",
+          "passed": 4
+        },
+        {
+          "suite": "ban-xdp",
+          "passed": 64
+        }
+      ]
+    },
+    {
+      "runtime": "openresty",
+      "linkage": "dynamic",
+      "passed": 1005,
+      "suites": [
+        {
+          "suite": "identity",
+          "passed": 8
+        },
+        {
+          "suite": "capacity",
+          "passed": 6
+        },
+        {
+          "suite": "edge-audit",
+          "passed": 13
+        },
+        {
+          "suite": "edge",
+          "passed": 47
+        },
+        {
+          "suite": "api",
+          "passed": 47
+        },
+        {
+          "suite": "roles",
+          "passed": 50
+        },
+        {
+          "suite": "distribution",
+          "passed": 40
+        },
+        {
+          "suite": "recovery",
+          "passed": 47
+        },
+        {
+          "suite": "tasks",
+          "passed": 99
+        },
+        {
+          "suite": "tier-tasks",
+          "passed": 102
+        },
+        {
+          "suite": "tier",
+          "passed": 48
+        },
+        {
+          "suite": "tier-boundaries",
+          "passed": 73
+        },
+        {
+          "suite": "coexist",
+          "passed": 54
+        },
+        {
+          "suite": "purge",
+          "passed": 70
+        },
+        {
+          "suite": "patterns",
+          "passed": 64
+        },
+        {
+          "suite": "regex-cache",
+          "passed": 2
+        },
+        {
+          "suite": "revalidate",
+          "passed": 45
+        },
+        {
+          "suite": "headers",
+          "passed": 32
+        },
+        {
+          "suite": "startup",
+          "passed": 6
+        },
+        {
+          "suite": "mixed",
+          "passed": 53
+        },
+        {
+          "suite": "ban",
+          "passed": 64
+        },
+        {
+          "suite": "custom-cache",
+          "passed": 4
+        },
+        {
+          "suite": "lua-handoff",
+          "passed": 27
+        },
+        {
+          "suite": "ban-lua",
+          "passed": 4
+        }
+      ]
+    },
+    {
+      "runtime": "static",
+      "linkage": "static",
+      "passed": 1005,
+      "suites": [
+        {
+          "suite": "identity",
+          "passed": 8
+        },
+        {
+          "suite": "capacity",
+          "passed": 6
+        },
+        {
+          "suite": "edge-audit",
+          "passed": 13
+        },
+        {
+          "suite": "edge",
+          "passed": 47
+        },
+        {
+          "suite": "api",
+          "passed": 47
+        },
+        {
+          "suite": "roles",
+          "passed": 50
+        },
+        {
+          "suite": "distribution",
+          "passed": 40
+        },
+        {
+          "suite": "recovery",
+          "passed": 47
+        },
+        {
+          "suite": "tasks",
+          "passed": 99
+        },
+        {
+          "suite": "tier-tasks",
+          "passed": 102
+        },
+        {
+          "suite": "tier",
+          "passed": 48
+        },
+        {
+          "suite": "tier-boundaries",
+          "passed": 73
+        },
+        {
+          "suite": "coexist",
+          "passed": 54
+        },
+        {
+          "suite": "purge",
+          "passed": 70
+        },
+        {
+          "suite": "patterns",
+          "passed": 64
+        },
+        {
+          "suite": "regex-cache",
+          "passed": 2
+        },
+        {
+          "suite": "revalidate",
+          "passed": 45
+        },
+        {
+          "suite": "headers",
+          "passed": 32
+        },
+        {
+          "suite": "startup",
+          "passed": 6
+        },
+        {
+          "suite": "mixed",
+          "passed": 53
+        },
+        {
+          "suite": "ban",
+          "passed": 64
+        },
+        {
+          "suite": "custom-cache",
+          "passed": 4
+        },
+        {
+          "suite": "lua-handoff",
+          "passed": 27
+        },
+        {
+          "suite": "ban-lua",
+          "passed": 4
+        }
+      ]
+    }
+  ],
+  "standalone": [
+    {
+      "suite": "ban-recovery",
+      "passed": 4
+    }
+  ],
+  "total": 3052,
+  "sanitizers": "Local Nginx uses UBSan traps. GitHub nginx matrix additionally requires ASan/UBSan for runtime and Agent.",
+  "limits": [
+    "Counts are fixture assertions, not independent production workloads.",
+    "Nginx suites unaffected by the final Tier guard reuse the initial successful full matrix; Tier and Agent were rebuilt and retested.",
+    "Ban recovery is counted once as a standalone real-kernel Engine suite."
+  ]
+}

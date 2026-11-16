@@ -105,3 +105,9 @@ Sync 缓存预热走同一业务入口，能填充相应层。热对象 L1 HIT �
 合并审查补充：凭据字段即使重复出现也始终绕过缓存；重复 Cache-Control/Pragma 保守绕过，不能因严格唯一字段查找失败而退回共享缓存。回归会先填充匿名公共对象，再验证不同凭据请求均真实回源且不会相互复用。
 
 当前统一构建包含原生 [Ban](../native-ban/RUNTIME.zh-CN.md)。一起编译时 Ban 必须先于 API/Edge 动态加载；未配置 scdn_ban on 时不启用封禁。其 Agent/eBPF 和全节点快照是独立运行路径，Sync 桥接需显式 scdn_sync_ban_agent。
+
+## 自定义缓存配置与传输边界
+
+backend/status 只接受 AF_UNIX，127.0.0.1/::1 TCP 不是替代传输；status 成功响应带 no-store，权限由 Socket 父目录限制。自定义配置应保留 proxy_cache $scdn_tier_cache 和推荐 cache key，使变量在缓存头解析前捕获原始绝对期限。
+
+静态 backend zone/key 若未捕获原始期限，模块继续服务 L2 HIT，但禁止向 L1 晋升，避免给旧内容重设相对 TTL。回归见 tests/custom_cache.py，完整结论见[独立复审](../docs/AUDIT-REVIEW-2026-11-16.zh-CN.md)。

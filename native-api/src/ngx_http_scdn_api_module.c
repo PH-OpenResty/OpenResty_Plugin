@@ -277,44 +277,59 @@ static void
 api_classify_headers(ngx_http_request_t *r, api_request_t *ctx)
 {
     ngx_table_elt_t *content = r->headers_in.content_type;
-    ngx_table_elt_t *accept = api_find_header(r, "accept");
-    ngx_table_elt_t *requested = api_find_header(r, "x-requested-with");
-    ngx_table_elt_t *upgrade = api_find_header(r, "upgrade");
-    ngx_table_elt_t *control = api_find_header(r, "cache-control");
-    ngx_table_elt_t *pragma = api_find_header(r, "pragma");
+    ngx_list_part_t *part;
+    ngx_table_elt_t *headers, *header;
+    ngx_uint_t i;
+    ngx_flag_t json = 0, sse = 0, requested = 0, upgrade = 0, anthropic = 0;
     if (ctx->headers_done) { return; }
     ctx->headers_done = 1;
-    ctx->private_request = api_find_header(r, "authorization") != NULL
-        || api_find_header(r, "proxy-authorization") != NULL
-        || api_find_header(r, "cookie") != NULL
-        || api_find_header(r, "x-api-key") != NULL
-        || api_find_header(r, "api-key") != NULL
-        || (control && (api_contains(&control->value, "no-cache")
-            || api_contains(&control->value, "no-store")))
-        || (pragma && api_contains(&pragma->value, "no-cache"))
-        || r->headers_in.content_length_n > 0 || r->headers_in.chunked;
+    ctx->private_request = r->headers_in.content_length_n > 0 || r->headers_in.chunked;
+    part = &r->headers_in.headers.part; headers = part->elts;
+    for (i = 0; ; i++) {
+        if (i >= part->nelts) {
+            if (!part->next) break;
+            part = part->next; headers = part->elts; i = 0;
+        }
+        header = &headers[i];
+        if (!header->hash) continue;
+#define API_HEADER(name) (header->key.len == sizeof(name) - 1 \
+    && !ngx_strncasecmp(header->key.data, (u_char *) name, sizeof(name) - 1))
+        if (API_HEADER("authorization") || API_HEADER("proxy-authorization")
+            || API_HEADER("cookie") || API_HEADER("x-api-key") || API_HEADER("api-key"))
+            ctx->private_request = 1;
+        else if (API_HEADER("cache-control")) {
+            if (api_contains(&header->value, "no-cache") || api_contains(&header->value, "no-store"))
+                ctx->private_request = 1;
+        } else if (API_HEADER("pragma")) {
+            if (api_contains(&header->value, "no-cache")) ctx->private_request = 1;
+        } else if (API_HEADER("accept")) {
+            json |= api_contains(&header->value, "application/json") || api_contains(&header->value, "+json");
+            sse |= api_contains(&header->value, "text/event-stream");
+        } else if (API_HEADER("x-requested-with")) requested |= api_contains(&header->value, "XMLHttpRequest");
+        else if (API_HEADER("upgrade")) upgrade |= api_contains(&header->value, "websocket");
+        else if (API_HEADER("anthropic-version")) anthropic = 1;
+#undef API_HEADER
+    }
     if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD))
         || (content && api_json_mime(&content->value))
-        || (accept && (api_contains(&accept->value, "application/json")
-            || api_contains(&accept->value, "+json")))
-        || (requested && api_contains(&requested->value, "XMLHttpRequest"))
+        || json || requested
         || (r->uri.len >= 5 && ngx_memcmp(r->uri.data, "/api/", 5) == 0)
         || (r->uri.len == 4 && ngx_memcmp(r->uri.data, "/api", 4) == 0)
         || (r->uri.len >= 4 && ngx_memcmp(r->uri.data, "/v1/", 4) == 0)
         || api_suffix(&r->uri, "/graphql")) {
         api_set_kind(ctx, API_DYNAMIC, "request_api");
     }
-    if (accept && api_contains(&accept->value, "text/event-stream")) {
+    if (sse) {
         api_set_kind(ctx, API_STREAM, "accept_sse"); ctx->stream = 1;
     }
-    if (api_ai_path(&r->uri) || api_find_header(r, "anthropic-version") != NULL) {
+    if (api_ai_path(&r->uri) || anthropic) {
         api_set_kind(ctx, API_AI, "ai_endpoint");
     }
     if (content && (api_mime(&content->value, "application/grpc")
         || api_contains(&content->value, "application/grpc+"))) {
         api_set_kind(ctx, API_GRPC, "grpc_content_type"); ctx->stream = 1;
     }
-    if (upgrade && api_contains(&upgrade->value, "websocket")) {
+    if (upgrade) {
         api_set_kind(ctx, API_WEBSOCKET, "websocket_upgrade"); ctx->stream = 1;
     }
 }
@@ -755,12 +770,17 @@ api_metrics(ngx_http_request_t *r)
     ngx_chain_t chain;
     ngx_uint_t i;
     ngx_int_t rc;
+    ngx_table_elt_t *header;
     if (!api_local(r)) { return NGX_HTTP_FORBIDDEN; }
     if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD))) { return NGX_HTTP_NOT_ALLOWED; }
     if (r->args.len || r->headers_in.content_length_n > 0 || r->headers_in.chunked) {
         r->keepalive = 0; return NGX_HTTP_BAD_REQUEST;
     }
     if (main->shared == NULL) { return NGX_HTTP_SERVICE_UNAVAILABLE; }
+    header = ngx_list_push(&r->headers_out.headers);
+    if (!header) return NGX_HTTP_INTERNAL_SERVER_ERROR;
+    ngx_memzero(header, sizeof(*header)); header->hash = 1;
+    ngx_str_set(&header->key, "Cache-Control"); ngx_str_set(&header->value, "no-store");
     buffer = ngx_create_temp_buf(r->pool, 2048);
     if (buffer == NULL) { return NGX_HTTP_INTERNAL_SERVER_ERROR; }
     buffer->last = ngx_snprintf(buffer->last, buffer->end - buffer->last,

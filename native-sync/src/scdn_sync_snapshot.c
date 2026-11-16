@@ -2,6 +2,7 @@
  * without Config, and never parses site data using a second, weaker grammar. */
 #define scdn_config_load scdn_sync_snapshot_load
 #define scdn_config_load_cached scdn_sync_snapshot_load_cached
+#define scdn_config_matches scdn_sync_snapshot_matches
 #define scdn_config_destroy scdn_sync_snapshot_destroy
 #define scdn_config_lookup scdn_sync_snapshot_lookup
 #include "../../native-config/src/scdn_config_parse.c"
@@ -68,7 +69,15 @@ void scdn_sync_digest(const void *bytes, size_t length, u_char digest[32])
 typedef struct { u_char *bytes; size_t used, size; int failed; } snapshot_output;
 static void put(snapshot_output *out, const void *bytes, size_t n)
 {
-    if (out->failed || n > out->size - out->used) { out->failed = 1; return; }
+    u_char *grown;
+    size_t capacity;
+    if (out->failed || n > SCDN_CONFIG_BYTES - out->used) { out->failed = 1; return; }
+    if (n > out->size - out->used) {
+        capacity = ngx_min(SCDN_CONFIG_BYTES, ngx_max(out->used + n, out->size * 2));
+        grown = realloc(out->bytes, capacity);
+        if (!grown) { out->failed = 1; return; }
+        out->bytes = grown; out->size = capacity;
+    }
     memcpy(out->bytes + out->used, bytes, n); out->used += n;
 }
 static void literal(snapshot_output *out, const char *value) { put(out, value, strlen(value)); }
@@ -105,7 +114,7 @@ u_char *scdn_sync_snapshot_export(scdn_config_snapshot_t *snapshot,
     scdn_config_route_t *route;
     ngx_uint_t i, j;
     char line[2048];
-    out.size = SCDN_CONFIG_BYTES; out.bytes = malloc(out.size); out.used = 0; out.failed = 0;
+    out.size = 4096; out.bytes = malloc(out.size); out.used = 0; out.failed = 0;
     if (!out.bytes) return NULL;
     literal(&out, "sites {\n");
     for (i = 0; i < snapshot->count; i++) {

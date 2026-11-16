@@ -8,7 +8,12 @@
 #define DIST_LIMIT (SYNC_BUNDLE_MAX + 2048)
 #define DIST_STATE 112
 typedef struct { ngx_str_t id, path; u_char digest[32]; time_t since; } dist_source;
-typedef struct { ngx_str_t id, path; } dist_peer_key;
+typedef struct {
+    ngx_str_t id, path;
+    struct stat verified_file;
+    u_char verified_payload[32], verified_binding[32];
+    uint64_t verified_sequence, verified_expiry;
+} dist_peer_key;
 typedef struct { ngx_str_t url; long status; } dist_probe;
 typedef struct {
     ngx_str_t directory, signing, trust, decrypt, master, ca, certificate, key, status_socket;
@@ -16,6 +21,11 @@ typedef struct {
     ngx_flag_t allow_empty;
     ngx_thread_pool_t *threads, *poll_threads;
     ngx_uint_t cursor;
+    ngx_msec_t apply_timeout;
+    dist_source *cached_source;
+    scdn_config_snapshot_t *cached_snapshot;
+    u_char *cached_payload;
+    size_t cached_length;
 } dist_conf;
 typedef struct {
     ngx_http_scdn_main_conf_t *main;
@@ -32,6 +42,8 @@ typedef struct {
 typedef struct {
     u_char *body;
     size_t length, limit;
+    size_t capacity;
+    int dynamic;
     char revision[65], managed[65];
     int ready;
 } dist_response;
@@ -151,11 +163,13 @@ static int status_write(int dir, const char *state, const char *error,
 
 /* Payload: magic, canonical config length, cert count, original source digest,
  * config bytes, then index/cert length/key length + opaque PEM pairs. */
-static u_char *payload_create(dist_source *source, size_t *length, const char **error)
+static u_char *payload_create(dist_source *source, size_t *length, const char **error,
+    scdn_config_snapshot_t **loaded)
 {
     scdn_config_snapshot_t *snapshot = scdn_sync_snapshot_load((char *) source->path.data, error);
     u_char *out = NULL, *config = NULL, *cert = NULL, *key = NULL, material[32];
-    size_t config_length, cert_length = 0, key_length = 0, used = 56;
+    size_t config_length, cert_length = 0, key_length = 0, used = 56, capacity, needed;
+    u_char *grown;
     ngx_uint_t i, count = 0;
     char path[2049];
     EVP_MD_CTX *ctx;
@@ -165,7 +179,9 @@ static u_char *payload_create(dist_source *source, size_t *length, const char **
     if (memmem(snapshot->source, snapshot->source_size, "/__sync_bundle__", 16)) goto failed;
     config = scdn_sync_snapshot_export(snapshot, "/__sync_bundle__", &config_length);
     if (!config) goto failed;
-    out = malloc(SYNC_BUNDLE_MAX); if (!out) goto failed;
+    capacity = 56 + config_length;
+    if (capacity > SYNC_BUNDLE_MAX) goto failed;
+    out = malloc(capacity); if (!out) goto failed;
     memcpy(out, "SNAP0002", 8); scdn_sync_put64(out + 8, config_length);
     memcpy(out + 24, snapshot->digest, 32);
     memcpy(out + used, config, config_length); used += config_length;
@@ -177,6 +193,12 @@ static u_char *payload_create(dist_source *source, size_t *length, const char **
         memcpy(path, site->certificate_key.data, site->certificate_key.len); path[site->certificate_key.len] = 0;
         key = scdn_sync_read_file(path, 65536, &key_length, 1);
         if (!cert || !key || used + 24 + cert_length + key_length > SYNC_BUNDLE_MAX) goto failed;
+        needed = used + 24 + cert_length + key_length;
+        if (needed > capacity) {
+            capacity = ngx_min(SYNC_BUNDLE_MAX, ngx_max(needed, capacity * 2));
+            grown = realloc(out, capacity); if (!grown) goto failed;
+            out = grown;
+        }
         ctx = EVP_MD_CTX_new(); if (!ctx) goto failed;
         EVP_DigestInit_ex(ctx, EVP_sha256(), NULL); EVP_DigestUpdate(ctx, cert, cert_length);
         EVP_DigestUpdate(ctx, "\0", 1); EVP_DigestUpdate(ctx, key, key_length);
@@ -189,7 +211,7 @@ static u_char *payload_create(dist_source *source, size_t *length, const char **
         free(cert); cert = NULL; OPENSSL_cleanse(key, key_length); free(key); key = NULL; count++;
     }
     scdn_sync_put64(out + 16, count); *length = used;
-    free(config); scdn_sync_snapshot_destroy(snapshot); return out;
+    free(config); *loaded = snapshot; return out;
 failed:
     *error = "snapshot_material_changed_or_invalid";
     free(cert); if (key) OPENSSL_cleanse(key, key_length); free(key); free(config);
@@ -201,7 +223,15 @@ static size_t response_body(char *bytes, size_t size, size_t count, void *data)
 {
     dist_response *response = data;
     size_t n = size * count;
+    u_char *grown;
+    size_t capacity;
     if (n > response->limit - response->length) return 0;
+    if (response->dynamic && response->length + n > response->capacity) {
+        capacity = response->capacity ? response->capacity * 2 : 4096;
+        capacity = ngx_min(response->limit, ngx_max(response->length + n, capacity));
+        grown = realloc(response->body, capacity); if (!grown) return 0;
+        response->body = grown; response->capacity = capacity;
+    }
     if (response->body) memcpy(response->body + response->length, bytes, n);
     response->length += n; return n;
 }
@@ -218,17 +248,17 @@ static size_t response_header(char *bytes, size_t size, size_t count, void *data
     }
     if (n == 19 && !strncasecmp(bytes, "X-Config-Ready: 1\r\n", 19)) response->ready = 1;
     if (n == 84 && !strncasecmp(bytes, "X-Config-Managed: ", 18)) {
+        for (i = 18; i < 82; i++) if (!((bytes[i] >= '0' && bytes[i] <= '9')
+            || (bytes[i] >= 'a' && bytes[i] <= 'f'))) return n;
         memcpy(response->managed, bytes + 18, 64); response->managed[64] = 0;
     }
     return n;
 }
-static int http(dist_conf *conf, const char *url, int remote, const char *socket,
+static CURL *http_handle(dist_conf *conf, const char *url, int remote, const char *socket,
     struct curl_slist *headers, dist_response *response, int post)
 {
     CURL *curl = curl_easy_init();
-    CURLcode code;
-    long status = 0;
-    if (!curl) return 0;
+    if (!curl) return NULL;
     curl_easy_setopt(curl, CURLOPT_URL, url); curl_easy_setopt(curl, CURLOPT_PROTOCOLS_STR, "http,https");
     curl_easy_setopt(curl, CURLOPT_PROXY, ""); curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 0L);
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L); curl_easy_setopt(curl, CURLOPT_CONNECTTIMEOUT_MS, 2000L);
@@ -244,6 +274,15 @@ static int http(dist_conf *conf, const char *url, int remote, const char *socket
     if (post) { curl_easy_setopt(curl, CURLOPT_POSTFIELDS, ""); curl_easy_setopt(curl, CURLOPT_POSTFIELDSIZE, 0L); }
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, response_body); curl_easy_setopt(curl, CURLOPT_WRITEDATA, response);
     curl_easy_setopt(curl, CURLOPT_HEADERFUNCTION, response_header); curl_easy_setopt(curl, CURLOPT_HEADERDATA, response);
+    return curl;
+}
+static int http(dist_conf *conf, const char *url, int remote, const char *socket,
+    struct curl_slist *headers, dist_response *response, int post)
+{
+    CURL *curl = http_handle(conf, url, remote, socket, headers, response, post);
+    CURLcode code;
+    long status = 0;
+    if (!curl) return 0;
     code = curl_easy_perform(curl); curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &status);
     curl_easy_cleanup(curl); return code == CURLE_OK ? (int) status : 0;
 }
@@ -252,28 +291,60 @@ static int active_wait(dist_conf *conf, const u_char digest[32])
     char expected[65], managed[65]; u_char managed_hash[32];
     struct timespec pause = {0, 50000000};
     struct timespec now;
-    time_t deadline;
+    int64_t deadline;
     hex(digest, expected);
     scdn_sync_digest(conf->directory.data, conf->directory.len, managed_hash); hex(managed_hash, managed);
-    clock_gettime(CLOCK_MONOTONIC, &now); deadline = now.tv_sec + 15;
+    clock_gettime(CLOCK_MONOTONIC, &now);
+    deadline = (int64_t) now.tv_sec * 1000 + now.tv_nsec / 1000000 + conf->apply_timeout;
     while (!ngx_quit && !ngx_terminate) {
         dist_response response; memset(&response, 0, sizeof(response)); response.limit = 4096;
         if (http(conf, "http://localhost/status", 0, (char *) conf->status_socket.data, NULL, &response, 0) == 200
             && response.ready && !strcmp(response.revision, expected) && !strcmp(response.managed, managed)) return 1;
         nanosleep(&pause, NULL);
-        clock_gettime(CLOCK_MONOTONIC, &now); if (now.tv_sec >= deadline) break;
+        if (pause.tv_nsec < 800000000) pause.tv_nsec *= 2;
+        clock_gettime(CLOCK_MONOTONIC, &now);
+        if ((int64_t) now.tv_sec * 1000 + now.tv_nsec / 1000000 >= deadline) break;
     }
     return 0;
 }
 static int probe_business(dist_conf *conf)
 {
     dist_probe *probes = conf->probes.elts;
-    ngx_uint_t i;
-    for (i = 0; i < conf->probes.nelts; i++) {
-        dist_response response; memset(&response, 0, sizeof(response)); response.limit = 1048576;
-        if (http(conf, (char *) probes[i].url.data, 0, NULL, NULL, &response, 0) != probes[i].status) return 0;
+    CURLM *multi;
+    CURL *handles[4] = {NULL};
+    dist_response responses[4];
+    ngx_uint_t indexes[4], next = 0, completed = 0, i;
+    CURLMsg *message;
+    int running, remaining, ok = 0;
+    long status;
+    if (!conf->probes.nelts) return 1;
+    multi = curl_multi_init(); if (!multi) return 0;
+    memset(responses, 0, sizeof(responses));
+    while (completed < conf->probes.nelts && !ngx_quit && !ngx_terminate) {
+        for (i = 0; i < 4 && next < conf->probes.nelts; i++) if (!handles[i]) {
+            indexes[i] = next++;
+            memset(&responses[i], 0, sizeof(responses[i])); responses[i].limit = 1048576;
+            handles[i] = http_handle(conf, (char *) probes[indexes[i]].url.data, 0, NULL, NULL, &responses[i], 0);
+            if (!handles[i] || curl_multi_add_handle(multi, handles[i]) != CURLM_OK) goto finish;
+        }
+        if (curl_multi_perform(multi, &running) != CURLM_OK) goto finish;
+        while ((message = curl_multi_info_read(multi, &remaining)) != NULL) {
+            if (message->msg != CURLMSG_DONE) continue;
+            for (i = 0; i < 4; i++) if (handles[i] == message->easy_handle) break;
+            if (i == 4) goto finish;
+            curl_easy_getinfo(handles[i], CURLINFO_RESPONSE_CODE, &status);
+            if (message->data.result != CURLE_OK || status != probes[indexes[i]].status) goto finish;
+            curl_multi_remove_handle(multi, handles[i]); curl_easy_cleanup(handles[i]); handles[i] = NULL;
+            completed++;
+        }
+        if (completed < conf->probes.nelts && curl_multi_poll(multi, NULL, 0, 100, NULL) != CURLM_OK) goto finish;
     }
-    return 1;
+    ok = completed == conf->probes.nelts;
+finish:
+    for (i = 0; i < 4; i++) if (handles[i]) {
+        curl_multi_remove_handle(multi, handles[i]); curl_easy_cleanup(handles[i]);
+    }
+    curl_multi_cleanup(multi); return ok;
 }
 static int report_result(dist_conf *conf, uint64_t sequence, const u_char digest[32],
     const char *state, const char *error, const u_char *applied)
@@ -299,8 +370,16 @@ static int report_result(dist_conf *conf, uint64_t sequence, const u_char digest
 static u_char *relocate(const u_char *input, size_t length, const char *directory, size_t *size)
 {
     static const char marker[] = "/__sync_bundle__";
-    size_t i = 0, used = 0, d = strlen(directory);
-    u_char *output = malloc(SCDN_CONFIG_BYTES);
+    size_t i = 0, used = 0, d = strlen(directory), needed = 0, step;
+    u_char *output;
+    while (i < length) {
+        step = i + sizeof(marker) - 1 <= length && !memcmp(input + i, marker, sizeof(marker) - 1);
+        needed += step ? d : 1;
+        if (needed >= SCDN_CONFIG_BYTES) return NULL;
+        i += step ? sizeof(marker) - 1 : 1;
+    }
+    i = 0;
+    output = malloc(needed + 1);
     if (!output) return NULL;
     while (i < length) {
         if (i + sizeof(marker) - 1 <= length && !memcmp(input + i, marker, sizeof(marker) - 1)) {
@@ -431,8 +510,7 @@ static void node_cycle(ngx_http_scdn_main_conf_t *main)
     scdn_sync_digest(conf->directory.data, conf->directory.len, digest); hex(digest, hash_text);
     if (http(conf, "http://localhost/status", 0, (char *) conf->status_socket.data, NULL, &response, 0) != 200
         || strcmp(response.managed, hash_text)) { error = "managed_configuration_mismatch"; goto failed; }
-    envelope = malloc(DIST_LIMIT); if (!envelope) goto failed;
-    memset(&response, 0, sizeof(response)); response.body = envelope; response.limit = DIST_LIMIT;
+    memset(&response, 0, sizeof(response)); response.dynamic = 1; response.limit = DIST_LIMIT;
     snprintf(url, sizeof(url), "%s/_scdn_sync/v1/config/desired", conf->master.data);
     if (scdn_sync_u64(applied + 8)) {
         hex(applied + 16, hash_text);
@@ -440,6 +518,7 @@ static void node_cycle(ngx_http_scdn_main_conf_t *main)
         conditional = curl_slist_append(NULL, tag);
     }
     result = http(conf, url, 1, NULL, conditional, &response, 0);
+    envelope = response.body;
     curl_slist_free_all(conditional); conditional = NULL;
     if (result == 204) { if (!scdn_sync_u64(applied + 8)) status_write(dir, "waiting_for_publish", "", 0, NULL, 0); goto finish; }
     if (result == 304 && scdn_sync_u64(applied + 8)) {
@@ -548,6 +627,13 @@ finish:
     if (dir >= 0) close(dir);
 }
 
+static int same_file(const struct stat *a, const struct stat *b)
+{
+    return S_ISREG(a->st_mode) && !(a->st_mode & 077)
+        && a->st_dev == b->st_dev && a->st_ino == b->st_ino && a->st_size == b->st_size
+        && a->st_mtim.tv_sec == b->st_mtim.tv_sec && a->st_mtim.tv_nsec == b->st_mtim.tv_nsec
+        && a->st_ctim.tv_sec == b->st_ctim.tv_sec && a->st_ctim.tv_nsec == b->st_ctim.tv_nsec;
+}
 static void master_cycle(ngx_http_scdn_main_conf_t *main)
 {
     dist_conf *conf = main->distribution;
@@ -556,7 +642,13 @@ static void master_cycle(ngx_http_scdn_main_conf_t *main)
     ngx_http_scdn_peer_t *peers = main->peers.elts;
     ngx_uint_t i, j;
     EVP_PKEY *sign = NULL, *encrypt = NULL;
-    u_char *plain = NULL, *sealed = NULL, *old = NULL, counter[8], state[DIST_STATE], zero[32] = {0}, payload_digest[32];
+    u_char *plain = NULL, *sealed = NULL, *old = NULL, state[DIST_STATE], binding[32], payload_digest[32];
+    u_char *der = NULL, *binding_input, signing_public[32];
+    size_t signing_length = sizeof(signing_public);
+    int der_length;
+    struct stat current_file;
+    scdn_config_snapshot_t *loaded = NULL;
+    dist_peer_key *peer_key;
     size_t size = 0, sealed_size = 0, old_size = 0;
     uint64_t sequence;
     int root = -1, dir = -1, lock = -1, found;
@@ -565,7 +657,17 @@ static void master_cycle(ngx_http_scdn_main_conf_t *main)
     if (!conf->sources.nelts) return;
     source = &sources[conf->cursor++ % conf->sources.nelts];
     root = directory_open((char *) conf->directory.data); if (root < 0) return;
-    plain = payload_create(source, &size, &error);
+    if (source == conf->cached_source && scdn_sync_snapshot_matches((char *) source->path.data, conf->cached_snapshot)) {
+        plain = conf->cached_payload; size = conf->cached_length;
+    } else {
+        plain = payload_create(source, &size, &error, &loaded);
+        if (plain) {
+            if (conf->cached_payload) OPENSSL_cleanse(conf->cached_payload, conf->cached_length);
+            free(conf->cached_payload); scdn_sync_snapshot_destroy(conf->cached_snapshot);
+            conf->cached_source = source; conf->cached_snapshot = loaded;
+            conf->cached_payload = plain; conf->cached_length = size;
+        }
+    }
     if (!plain) { status_write(root, "source_rejected", error, 0, NULL, 0); goto finish; }
     if (!conf->allow_empty && size >= 56 && !memcmp(plain + 56, "sites {\n}\n", 10)) {
         status_write(root, "source_rejected", "empty_configuration", 0, NULL, 0); goto finish;
@@ -574,38 +676,79 @@ static void master_cycle(ngx_http_scdn_main_conf_t *main)
     if (now - source->since < 2) goto finish;
     sign = scdn_sync_key_load((char *) conf->signing.data, 1, EVP_PKEY_ED25519);
     if (!sign) { status_write(root, "publish_failed", "signing_key_unavailable", 0, NULL, 0); goto finish; }
+    if (EVP_PKEY_get_raw_public_key(sign, signing_public, &signing_length) != 1
+        || signing_length != sizeof(signing_public)) goto finish;
     scdn_sync_digest(plain, size, payload_digest);
     for (i = 0; i < main->peers.nelts; i++) {
         if (peers[i].scope.len != source->id.len || memcmp(peers[i].scope.data, source->id.data, source->id.len)) continue;
         for (j = 0; j < conf->keys.nelts; j++) if (keys[j].id.len == peers[i].id.len && !memcmp(keys[j].id.data, peers[i].id.data, peers[i].id.len)) break;
         if (j == conf->keys.nelts) continue;
+        peer_key = &keys[j];
         dir = child_directory(root, &peers[i].id); if (dir < 0) continue;
         lock = lock_directory(dir, "publish.lock"); if (lock < 0) { close(dir); dir = -1; continue; }
-        old = read_at(dir, "desired.bundle", DIST_LIMIT, &old_size);
-        if (old && old_size >= SYNC_BUNDLE_HEADER && !memcmp(old, "SCNBND02", 8)
-            && !memcmp(old + 248, payload_digest, 32) && scdn_sync_u64(old + 24) > (uint64_t) now + 3600
-            && scdn_sync_signature_valid(old, old_size, sign)) goto next;
         found = state_read(dir, "sequence.state", state);
         if (found < 0) { status_write(dir, "publish_failed", "sequence_corrupt", 0, NULL, 0); goto next; }
-        if (!found && old) { status_write(dir, "publish_failed", "sequence_missing", 0, NULL, 0); goto next; }
+        encrypt = scdn_sync_key_load((char *) peer_key->path.data, 0, EVP_PKEY_RSA);
+        if (!encrypt) goto next;
+        der_length = i2d_PUBKEY(encrypt, &der);
+        if (der_length <= 0) goto next;
+        binding_input = malloc((size_t) der_length + 64);
+        if (!binding_input) goto next;
+        memcpy(binding_input, der, (size_t) der_length);
+        memcpy(binding_input + der_length, peers[i].fingerprint, 32);
+        memcpy(binding_input + der_length + 32, signing_public, 32);
+        scdn_sync_digest(binding_input, (size_t) der_length + 64, binding);
+        free(binding_input); OPENSSL_free(der); der = NULL;
+        if (found && peer_key->verified_sequence == scdn_sync_u64(state + 8)
+            && peer_key->verified_expiry > (uint64_t) now + 3600
+            && !memcmp(peer_key->verified_payload, payload_digest, 32)
+            && !memcmp(peer_key->verified_binding, binding, 32)
+            && !memcmp(state + 16, payload_digest, 32) && !memcmp(state + 48, binding, 32)
+            && !fstatat(dir, "desired.bundle", &current_file, AT_SYMLINK_NOFOLLOW)
+            && same_file(&current_file, &peer_key->verified_file)) goto next;
+        old = read_at(dir, "desired.bundle", DIST_LIMIT, &old_size);
+        if (old && scdn_sync_signature_valid(old, old_size, sign)) {
+            /* Recover only from an authenticated local high-water mark. */
+            if (!found) {
+                if (!state_write(dir, "sequence.state", scdn_sync_u64(old + 8), old + 248, (u_char[32]){0})) goto next;
+                found = state_read(dir, "sequence.state", state);
+                if (found != 1) goto next;
+            }
+            if (old[48] == peers[i].id.len && old[49] == peers[i].scope.len
+                && !memcmp(old + 56, peers[i].id.data, peers[i].id.len)
+                && !memcmp(old + 152, peers[i].scope.data, peers[i].scope.len)
+                && scdn_sync_u64(old + 8) == scdn_sync_u64(state + 8)
+                && !memcmp(state + 48, binding, 32)
+                && !memcmp(old + 248, payload_digest, 32)
+                && scdn_sync_u64(old + 24) > (uint64_t) now + 3600) {
+                if (!fstatat(dir, "desired.bundle", &peer_key->verified_file, AT_SYMLINK_NOFOLLOW)) {
+                    peer_key->verified_sequence = scdn_sync_u64(old + 8);
+                    peer_key->verified_expiry = scdn_sync_u64(old + 24);
+                    memcpy(peer_key->verified_payload, payload_digest, 32);
+                    memcpy(peer_key->verified_binding, binding, 32);
+                }
+                goto next;
+            }
+        } else if (!found && (old || errno != ENOENT)) {
+            status_write(dir, "publish_failed", "sequence_missing", 0, NULL, 0); goto next;
+        }
         sequence = found ? scdn_sync_u64(state + 8) : 0;
         if (sequence == UINT64_MAX) goto next;
         sequence++;
-        if (!state_write(dir, "sequence.state", sequence, payload_digest, zero)) goto next;
-        encrypt = scdn_sync_key_load((char *) keys[j].path.data, 0, EVP_PKEY_RSA);
-        if (!encrypt) goto next;
+        if (!state_write(dir, "sequence.state", sequence, payload_digest, binding)) goto next;
         sealed = scdn_sync_seal(plain, size, sequence, &peers[i].id, &peers[i].scope, sign, encrypt, &sealed_size);
         if (!sealed || !scdn_sync_write_file(dir, "desired.bundle", sealed, sealed_size)) goto next;
-        scdn_sync_put64(counter, sequence);
+        peer_key->verified_sequence = 0; /* Verify the persisted object once before caching it. */
         status_write(dir, "published", "", sequence, NULL, 0);
         status_write(root, "published", "", sequence, NULL, 0);
 next:
+        OPENSSL_free(der); der = NULL;
         EVP_PKEY_free(encrypt); encrypt = NULL; free(old); old = NULL; free(sealed); sealed = NULL;
         close(lock); lock = -1; close(dir); dir = -1;
     }
 finish:
-    EVP_PKEY_free(sign); EVP_PKEY_free(encrypt); if (plain) OPENSSL_cleanse(plain, size);
-    free(plain); free(old); free(sealed);
+    EVP_PKEY_free(sign); EVP_PKEY_free(encrypt); OPENSSL_free(der);
+    free(old); free(sealed);
     if (lock >= 0) close(lock);
     if (dir >= 0) close(dir);
     if (root >= 0) close(root);
@@ -820,10 +963,16 @@ char *scdn_sync_distribution_directive(ngx_conf_t *cf, ngx_command_t *cmd, void 
     ngx_uint_t i;
     if (!conf) {
         conf = ngx_pcalloc(cf->pool, sizeof(*conf)); if (!conf) return NGX_CONF_ERROR;
+        conf->apply_timeout = 15000;
         main->distribution = conf;
         if (ngx_array_init(&conf->sources, cf->pool, 4, sizeof(dist_source)) != NGX_OK
             || ngx_array_init(&conf->keys, cf->pool, 4, sizeof(dist_peer_key)) != NGX_OK
             || ngx_array_init(&conf->probes, cf->pool, 4, sizeof(dist_probe)) != NGX_OK) return NGX_CONF_ERROR;
+    }
+    if (equal(&cmd->name, "scdn_sync_config_apply_timeout")) {
+        ngx_int_t timeout = ngx_parse_time(&v[1], 0);
+        if (timeout < 1000 || timeout > 600000) return "requires 1s to 10m";
+        conf->apply_timeout = (ngx_msec_t) timeout; return NGX_CONF_OK;
     }
     if (equal(&cmd->name, "scdn_sync_config_source")) {
         if (!scdn_sync_valid_id(v[1].data, v[1].len) || v[2].data[0] != '/' || conf->sources.nelts >= 256) return "requires scope and absolute source path";
@@ -837,7 +986,7 @@ char *scdn_sync_distribution_directive(ngx_conf_t *cf, ngx_command_t *cmd, void 
         keys = conf->keys.elts;
         for (i = 0; i < conf->keys.nelts; i++) if (equal(&keys[i].id, (char *) v[1].data)) return "duplicates peer key";
         key = ngx_array_push(&conf->keys); if (!key) return NGX_CONF_ERROR;
-        key->id = v[1]; key->path = v[2]; return NGX_CONF_OK;
+        memset(key, 0, sizeof(*key)); key->id = v[1]; key->path = v[2]; return NGX_CONF_OK;
     }
     if (equal(&cmd->name, "scdn_sync_config_probe")) {
         ngx_int_t status = ngx_atoi(v[2].data, v[2].len);

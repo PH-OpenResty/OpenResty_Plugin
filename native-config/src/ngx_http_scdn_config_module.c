@@ -13,7 +13,8 @@ typedef struct {
 } scdn_worker_slot_t;
 
 typedef struct {
-    ngx_uint_t generation, workers;
+    ngx_atomic_t generation;
+    ngx_uint_t workers;
     u_char active[32];
     scdn_worker_slot_t slots[SCDN_CONFIG_WORKERS];
 } scdn_shared_t;
@@ -37,11 +38,13 @@ typedef struct {
     const char *path, *error;
     scdn_config_snapshot_t *result;
     scdn_config_snapshot_t *cache;
+    ngx_flag_t unchanged;
 } scdn_job_t;
 
 static scdn_main_t *scdn_main;
 static scdn_config_snapshot_t *scdn_current, *scdn_prepared;
 static ngx_msec_t scdn_since;
+static ngx_atomic_uint_t scdn_generation;
 static const char *scdn_error;
 static ngx_flag_t scdn_busy;
 static ngx_event_t scdn_timer;
@@ -282,34 +285,30 @@ scdn_config_release(scdn_config_snapshot_t *snapshot)
 static void
 scdn_adopt(void)
 {
-    u_char active[32];
-    scdn_config_snapshot_t *previous;
+    scdn_config_snapshot_t *previous = NULL;
+    scdn_shared_t *shared;
     if (scdn_main == NULL || scdn_main->shared == NULL) { return; }
+    shared = scdn_main->shared;
+    if (scdn_generation && scdn_generation == shared->generation) return;
     ngx_shmtx_lock(&scdn_main->slab->mutex);
-    ngx_memcpy(active, scdn_main->shared->active, 32);
-    ngx_shmtx_unlock(&scdn_main->slab->mutex);
-    if (scdn_prepared != NULL && ngx_memcmp(active, scdn_prepared->digest, 32) == 0) {
+    if (scdn_prepared != NULL && ngx_memcmp(shared->active, scdn_prepared->digest, 32) == 0) {
         previous = scdn_current;
         scdn_current = scdn_prepared;
         scdn_prepared = NULL;
-        scdn_config_release(previous);
     }
-    ngx_shmtx_lock(&scdn_main->slab->mutex);
-    if (scdn_current != NULL) ngx_memcpy(scdn_main->shared->slots[ngx_worker].applied, scdn_current->digest, 32);
+    if (scdn_current != NULL && ngx_memcmp(shared->active, scdn_current->digest, 32) == 0) {
+        ngx_memcpy(shared->slots[ngx_worker].applied, scdn_current->digest, 32);
+        scdn_generation = shared->generation;
+    } else scdn_generation = 0;
     ngx_shmtx_unlock(&scdn_main->slab->mutex);
+    scdn_config_release(previous);
 }
 
 scdn_config_snapshot_t *
 scdn_config_acquire(void)
 {
-    ngx_flag_t matches;
     scdn_adopt();
-    if (scdn_main == NULL || scdn_main->shared == NULL) { return NULL; }
-    ngx_shmtx_lock(&scdn_main->slab->mutex);
-    matches = scdn_current != NULL
-              && ngx_memcmp(scdn_main->shared->active, scdn_current->digest, 32) == 0;
-    ngx_shmtx_unlock(&scdn_main->slab->mutex);
-    if (!matches) { return NULL; }
+    if (!scdn_generation || scdn_current == NULL) return NULL;
     if (scdn_current != NULL) { scdn_current->refs++; }
     return scdn_current;
 }
@@ -319,7 +318,8 @@ scdn_scan(void *data, ngx_log_t *log)
 {
     scdn_job_t *job = data;
     (void) log;
-    job->result = scdn_config_load_cached(job->path, &job->error, job->cache);
+    job->unchanged = scdn_config_matches(job->path, job->cache);
+    job->result = job->unchanged ? NULL : scdn_config_load_cached(job->path, &job->error, job->cache);
 }
 
 static void
@@ -331,9 +331,12 @@ scdn_complete(ngx_event_t *event)
     scdn_worker_slot_t *slot;
     ngx_uint_t i;
     ngx_flag_t ready = 1;
+    scdn_config_snapshot_t *discard = NULL, *previous = NULL;
+    ngx_msec_t freshness = ngx_max(5000, scdn_main->interval * 3);
 
     scdn_busy = 0;
     job->result = NULL;
+    if (job->unchanged) { result = job->cache; job->cache = NULL; }
     scdn_config_release(job->cache);
     job->cache = NULL;
     scdn_adopt();
@@ -352,16 +355,16 @@ scdn_complete(ngx_event_t *event)
     if (result != NULL) {
         scdn_error = NULL;
         if (ngx_memcmp(result->digest, scdn_current->digest, 32) == 0) {
-            scdn_config_release(result);
-            scdn_config_release(scdn_prepared); scdn_prepared = NULL;
+            discard = result;
+            previous = scdn_prepared; scdn_prepared = NULL;
         } else if (scdn_prepared == NULL
                    || ngx_memcmp(result->digest, scdn_prepared->digest, 32) != 0)
         {
-            scdn_config_release(scdn_prepared);
+            previous = scdn_prepared;
             scdn_prepared = result;
             scdn_since = ngx_current_msec;
         } else {
-            scdn_config_release(result);
+            discard = result;
             if ((ngx_msec_int_t) (ngx_current_msec - scdn_since)
                 >= (ngx_msec_int_t) scdn_main->settle)
             {
@@ -369,13 +372,14 @@ scdn_complete(ngx_event_t *event)
                 for (i = 0; i < shared->workers; i++) {
                     if (shared->slots[i].pid <= 0
                         || kill(shared->slots[i].pid, 0) != 0
-                        || (ngx_msec_int_t) (ngx_current_msec - shared->slots[i].heartbeat) > 5000
+                        || (ngx_msec_int_t) (ngx_current_msec - shared->slots[i].heartbeat) > (ngx_msec_int_t) freshness
                         || ngx_memcmp(shared->slots[i].prepared, scdn_prepared->digest, 32) != 0)
                     { ready = 0; break; }
                 }
                 if (ready && ngx_memcmp(shared->active, scdn_prepared->digest, 32) != 0) {
                     ngx_memcpy(shared->active, scdn_prepared->digest, 32);
-                    shared->generation++;
+                    ngx_memory_barrier();
+                    (void) ngx_atomic_fetch_add(&shared->generation, 1);
                 }
             }
         }
@@ -385,9 +389,11 @@ scdn_complete(ngx_event_t *event)
                           "scdn_config candidate rejected: %s", job->error);
         }
         scdn_error = job->error;
-        scdn_config_release(scdn_prepared); scdn_prepared = NULL;
+        previous = scdn_prepared; scdn_prepared = NULL;
     }
     ngx_shmtx_unlock(&scdn_main->slab->mutex);
+    scdn_config_release(discard);
+    scdn_config_release(previous);
     scdn_adopt();
 }
 
@@ -509,7 +515,8 @@ scdn_status(ngx_http_request_t *r)
     for (i = 0; i < scdn_main->shared->workers; i++) {
         scdn_worker_slot_t *slot = &scdn_main->shared->slots[i];
         if (slot->pid <= 0 || kill(slot->pid, 0) != 0
-            || (ngx_msec_int_t) (ngx_current_msec - slot->heartbeat) > 5000
+            || (ngx_msec_int_t) (ngx_current_msec - slot->heartbeat)
+               > (ngx_msec_int_t) ngx_max(5000, scdn_main->interval * 3)
             || ngx_memcmp(slot->applied, scdn_main->shared->active, 32)) all_ready = 0;
     }
     ngx_shmtx_unlock(&scdn_main->slab->mutex);

@@ -123,20 +123,32 @@ Engine::Engine(Config c) : conf(std::move(c)) {
   auto oldboot = meta("boot");
   if (oldboot != conf.boot) {
     sql("BEGIN IMMEDIATE");
-    sql("DELETE FROM requests; DELETE FROM evidence;");
+    sql("DELETE FROM requests; DELETE FROM evidence; UPDATE fences SET boot=0;");
+    auto saved_wall = std::stoll(meta("recovery_utc", "0"));
+    auto saved_boot = std::stoll(meta("recovery_boot_ns", "0"));
+    auto wall = utc(), monotonic = (int64_t)ban_now();
     Statement q(db, "SELECT key,value FROM records");
     std::vector<std::pair<std::string, J>> all;
     while (q.row())
       all.push_back({q.text(0), parse(q.text(1))});
     for (auto &r : all) {
-      auto remaining = std::max<int64_t>(0, integer_text(r.second, "expires") -
-                                                utc() - conf.skew_ms);
+      auto remaining = std::max<int64_t>(0, std::min(
+          integer_text(r.second, "expires") - integer_text(r.second, "decided"),
+          integer_text(r.second, "expires") - std::max<int64_t>(wall, saved_wall) - conf.skew_ms));
+      if (saved_boot && str(r.second, "boot") == oldboot) {
+        auto checkpoint_remaining = std::max<int64_t>(0,
+            (integer_text(r.second, "deadline") - saved_boot) / 1000000
+            - std::max<int64_t>(0, wall - saved_wall));
+        remaining = std::min(remaining, checkpoint_remaining);
+      }
       set(r.second, "deadline",
-          scalar((int64_t)ban_now() + remaining * 1000000));
+          scalar(monotonic + remaining * 1000000));
       set(r.second, "boot", conf.boot);
       save_record(r.first, r.second);
     }
     meta_set("boot", conf.boot);
+    meta_set("recovery_utc", scalar(wall));
+    meta_set("recovery_boot_ns", scalar(monotonic));
     sql("COMMIT");
   }
   reconcile();
@@ -237,7 +249,7 @@ static void append_log(sqlite3 *db, const std::string &path, bool ip_only) {
     }
     Statement q(db,
                 "SELECT seq,value FROM audit WHERE seq>? AND (?=0 OR "
-                "json_type(value,'$.ip') IS NOT NULL) ORDER BY seq LIMIT 256");
+                "json_type(value,'$.ip') IS NOT NULL) ORDER BY seq");
     q.bind(1, last);
     q.bind(2, ip_only ? 1 : 0);
     require(lseek(fd, 0, SEEK_END) >= 0, "log_seek");
@@ -341,6 +353,8 @@ void Engine::insert_ban(const ban_event &e, int layer) {
   }
   audit("PREPARE", r);
   save_record(key, r);
+  meta_set("recovery_utc", scalar(utc()));
+  meta_set("recovery_boot_ns", scalar((int64_t)ban_now()));
 }
 void Engine::delete_ban(const std::string &key, const std::string &action) {
   auto r = record(key);
@@ -414,6 +428,7 @@ ban_ack Engine::event(const ban_event &e, uint32_t uid) {
         "unregistered_rule");
   auto request = hex(e.instance, 16) + hex(e.request, 16);
   bool duplicate = false;
+  bool enforcement_changed = false;
   int previous_source = 0;
   {
     Statement q(db, "SELECT source FROM requests WHERE id=?");
@@ -452,11 +467,15 @@ ban_ack Engine::event(const ban_event &e, uint32_t uid) {
         q.done();
       }
       if (e.source == BAN_CC) {
-        if (!duplicate || previous_source != BAN_CC)
+        if (!duplicate || previous_source != BAN_CC) {
           insert_ban(e, 3);
+          enforcement_changed = true;
+        }
       } else if (!duplicate) {
-        if (e.source == BAN_WAF)
+        if (e.source == BAN_WAF) {
           insert_ban(e, 7);
+          enforcement_changed = true;
+        }
         Statement q(db, "INSERT INTO evidence VALUES(?,?,?)");
         q.bind(1, ip);
         q.bind(2, request);
@@ -467,8 +486,10 @@ ban_ack Engine::event(const ban_event &e, uint32_t uid) {
         countq.bind(1, ip);
         countq.bind(2, (int64_t)now - conf.window * 1000000);
         require(countq.row(), "evidence_count");
-        if (countq.integer(0) >= conf.threshold)
+        if (countq.integer(0) >= conf.threshold) {
           insert_ban(e, 3);
+          enforcement_changed = true;
+        }
       }
     }
     Statement p(db, "INSERT INTO producers VALUES(?,?) ON CONFLICT(id) DO "
@@ -492,6 +513,9 @@ ban_ack Engine::event(const ban_event &e, uint32_t uid) {
     sql("ROLLBACK");
     throw;
   }
+  // Receipt/evidence-only traffic has no datapath or log projection to change.
+  // The periodic tick still retries earlier failed enforcement and projection.
+  if (!enforcement_changed && logs_ok && !enforcement_pending) return ack;
   try {
     reconcile();
     project();
@@ -516,6 +540,7 @@ static ban_record view_record(const J &r) {
   return out;
 }
 void Engine::reconcile() {
+  enforcement_pending = true;
   std::map<std::string, J> desired;
   Statement q(db, "SELECT key,value FROM records");
   std::vector<std::pair<std::string, J>> rows;
@@ -625,6 +650,7 @@ void Engine::reconcile() {
   __atomic_store_n(&view->data->reserved[0], accepted_revision > 0 ? 1 : 0,
                    __ATOMIC_SEQ_CST);
   require(failed.empty(), "kernel_apply_failed_fallback_only");
+  enforcement_pending = false;
 }
 void Engine::tick() {
   int64_t now = (int64_t)ban_now();
@@ -652,6 +678,8 @@ void Engine::tick() {
     d.bind(1, now - (conf.window + conf.event_age) * 1000000);
     d.done();
   }
+  meta_set("recovery_utc", scalar(utc()));
+  meta_set("recovery_boot_ns", scalar((int64_t)ban_now()));
   try {
     reconcile();
   } catch (...) {

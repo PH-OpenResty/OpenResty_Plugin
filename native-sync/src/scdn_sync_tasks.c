@@ -316,6 +316,7 @@ static int record_load(int directory, const char *id, cache_task_t *task)
     if (!number(field[12], &n) || n > TASK_BODY || n != (uint64_t) (end - p))
         goto finish;
     task->length = (unsigned) n; memcpy(task->body, p, task->length);
+    if (task->lease > (int64_t) time(NULL) + TASK_LEASE + 30) goto finish;
     if (strcmp(id, task->id) || !task_valid(task)
         || !task_digest(task, checksum) || strcmp(task->digest, checksum)) goto finish;
     result = 1;
@@ -949,6 +950,9 @@ static void node_poll(void *data, ngx_log_t *log)
     }
     if (!found && !receipt_room(directory)) goto finish;
     task->state = TASK_RUNNING; task->created = time(NULL);
+    /* The wire lease field is the attempt number, not an expiry timestamp.
+     * A nonzero durable marker protects the receipt until Master accepts it. */
+    task->lease = task->created + TASK_LEASE;
     if (!record_save(directory, task)) goto finish;
     site = site_for(&conf->cache, task->scope);
     if (!strcmp(task->mode, "all") || !strcmp(task->mode, "node")) {

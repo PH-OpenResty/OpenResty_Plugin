@@ -22,6 +22,8 @@ Purge 可独立加载，不依赖其他插件，也不修改 Nginx 核心或私�
 
 ## 文档导航
 
+- [安全与性能独立复审](docs/AUDIT-REVIEW-2026-11-16.zh-CN.md)：CNB issue #2/#3–#10 的逐项证据、修复、验证与升级约束。
+
 - [当前文档与能力核对](docs/DOCUMENTATION-INDEX.zh-CN.md)：所有模块入口、当前功能与历史证据边界。
 
 - [站点配置与证书加密发布/应用](docs/SYNC-PUBLICATION.zh-CN.md)：真实 Master/Node 发布、热更新、回退、身份与序号边界。

@@ -94,7 +94,7 @@ directory `/assets` 或 `/assets/` 匹配 `/assets`、`/assets?x=1`、`/assets/a
 
 prefix/wildcard/regex/suffix/directory 共用每 scope 128 个不同模式规则的预算，不是每种各 128。正则编译产物最多 128KiB；执行限制为 100000 次匹配步骤、128 深度、1MiB 匹配堆；glob 也有步骤预算。编译错误整批返回 400，容量不足整批返回 507。运行预算耗尽时，请求绕过缓存读取并在回源前失败为 5xx，不把执行失败当作“没有匹配”。整站清理可回收问题规则。
 
-规则在本地 key 缓存未命中时匹配；表达式编译使用每 Worker 64 项有界缓存。匹配在共享锁外进行，不扫描缓存文件。高基数流量、复杂正则和频繁失效仍会增加请求成本。node 是整机单实例的所有缓存区；多 master、其他进程及未接入版本键的缓存需要控制端分别处理。
+规则在本地 key 缓存未命中时匹配；表达式编译使用每 Worker 128 项有界缓存。匹配在共享锁外进行，不扫描缓存文件。高基数流量、复杂正则和频繁失效仍会增加请求成本。node 是整机单实例的所有缓存区；多 master、其他进程及未接入版本键的缓存需要控制端分别处理。
 
 ## 5. 调用示例
 
@@ -213,3 +213,9 @@ Config/Edge 已支持 [缓存响应头与规则回源头](../docs/CACHE-HEADERS.
 与 [Tier](../native-tier/README.zh-CN.md) 配合时，front/backend 都接入相同 scope、完整基础 key、逻辑 resource 和 `$scdn_purge_key`；一次 epoch 失效覆盖两层。上层再验证使用 Tier 的验证标记穿透 L2，保留原有 ETag/Last-Modified 和有限 stale 语义。
 
 当前统一构建包含原生 [Ban](../native-ban/RUNTIME.zh-CN.md)。一起编译时 Ban 必须先于 API/Edge 动态加载；未配置 scdn_ban on 时不启用封禁。其 Agent/eBPF 和全节点快照是独立运行路径，Sync 桥接需显式 scdn_sync_ban_agent。
+
+## 正则缓存与防御边界复审
+
+Worker 编译缓存与单 scope 的 128 条规则上限对齐，避免同一 scope 65–128 条 regex 的顺序扫描反复编译。多个 scope 工作集超过容量仍会淘汰；字节码大小、匹配次数、深度和堆预算保持有界。wildcard 自身也拒绝尾部裸反斜杠，空控制 token 明确拒绝。
+
+当前 Purge LRU 在查找前已求值并校验 scope/key/resource，复审未支持“命中后读取未初始化变量”的结论。完整依据见[独立复审](../docs/AUDIT-REVIEW-2026-11-16.zh-CN.md)。

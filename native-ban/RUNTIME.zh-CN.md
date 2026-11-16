@@ -142,3 +142,9 @@ kernel_ready 表示所有配置接口已附着；pending_enforcement 表示尚�
 保留的 compat/lib/security_guard 在真实 WAF 命中且 `$scdn_ban_enabled=1` 时自动上报该引擎返回的 rule ID；Agent trusted_rules 必须登记相同 ID。普通限流 429 不会自动变成 CC，CC 检测器仍须显式确认。主分支的 Sync 收据恢复/Lua 交接逻辑已合并保留。
 
 `tests/lua_waf.py` 在 OpenResty 中执行保留的真实 SQL 注入规则和 security_guard，验证原生 scope/rule 上报、L7 和三节点内核 L3；该 4 项联动套件只在实际含 Lua 的 OpenResty 运行，不在纯 Nginx 冒报。
+
+## 水位、时钟与日志恢复补充
+
+签名 UTC 解封水位转换为本 boot 的事件截止时间，重复水位不滑动，旧排队事件不能复活封禁；更换 boot 清除旧单调水位，仍拒绝旧 boot 身份。恢复期限受原时长、UTC 期限和最后持久化剩余单调时间约束，时钟回拨不会增加额外小时。
+
+日志投影一次启动处理有界的可恢复积压。仅变更回执/证据且没有待执行或日志错误时省略全量 reconcile，周期任务继续重试失败工作。tests/recovery.py --agent-build /absolute/build 验证真实 Engine/SQLite/BPF 的四组恢复，--sanitize 启用辅助 ASan/UBSan。完整结论见[独立复审](../docs/AUDIT-REVIEW-2026-11-16.zh-CN.md)。
