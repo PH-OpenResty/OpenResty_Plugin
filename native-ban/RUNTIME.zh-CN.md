@@ -56,7 +56,7 @@ scope 使用最多 95 字节的稳定 ASCII 站点 ID，不使用任意客户端
 已有 C 检测器可调用 ngx_http_scdn_ban_report(request, BAN_WAF/BAN_CC, reason)。已有 Lua WAF 的适配只需在真实命中后设置受控变量，不搬迁其规则引擎：
 
 ```lua
-ngx.var.scdn_ban_reason = "crs:942100"
+ngx.var.scdn_ban_reason = "942100"
 ngx.var.scdn_ban_event = "waf"
 return ngx.exit(403)
 ```
@@ -138,3 +138,5 @@ kernel_ready 表示所有配置接口已附着；pending_enforcement 表示尚�
 `tests/runtime.py` 要求 root/CAP_BPF/CAP_NET_ADMIN，主动创建随机名称的临时 netns/veth/bridge 和独立 bpffs，测试后停止所创建进程并清理这些对象。权限不足直接失败，不用 mock 或 skip 冒充真实 eBPF 验收。用 --mode tcx_ingress/xdp_native 分别验证；--static 验证静态编入的 Nginx 模块。
 
 覆盖真实 HTTP/UDP 丢包、IPv4/IPv6、固定过期、L7 升级、任意设备全量发布、成员 ACK、解封、Master 断线、Agent kill/重启、只读 FD、过时/重复事件、CIDR 豁免、策略热更新、日志失败/补投，以及内核 BPF_PROG_TEST_RUN 的 VLAN/分片/边界语料。既有七模块回归同时执行。生产 NIC offload/多缓冲区、HTTP/3 L7、所有跨地域时钟/断电组合、全容量压力和 p99 收敛延迟需要目标环境验收，不能由隔离用例推导吞吐承诺。
+
+保留的 compat/lib/security_guard 在真实 WAF 命中且 `$scdn_ban_enabled=1` 时自动上报该引擎返回的 rule ID；Agent trusted_rules 必须登记相同 ID。普通限流 429 不会自动变成 CC，CC 检测器仍须显式确认。主分支的 Sync 收据恢复/Lua 交接逻辑已合并保留。

@@ -1,3 +1,4 @@
+#include <ngx_config.h>
 #include "ban_common.h"
 #include "ngx_scdn_ban.h"
 #include <fcntl.h>
@@ -296,18 +297,19 @@ static ngx_int_t get_variable(ngx_http_request_t *r,
   v->not_found = 0;
   v->len = 0;
   v->data = (u_char *)"";
+  if(kind==2){ban_location*c=ngx_http_get_module_loc_conf(r,ngx_http_scdn_ban_module);v->len=1;v->data=(u_char*)(c->enabled?"1":"0");}
   return NGX_OK;
 }
 static ngx_int_t preconfiguration(ngx_conf_t *cf) {
   ngx_str_t names[] = {ngx_string("scdn_ban_reason"),
-                       ngx_string("scdn_ban_event")};
-  for (unsigned i = 0; i < 2; i++) {
+                       ngx_string("scdn_ban_event"),ngx_string("scdn_ban_enabled")};
+  for (unsigned i = 0; i < 3; i++) {
     ngx_http_variable_t *v = ngx_http_add_variable(
-        cf, &names[i], NGX_HTTP_VAR_CHANGEABLE | NGX_HTTP_VAR_NOCACHEABLE);
+        cf, &names[i], (i<2?NGX_HTTP_VAR_CHANGEABLE:0) | NGX_HTTP_VAR_NOCACHEABLE);
     if (!v)
       return NGX_ERROR;
     v->get_handler = get_variable;
-    v->set_handler = setter;
+    if(i<2)v->set_handler = setter;
     v->data = i;
   }
   return NGX_OK;

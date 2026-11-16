@@ -39,6 +39,15 @@ function _M.run()
     local blocked, rule, score = waf.inspect(site)
     if blocked then
         ngx.log(ngx.WARN, "waf block site=", site.name, " rule=", rule, " score=", score)
+        -- Only a confirmed WAF decision becomes evidence. A limiter's ordinary
+        -- 429 is not a confirmed CC event. Ban remains optional for old builds.
+        local reported = pcall(function()
+            if ngx.var.scdn_ban_enabled == "1" then
+                ngx.var.scdn_ban_reason = tostring(rule)
+                ngx.var.scdn_ban_event = "waf"
+            end
+        end)
+        if not reported then ngx.log(ngx.ERR, "native Ban WAF adapter unavailable") end
         return ngx.exit(403)
     end
     ngx.var.scdn_edge_security_checked = "1"

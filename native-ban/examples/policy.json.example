@@ -12,7 +12,7 @@
   "sync_uid": 1001,
   "instances": ["00000000-0000-0000-0000-000000000100"],
   "trusted_rules": [
-    {"source": "waf", "reason": "crs:942100"},
+    {"source": "waf", "reason": "942100"},
     {"source": "cc", "reason": "cc:confirmed-rate"}
   ],
   "policy": {
