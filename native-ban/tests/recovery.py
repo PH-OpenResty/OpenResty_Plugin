@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Real Engine/SQLite/BPF recovery with controlled wall and boot clocks."""
+"""Real Engine/Ban Store/BPF recovery with controlled wall and boot clocks."""
 import argparse
 import json
 import os
@@ -25,10 +25,11 @@ def main():
     with tempfile.TemporaryDirectory(prefix='ban-recovery-') as temporary:
         root = Path(temporary)
         flags = ['-fsanitize=address,undefined', '-fno-omit-frame-pointer'] if args.sanitize else []
-        include = ['-I', str(ROOT/'native-ban/src'), '-I', str(ROOT/'native-ban/agent')]
+        include = ['-I', str(ROOT/'native-ban/src'), '-I', str(ROOT/'native-ban/agent'), '-I', str(ROOT/'native-ban-store/include')]
         run('cc', '-std=c11', '-O1', *flags, *include, '-c', str(ROOT/'native-ban/src/ban_common.c'), '-o', str(root/'common.o'))
-        libraries = run('pkg-config', '--cflags', '--libs', 'libbpf', 'json-c', 'sqlite3', 'libcurl', 'openssl').stdout.split()
+        libraries = run('pkg-config', '--cflags', '--libs', 'libbpf', 'json-c', 'libcurl', 'openssl').stdout.split()
         sources = [str(ROOT/'native-ban/agent'/name) for name in ('util.cpp', 'config.cpp', 'kernel.cpp', 'engine.cpp', 'cluster.cpp')]
+        sources.append(str(ROOT/'native-ban-store/src/ban_store.cpp'))
         run('c++', '-std=c++17', '-O1', '-g', '-Wall', '-Wextra', '-Werror', '-pthread', *flags,
             '-Wl,--wrap=clock_gettime', *include, str(ROOT/'native-ban/tests/recovery.cpp'), *sources,
             str(root/'common.o'), *libraries, '-o', str(root/'recovery'))
@@ -44,7 +45,7 @@ def main():
             run('openssl', 'genpkey', '-algorithm', 'ED25519', '-out', str(root/'sign.key'))
             (root/'sign.key').chmod(0o600)
             run('openssl', 'pkey', '-in', str(root/'sign.key'), '-pubout', '-out', str(root/'sign.pub'))
-            for mode in ('remote-fence', 'reboot-fence', 'reboot-clock', 'backlog'):
+            for mode in ('remote-fence', 'reboot-fence', 'reboot-clock', 'batch', 'projection', 'quota', 'backlog'):
                 base = root/mode; base.mkdir()
                 for p in (base/'state', base/'logs', root/'runtime'/mode, root/'pins'/mode): p.mkdir(mode=0o700)
                 runtime = root/'runtime'/mode

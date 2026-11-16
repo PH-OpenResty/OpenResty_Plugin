@@ -22,166 +22,169 @@ static std::string address_key(const std::string &ip,
                                const std::string &scope) {
   return scope + "|" + ip;
 }
-void Engine::sql(const char *s) {
-  require(sqlite3_exec(db, s, nullptr, nullptr, nullptr) == SQLITE_OK,
-          "database_transaction");
+static ban_store::Options storage_options(const Config &c) {
+  struct stat st{};
+  for (const char *name :
+       {"state.sqlite", "state.sqlite-wal", "state.sqlite-shm"}) {
+    auto file = c.state + "/" + name;
+    require(lstat(file.c_str(), &st) != 0 && errno == ENOENT,
+            "legacy_state_requires_offline_migration");
+  }
+  return c.storage;
 }
 std::string Engine::meta(const std::string &key, const std::string &fallback) {
-  Statement q(db, "SELECT value FROM meta WHERE key=?");
-  q.bind(1, key);
-  return q.row() ? q.text(0) : fallback;
+  auto value = db.get(Table::Meta, key);
+  return value ? *value : fallback;
 }
 void Engine::meta_set(const std::string &key, const std::string &value) {
-  Statement q(db, "INSERT INTO meta VALUES(?,?) ON CONFLICT(key) DO UPDATE SET "
-                  "value=excluded.value");
-  q.bind(1, key);
-  q.bind(2, value);
-  q.done();
+  db.put(Table::Meta, key, value);
 }
-int64_t Engine::count(const char *table) {
-  std::string s = "SELECT COUNT(*) FROM " + std::string(table);
-  Statement q(db, s.c_str());
-  require(q.row(), "database_count");
-  return q.integer(0);
+int64_t Engine::count(const char *name) {
+  return (int64_t)db.size(ban_store::table(name));
 }
-Engine::Engine(Config c) : conf(std::move(c)) {
-  auto dbpath = conf.state + "/state.sqlite";
-  int fd = safe_open(dbpath, O_RDWR | O_CREAT, 0600);
-  require(fd >= 0, "state_file");
-  struct stat st;
-  require(!fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_nlink == 1 &&
-              !(st.st_mode & 077) && st.st_uid == geteuid(),
-          "state_file_permissions");
-  close(fd);
-  require(sqlite3_open_v2(dbpath.c_str(), &db,
-                          SQLITE_OPEN_READWRITE | SQLITE_OPEN_FULLMUTEX,
-                          nullptr) == SQLITE_OK,
-          "database_open");
-  sqlite3_busy_timeout(db, 1000);
-  sql("PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA "
-      "foreign_keys=ON; PRAGMA wal_autocheckpoint=100;");
-  {
-    Statement q(db, "PRAGMA integrity_check");
-    require(q.row() && q.text(0) == "ok", "database_corrupt");
+J Engine::data(Table t, const std::string &key) {
+  auto value = db.get(t, key);
+  return value ? parse(*value) : J{};
+}
+void Engine::save(Table t, const std::string &key, const J &value) {
+  db.put(t, key, dump(value));
+}
+uint64_t Engine::audit_sequence() {
+  return std::stoull(meta("audit_seq", "0"));
+}
+uint64_t Engine::producer_sequence(const std::string &id) {
+  auto value = db.get(Table::Producers, id);
+  return value ? std::stoull(*value) : 0;
+}
+static void volatile_log_session(const std::string &path) {
+  struct stat st{};
+  if (lstat(path.c_str(), &st)) {
+    require(errno == ENOENT, "log_lstat");
+    return;
   }
-  sql("CREATE TABLE IF NOT EXISTS meta(key TEXT PRIMARY KEY,value TEXT NOT "
-      "NULL);"
-      "CREATE TABLE IF NOT EXISTS records(key TEXT PRIMARY KEY,value TEXT NOT "
-      "NULL);"
-      "CREATE TABLE IF NOT EXISTS audit(seq INTEGER PRIMARY KEY "
-      "AUTOINCREMENT,ts INTEGER NOT NULL,value TEXT NOT NULL);"
-      "CREATE TABLE IF NOT EXISTS producers(id TEXT PRIMARY KEY,seq INTEGER "
-      "NOT NULL);"
-      "CREATE TABLE IF NOT EXISTS receipts(producer TEXT,seq INTEGER,digest "
-      "TEXT NOT NULL,durable INTEGER NOT NULL,PRIMARY KEY(producer,seq));"
-      "CREATE TABLE IF NOT EXISTS requests(id TEXT PRIMARY KEY,ip "
-      "TEXT,observed INTEGER,source INTEGER);"
-      "CREATE TABLE IF NOT EXISTS evidence(ip TEXT,request TEXT PRIMARY "
-      "KEY,observed INTEGER);"
-      "CREATE INDEX IF NOT EXISTS evidence_ip ON evidence(ip,observed);"
-      "CREATE TABLE IF NOT EXISTS fences(ip TEXT PRIMARY KEY,utc INTEGER NOT "
-      "NULL,boot INTEGER NOT NULL);"
-      "CREATE TABLE IF NOT EXISTS outbox(seq INTEGER PRIMARY KEY,value TEXT "
-      "NOT NULL,accepted INTEGER NOT NULL DEFAULT 0);"
-      "CREATE TABLE IF NOT EXISTS globals(ip TEXT PRIMARY KEY,value TEXT NOT "
-      "NULL);"
-      "CREATE TABLE IF NOT EXISTS origin_receipts(node TEXT,seq INTEGER,digest "
-      "TEXT,revision INTEGER,PRIMARY KEY(node,seq));"
-      "CREATE TABLE IF NOT EXISTS origin_high(node TEXT PRIMARY KEY,seq "
-      "INTEGER NOT NULL);"
-      "CREATE TABLE IF NOT EXISTS results(node TEXT PRIMARY KEY,revision "
-      "INTEGER,digest TEXT,state TEXT);");
-  require(meta("version", "1") == "1", "database_version");
-  if (meta("node").empty()) {
-    meta_set("node", conf.node);
-    meta_set("cluster", conf.cluster);
-    meta_set("epoch", conf.epoch);
-    meta_set("revision", "1");
-    meta_set("local_seq", "0");
-    meta_set("policy", "1");
-    meta_set("version", "1");
-    meta_set("immutable", conf.immutable);
-  }
-  require(meta("node") == conf.node && meta("cluster") == conf.cluster &&
-              meta("epoch") == conf.epoch,
-          "state_identity_mismatch");
-  require(meta("immutable") == conf.immutable,
-          "immutable_policy_change_requires_migration");
-  generation = std::stoull(meta("policy", "1"));
-  accepted_revision = std::stoll(meta("accepted_revision", "0"));
-  view = std::make_unique<View>(conf);
-  kernel = std::make_unique<Kernel>(conf);
-  {
-    Statement q(db, "SELECT COALESCE(MAX(seq),0) FROM audit");
-    require(q.row(), "audit_watermark");
-    auto seq = (uint64_t)q.integer(0);
-    require(kernel->watermark() <= seq &&
-                __atomic_load_n(&view->data->reserved[1], __ATOMIC_SEQ_CST) <=
-                    seq,
-            "state_rollback_detected");
-  }
-  auto oldboot = meta("boot");
-  if (oldboot != conf.boot) {
-    sql("BEGIN IMMEDIATE");
-    sql("DELETE FROM requests; DELETE FROM evidence; UPDATE fences SET boot=0;");
-    auto saved_wall = std::stoll(meta("recovery_utc", "0"));
-    auto saved_boot = std::stoll(meta("recovery_boot_ns", "0"));
-    auto wall = utc(), monotonic = (int64_t)ban_now();
-    Statement q(db, "SELECT key,value FROM records");
-    std::vector<std::pair<std::string, J>> all;
-    while (q.row())
-      all.push_back({q.text(0), parse(q.text(1))});
-    for (auto &r : all) {
-      auto remaining = std::max<int64_t>(0, std::min(
-          integer_text(r.second, "expires") - integer_text(r.second, "decided"),
-          integer_text(r.second, "expires") - std::max<int64_t>(wall, saved_wall) - conf.skew_ms));
-      if (saved_boot && str(r.second, "boot") == oldboot) {
-        auto checkpoint_remaining = std::max<int64_t>(0,
-            (integer_text(r.second, "deadline") - saved_boot) / 1000000
-            - std::max<int64_t>(0, wall - saved_wall));
-        remaining = std::min(remaining, checkpoint_remaining);
-      }
-      set(r.second, "deadline",
-          scalar(monotonic + remaining * 1000000));
-      set(r.second, "boot", conf.boot);
-      save_record(r.first, r.second);
+  require(S_ISREG(st.st_mode) && st.st_uid == geteuid() && st.st_nlink == 1 &&
+              !(st.st_mode & 007),
+          "log_permissions");
+  auto split = path.rfind('/');
+  auto name = path.substr(split + 1);
+  auto archived = name + ".session-" + random_id() + ".jsonl";
+  int dir = safe_open(path.substr(0, split), O_RDONLY | O_DIRECTORY);
+  require(dir >= 0, "log_directory");
+  bool ok = !renameat(dir, name.c_str(), dir, archived.c_str()) && !fsync(dir);
+  close(dir);
+  require(ok, "log_session_rotate");
+}
+Engine::Engine(Config c) : conf(std::move(c)), db(storage_options(conf)) {
+  db.begin();
+  try {
+    require(meta("version", "1") == "1", "state_version");
+    if (meta("node").empty()) {
+      meta_set("node", conf.node);
+      meta_set("cluster", conf.cluster);
+      meta_set("epoch", conf.epoch);
+      meta_set("revision", "1");
+      meta_set("local_seq", "0");
+      meta_set("policy", "1");
+      meta_set("version", "1");
+      meta_set("immutable", conf.immutable);
     }
-    meta_set("boot", conf.boot);
-    meta_set("recovery_utc", scalar(wall));
-    meta_set("recovery_boot_ns", scalar(monotonic));
-    sql("COMMIT");
+    require(meta("node") == conf.node && meta("cluster") == conf.cluster &&
+                meta("epoch") == conf.epoch,
+            "state_identity_mismatch");
+    require(meta("immutable") == conf.immutable,
+            "immutable_policy_change_requires_migration");
+    generation = std::stoull(meta("policy", "1"));
+    accepted_revision = std::stoll(meta("accepted_revision", "0"));
+    view = std::make_unique<View>(conf);
+    kernel = std::make_unique<Kernel>(conf);
+    auto floor =
+        std::max(kernel->watermark(),
+                 __atomic_load_n(&view->data->reserved[1], __ATOMIC_SEQ_CST));
+    if (conf.storage.persistent)
+      require(floor <= audit_sequence(), "state_rollback_detected");
+    else {
+      require(floor < UINT64_MAX, "audit_sequence_exhausted");
+      meta_set("audit_seq", std::to_string(floor));
+      auto prior = __atomic_load_n(&view->data->generation, __ATOMIC_SEQ_CST);
+      generation = std::max(generation, prior) + 1;
+      meta_set("policy", std::to_string(generation));
+    }
+    if (meta("boot") != conf.boot) {
+      auto oldboot = meta("boot");
+      db.clear(Table::Requests);
+      db.clear(Table::Evidence);
+      for (auto &entry : db.rows(Table::Fences)) {
+        auto f = parse(entry.second);
+        set(f, "boot", std::string("0"));
+        save(Table::Fences, entry.first, f);
+      }
+      int64_t saved_wall = std::stoll(meta("recovery_utc", "0")),
+              saved_boot = std::stoll(meta("recovery_boot_ns", "0"));
+      auto wall = utc(), monotonic = (int64_t)ban_now();
+      for (auto &entry : db.rows(Table::Records)) {
+        auto r = parse(entry.second);
+        auto remaining = std::max<int64_t>(
+            0, std::min(integer_text(r, "expires") - integer_text(r, "decided"),
+                        integer_text(r, "expires") -
+                            std::max(wall, saved_wall) - conf.skew_ms));
+        if (saved_boot && str(r, "boot") == oldboot)
+          remaining = std::min(
+              remaining,
+              std::max<int64_t>(
+                  0, (integer_text(r, "deadline") - saved_boot) / 1000000 -
+                         std::max<int64_t>(0, wall - saved_wall)));
+        set(r, "deadline", scalar(monotonic + remaining * 1000000));
+        set(r, "boot", conf.boot);
+        save_record(entry.first, r);
+      }
+      meta_set("boot", conf.boot);
+      meta_set("recovery_utc", scalar(wall));
+      meta_set("recovery_boot_ns", scalar(monotonic));
+    }
+    db.commit();
+  } catch (...) {
+    db.rollback();
+    throw;
   }
-  reconcile();
+  if (conf.storage.persistent)
+    reconcile();
+  else {
+    // Keep already pinned deadlines while the Node obtains a fresh full set.
+    __atomic_store_n(&view->data->reserved[0], 0, __ATOMIC_SEQ_CST);
+    __atomic_store_n(&view->data->generation, generation, __ATOMIC_SEQ_CST);
+    volatile_log_session(conf.event_log);
+    volatile_log_session(conf.ip_log);
+  }
   project();
   if (conf.role == "master")
     publish_snapshot();
 }
-Engine::~Engine() {
-  if (db)
-    sqlite3_close(db);
-}
-J Engine::record(const std::string &key) {
-  Statement q(db, "SELECT value FROM records WHERE key=?");
-  q.bind(1, key);
-  return q.row() ? parse(q.text(0)) : J{};
-}
+Engine::~Engine() = default;
+J Engine::record(const std::string &key) { return data(Table::Records, key); }
 void Engine::save_record(const std::string &key, const J &r) {
-  Statement q(db, "INSERT INTO records VALUES(?,?) ON CONFLICT(key) DO UPDATE "
-                  "SET value=excluded.value");
-  q.bind(1, key);
-  q.bind(2, dump(r));
-  q.done();
+  save(Table::Records, key, r);
 }
 void Engine::audit(const std::string &action, const J &r) {
   require(count("audit") < 200000, "audit_capacity");
-  auto event = parse(dump(r));
-  set(event, "action", action);
-  set(event, "node_id", conf.node);
-  set(event, "time_ms", scalar(utc()));
-  Statement q(db, "INSERT INTO audit(ts,value) VALUES(?,?)");
-  q.bind(1, utc());
-  q.bind(2, dump(event));
-  q.done();
+  bool automatic = !db.in_transaction();
+  if (automatic)
+    db.begin();
+  try {
+    auto seq = audit_sequence();
+    require(seq < INT64_MAX, "audit_sequence_exhausted");
+    auto event = parse(dump(r));
+    set(event, "action", action);
+    set(event, "node_id", conf.node);
+    set(event, "time_ms", scalar(utc()));
+    db.put(Table::Audit, ban_store::number_key(seq + 1), dump(event));
+    meta_set("audit_seq", std::to_string(seq + 1));
+    if (automatic)
+      db.commit();
+  } catch (...) {
+    if (automatic)
+      db.rollback();
+    throw;
+  }
 }
 static J log_projection(const J &event, bool ip_only) {
   if (!ip_only)
@@ -200,8 +203,11 @@ static J log_projection(const J &event, bool ip_only) {
   }
   return out;
 }
-static void append_log(sqlite3 *db, const std::string &path, bool ip_only) {
-  int fd = safe_open(path, O_RDWR | O_CREAT, 0600);
+static void append_log(Engine &engine, const std::string &path, bool ip_only) {
+  int fd = safe_open(path, O_RDWR | O_CREAT | O_EXCL, 0600);
+  bool created = fd >= 0, changed = created;
+  if (fd < 0 && errno == EEXIST)
+    fd = safe_open(path, O_RDWR);
   require(fd >= 0, "log_open");
   struct stat st;
   require(!fstat(fd, &st) && S_ISREG(st.st_mode) && st.st_uid == geteuid() &&
@@ -209,12 +215,8 @@ static void append_log(sqlite3 *db, const std::string &path, bool ip_only) {
           "log_permissions");
   try {
     int64_t last = 0;
-    {
-      Statement cursor(db, "SELECT value FROM meta WHERE key=?");
-      cursor.bind(1, "log_cursor:" + path);
-      if (cursor.row())
-        last = std::stoll(cursor.text(0));
-    }
+    last = std::stoll(engine.meta("log_cursor:" + path, "0"));
+    uint64_t scanned = std::stoull(engine.meta("log_scan:" + path, "0"));
     off_t size = st.st_size;
     std::string tail((size_t)std::min<off_t>(size, 131072), '\0');
     if (!tail.empty()) {
@@ -225,11 +227,14 @@ static void append_log(sqlite3 *db, const std::string &path, bool ip_only) {
       if (end == std::string::npos) {
         require(size == (off_t)tail.size(), "log_corrupt");
         require(!ftruncate(fd, 0), "log_truncate");
+        changed = true;
         tail.clear();
       } else {
-        if (end + 1 != tail.size())
+        if (end + 1 != tail.size()) {
           require(!ftruncate(fd, size - (off_t)tail.size() + (off_t)end + 1),
                   "log_tail_recover");
+          changed = true;
+        }
         auto start = end ? tail.rfind('\n', end - 1) : std::string::npos;
         auto line =
             tail.substr(start == std::string::npos ? 0 : start + 1,
@@ -238,45 +243,56 @@ static void append_log(sqlite3 *db, const std::string &path, bool ip_only) {
         auto file_last = integer_text(item, "seq");
         require(file_last >= last, "log_rollback");
         last = file_last;
-        Statement q(db, "SELECT value FROM audit WHERE seq=?");
-        q.bind(1, last);
-        require(q.row(), "log_ahead_of_state");
-        auto expected = log_projection(parse(q.text(0)), ip_only);
+        auto saved = engine.db.get(Table::Audit, ban_store::number_key(last));
+        require(saved.has_value(), "log_ahead_of_state");
+        auto expected = log_projection(parse(*saved), ip_only);
         require((bool)expected, "log_projection_mismatch");
         set(expected, "seq", scalar(last));
         require(dump(expected) == line, "log_record_mismatch");
       }
     }
-    Statement q(db,
-                "SELECT seq,value FROM audit WHERE seq>? AND (?=0 OR "
-                "json_type(value,'$.ip') IS NOT NULL) ORDER BY seq");
-    q.bind(1, last);
-    q.bind(2, ip_only ? 1 : 0);
+    // The file may be durably ahead of its cursor when the other projection
+    // or the cursor transaction failed. Its verified tail is already written.
+    scanned = std::max(scanned, (uint64_t)last);
     require(lseek(fd, 0, SEEK_END) >= 0, "log_seek");
-    while (q.row()) {
-      auto event = log_projection(parse(q.text(1)), ip_only);
-      if (!event)
-        continue;
-      set(event, "seq", scalar(q.integer(0)));
-      last = q.integer(0);
-      auto text = dump(event) + "\n";
-      size_t done = 0;
-      while (done < text.size()) {
-        ssize_t n = write(fd, text.data() + done, text.size() - done);
-        if (n < 0 && errno == EINTR)
+    bool written = false;
+    while (true) {
+      auto rows = engine.db.range(Table::Audit,
+                                  ban_store::number_key(scanned + 1), "", 256);
+      if (rows.empty())
+        break;
+      for (auto &row : rows) {
+        scanned = std::stoull(row.first);
+        auto event = log_projection(parse(row.second), ip_only);
+        if (!event)
           continue;
-        require(n > 0, "log_write");
-        done += (size_t)n;
+        set(event, "seq", std::to_string(scanned));
+        auto value = dump(event) + "\n";
+        size_t done = 0;
+        while (done < value.size()) {
+          ssize_t n = write(fd, value.data() + done, value.size() - done);
+          if (n < 0 && errno == EINTR)
+            continue;
+          require(n > 0, "log_write");
+          done += (size_t)n;
+        }
+        last = (int64_t)scanned;
+        written = true;
       }
     }
-    require(!fsync(fd), "log_sync");
-    {
-      Statement cursor(db, "INSERT INTO meta VALUES(?,?) ON CONFLICT(key) DO "
-                           "UPDATE SET value=excluded.value");
-      cursor.bind(1, "log_cursor:" + path);
-      cursor.bind(2, scalar(last));
-      cursor.done();
+    if (written || changed)
+      require(!fsync(fd), "log_sync");
+    if (created) {
+      int dir =
+          safe_open(path.substr(0, path.rfind('/')), O_RDONLY | O_DIRECTORY);
+      require(dir >= 0, "log_directory");
+      bool ok = !fsync(dir);
+      close(dir);
+      require(ok, "log_directory_sync");
     }
+    engine.meta_set("log_cursor:" + path, scalar(last));
+    engine.meta_set("log_scan:" + path,
+                    std::to_string(std::max(scanned, engine.audit_sequence())));
     if (lseek(fd, 0, SEEK_END) > 16 * 1024 * 1024) {
       auto slash = path.rfind('/');
       int directory = safe_open(path.substr(0, slash), O_RDONLY | O_DIRECTORY);
@@ -289,11 +305,6 @@ static void append_log(sqlite3 *db, const std::string &path, bool ip_only) {
       close(directory);
       require(ok, "log_rotate");
     }
-    Statement pending(db, "SELECT COUNT(*) FROM audit WHERE seq>? AND (?=0 OR "
-                          "json_type(value,'$.ip') IS NOT NULL)");
-    pending.bind(1, last);
-    pending.bind(2, ip_only ? 1 : 0);
-    require(pending.row() && !pending.integer(0), "log_backlog");
     close(fd);
   } catch (...) {
     close(fd);
@@ -305,10 +316,23 @@ void Engine::project() {
   if (!stat(conf.event_log.c_str(), &a) && !stat(conf.ip_log.c_str(), &b))
     require(a.st_dev != b.st_dev || a.st_ino != b.st_ino, "aliased_logs");
   try {
-    append_log(db, conf.event_log, false);
-    append_log(db, conf.ip_log, true);
+    db.begin();
+    append_log(*this, conf.event_log, false);
+    append_log(*this, conf.ip_log, true);
+    auto event_tail = std::stoull(meta("log_cursor:" + conf.event_log, "0"));
+    auto ip_tail = std::stoull(meta("log_cursor:" + conf.ip_log, "0"));
+    auto floor = std::min(std::stoull(meta("log_scan:" + conf.event_log, "0")),
+                          std::stoull(meta("log_scan:" + conf.ip_log, "0")));
+    for (auto &row :
+         db.range(Table::Audit, "", ban_store::number_key(floor + 1))) {
+      auto seq = std::stoull(row.first);
+      if (seq != event_tail && seq != ip_tail)
+        db.erase(Table::Audit, row.first);
+    }
+    db.commit();
     logs_ok = true;
   } catch (...) {
+    db.rollback();
     logs_ok = false;
     throw;
   }
@@ -345,10 +369,10 @@ void Engine::insert_ban(const ban_event &e, int layer) {
     auto proposal = parse(dump(r));
     set(proposal, "seq", scalar(seq));
     set(proposal, "event_id", str(r, "ban_id"));
-    Statement q(db, "INSERT INTO outbox VALUES(?,?,0)");
-    q.bind(1, seq);
-    q.bind(2, dump(proposal));
-    q.done();
+    auto out = object();
+    set(out, "value", proposal);
+    set(out, "accepted", std::string("0"));
+    save(Table::Outbox, ban_store::number_key(seq), out);
     meta_set("local_seq", scalar(seq));
   }
   audit("PREPARE", r);
@@ -360,21 +384,23 @@ void Engine::delete_ban(const std::string &key, const std::string &action) {
   auto r = record(key);
   if (!r)
     return;
-  Statement q(db, "DELETE FROM records WHERE key=?");
-  q.bind(1, key);
-  q.done();
+  db.erase(Table::Records, key);
   audit(action, r);
   if (action == "SUPERSEDED")
     return;
-  Statement e(db, "DELETE FROM evidence WHERE ip=?");
-  e.bind(1, str(r, "ip"));
-  e.done();
-  Statement f(db, "INSERT INTO fences VALUES(?,?,?) ON CONFLICT(ip) DO UPDATE "
-                  "SET utc=MAX(utc,excluded.utc),boot=MAX(boot,excluded.boot)");
-  f.bind(1, str(r, "ip"));
-  f.bind(2, utc());
-  f.bind(3, (int64_t)ban_now());
-  f.done();
+  auto ip = str(r, "ip");
+  for (auto &entry : db.range(Table::Evidence, ip + "|", ip + "}"))
+    db.erase(Table::Evidence, entry.first);
+  auto fence = data(Table::Fences, ip);
+  auto now_utc = utc(), now_boot = (int64_t)ban_now();
+  if (fence) {
+    now_utc = std::max(now_utc, integer_text(fence, "utc"));
+    now_boot = std::max(now_boot, integer_text(fence, "boot"));
+  }
+  auto f = object();
+  set(f, "utc", scalar(now_utc));
+  set(f, "boot", scalar(now_boot));
+  save(Table::Fences, ip, f);
 }
 ban_ack Engine::event(const ban_event &e, uint32_t uid) {
   ban_ack ack{BAN_VERSION, 0, e.sequence, 0};
@@ -396,20 +422,13 @@ ban_ack Engine::event(const ban_event &e, uint32_t uid) {
   auto producer = hex(e.producer, 16),
        digest = sha(std::string((const char *)&e, sizeof(e))),
        ip = ip_text(e.ip);
-  int64_t prior = 0;
-  {
-    Statement q(db, "SELECT seq FROM producers WHERE id=?");
-    q.bind(1, producer);
-    if (q.row())
-      prior = q.integer(0);
-  }
-  if (e.sequence <= (uint64_t)prior) {
-    Statement q(
-        db, "SELECT digest,durable FROM receipts WHERE producer=? AND seq=?");
-    q.bind(1, producer);
-    q.bind(2, (int64_t)e.sequence);
-    require(q.row() && q.text(0) == digest, "event_replay_conflict");
-    ack.durable = q.integer(1);
+  auto prior = producer_sequence(producer);
+  if (e.sequence <= prior) {
+    auto receipt = data(Table::Receipts,
+                        producer + "|" + ban_store::number_key(e.sequence));
+    require(receipt && str(receipt, "digest") == digest,
+            "event_replay_conflict");
+    ack.durable = (uint64_t)integer_text(receipt, "durable");
     return ack;
   }
   require(e.sequence == (uint64_t)prior + 1, "producer_sequence_gap");
@@ -430,13 +449,9 @@ ban_ack Engine::event(const ban_event &e, uint32_t uid) {
   bool duplicate = false;
   bool enforcement_changed = false;
   int previous_source = 0;
-  {
-    Statement q(db, "SELECT source FROM requests WHERE id=?");
-    q.bind(1, request);
-    if (q.row()) {
-      duplicate = true;
-      previous_source = q.integer(0);
-    }
+  if (auto previous = data(Table::Requests, request)) {
+    duplicate = true;
+    previous_source = (int)num(previous, "source");
   }
   auto active = record(address_key(ip, ""));
   if (!active)
@@ -448,23 +463,19 @@ ban_ack Engine::event(const ban_event &e, uint32_t uid) {
       e.source != BAN_HIT || (l7 && num(l7, "waf") == 1 &&
                               integer_text(l7, "deadline") > (int64_t)now &&
                               str(l7, "ban_id") == hex(e.observed, 16));
-  {
-    Statement q(db, "SELECT boot FROM fences WHERE ip=?");
-    q.bind(1, ip);
-    if (q.row() && e.observed_ns <= (uint64_t)q.integer(0))
+  if (auto fence = data(Table::Fences, ip))
+    if (e.observed_ns <= (uint64_t)integer_text(fence, "boot"))
       timely = false;
-  }
-  sql("BEGIN IMMEDIATE");
+  db.begin();
   try {
     if (timely && hit && !exempt(conf, e.ip) && !active) {
       require(duplicate || count("requests") < 65536, "request_capacity");
       if (!duplicate) {
-        Statement q(db, "INSERT INTO requests VALUES(?,?,?,?)");
-        q.bind(1, request);
-        q.bind(2, ip);
-        q.bind(3, (int64_t)e.observed_ns);
-        q.bind(4, (int64_t)e.source);
-        q.done();
+        auto r = object();
+        set(r, "ip", ip);
+        set(r, "observed", std::to_string(e.observed_ns));
+        set(r, "source", e.source);
+        save(Table::Requests, request, r);
       }
       if (e.source == BAN_CC) {
         if (!duplicate || previous_source != BAN_CC) {
@@ -476,46 +487,49 @@ ban_ack Engine::event(const ban_event &e, uint32_t uid) {
           insert_ban(e, 7);
           enforcement_changed = true;
         }
-        Statement q(db, "INSERT INTO evidence VALUES(?,?,?)");
-        q.bind(1, ip);
-        q.bind(2, request);
-        q.bind(3, (int64_t)e.observed_ns);
-        q.done();
-        Statement countq(
-            db, "SELECT COUNT(*) FROM evidence WHERE ip=? AND observed>?");
-        countq.bind(1, ip);
-        countq.bind(2, (int64_t)now - conf.window * 1000000);
-        require(countq.row(), "evidence_count");
-        if (countq.integer(0) >= conf.threshold) {
+        db.put(Table::Evidence, ip + "|" + request,
+               std::to_string(e.observed_ns));
+        size_t hits = 0;
+        for (auto &entry : db.range(Table::Evidence, ip + "|", ip + "}"))
+          if (std::stoll(entry.second) > (int64_t)now - conf.window * 1000000)
+            hits++;
+        if (hits >= (size_t)conf.threshold) {
           insert_ban(e, 3);
           enforcement_changed = true;
         }
       }
     }
-    Statement p(db, "INSERT INTO producers VALUES(?,?) ON CONFLICT(id) DO "
-                    "UPDATE SET seq=excluded.seq");
-    p.bind(1, producer);
-    p.bind(2, (int64_t)e.sequence);
-    p.done();
-    ack.durable = (uint64_t)std::max<int64_t>(1, sqlite3_last_insert_rowid(db));
-    Statement receipt(db, "INSERT INTO receipts VALUES(?,?,?,?)");
-    receipt.bind(1, producer);
-    receipt.bind(2, (int64_t)e.sequence);
-    receipt.bind(3, digest);
-    receipt.bind(4, (int64_t)ack.durable);
-    receipt.done();
-    Statement gc(db, "DELETE FROM receipts WHERE producer=? AND seq<?");
-    gc.bind(1, producer);
-    gc.bind(2, (int64_t)e.sequence - 2048);
-    gc.done();
-    sql("COMMIT");
+    db.put(Table::Producers, producer, std::to_string(e.sequence));
+    auto receipt_seq = std::stoull(meta("receipt_seq", "0"));
+    require(receipt_seq < INT64_MAX, "receipt_sequence_exhausted");
+    ack.durable = receipt_seq + 1;
+    meta_set("receipt_seq", std::to_string(ack.durable));
+    auto receipt = object();
+    set(receipt, "digest", digest);
+    set(receipt, "durable", std::to_string(ack.durable));
+    save(Table::Receipts, producer + "|" + ban_store::number_key(e.sequence),
+         receipt);
+    if (e.sequence > 2049)
+      db.erase(Table::Receipts,
+               producer + "|" + ban_store::number_key(e.sequence - 2049));
+    db.commit();
   } catch (...) {
-    sql("ROLLBACK");
+    db.rollback();
     throw;
+  }
+  if (db.in_transaction()) {
+    if (enforcement_changed)
+      enforcement_pending = true;
+    return ack;
+  }
+  if (!conf.storage.persistent && accepted_revision == 0) {
+    ack.result = 4;
+    return ack;
   }
   // Receipt/evidence-only traffic has no datapath or log projection to change.
   // The periodic tick still retries earlier failed enforcement and projection.
-  if (!enforcement_changed && logs_ok && !enforcement_pending) return ack;
+  if (!enforcement_changed && logs_ok && !enforcement_pending)
+    return ack;
   try {
     reconcile();
     project();
@@ -523,6 +537,43 @@ ban_ack Engine::event(const ban_event &e, uint32_t uid) {
     ack.result = 4;
   }
   return ack;
+}
+std::vector<std::optional<ban_ack>>
+Engine::events(const std::vector<std::pair<ban_event, uint32_t>> &batch) {
+  require(batch.size() <= 128, "event_batch_limit");
+  std::vector<std::optional<ban_ack>> acknowledgements;
+  acknowledgements.reserve(batch.size());
+  db.begin();
+  try {
+    for (auto &input : batch) {
+      try {
+        acknowledgements.push_back(event(input.first, input.second));
+      } catch (const std::exception &) {
+        acknowledgements.push_back(std::nullopt);
+      }
+    }
+    db.commit();
+  } catch (...) {
+    db.rollback();
+    throw;
+  }
+  if (!conf.storage.persistent && accepted_revision == 0) {
+    for (auto &ack : acknowledgements)
+      if (ack)
+        ack->result = 4;
+    return acknowledgements;
+  }
+  if (enforcement_pending || !logs_ok) {
+    try {
+      reconcile();
+      project();
+    } catch (...) {
+      for (auto &ack : acknowledgements)
+        if (ack)
+          ack->result = 4;
+    }
+  }
+  return acknowledgements;
 }
 static ban_record view_record(const J &r) {
   ban_record out{};
@@ -542,11 +593,10 @@ static ban_record view_record(const J &r) {
 void Engine::reconcile() {
   enforcement_pending = true;
   std::map<std::string, J> desired;
-  Statement q(db, "SELECT key,value FROM records");
   std::vector<std::pair<std::string, J>> rows;
   auto now = ban_now();
-  while (q.row())
-    rows.push_back({q.text(0), parse(q.text(1))});
+  for (auto &row : db.rows(Table::Records))
+    rows.push_back({row.first, parse(row.second)});
   for (auto &r : rows) {
     if (integer_text(r.second, "deadline") <= (int64_t)now)
       continue;
@@ -610,7 +660,7 @@ void Engine::reconcile() {
     if (!desired.count(key) || (r.layer == 7 && l3.count(ip_text(r.ip))))
       view->publish(r, true);
   }
-  sql("BEGIN IMMEDIATE");
+  db.begin();
   try {
     for (auto &r : rows) {
       if (num(r.second, "layer") == 3 && failed.count(str(r.second, "ip"))) {
@@ -633,16 +683,14 @@ void Engine::reconcile() {
         audit("APPLIED", r.second);
       }
     }
-    sql("COMMIT");
+    db.commit();
   } catch (...) {
-    sql("ROLLBACK");
+    db.rollback();
     throw;
   }
   __atomic_store_n(&view->data->generation, generation, __ATOMIC_SEQ_CST);
   {
-    Statement q(db, "SELECT COALESCE(MAX(seq),0) FROM audit");
-    require(q.row(), "audit_watermark");
-    auto seq = (uint64_t)q.integer(0);
+    auto seq = audit_sequence();
     kernel->watermark(seq);
     __atomic_store_n(&view->data->reserved[1], seq, __ATOMIC_SEQ_CST);
   }
@@ -653,33 +701,44 @@ void Engine::reconcile() {
   enforcement_pending = false;
 }
 void Engine::tick() {
+  if (!conf.storage.persistent && accepted_revision == 0) {
+    // An unavailable authority is not an empty desired set. Kernel deadlines
+    // remain bounded by their original expiry while the Node waits for sync.
+    project();
+    return;
+  }
   int64_t now = (int64_t)ban_now();
-  Statement q(db, "SELECT key,value FROM records");
   std::vector<std::string> expired;
-  while (q.row())
-    if (integer_text(parse(q.text(1)), "deadline") <= now)
-      expired.push_back(q.text(0));
+  for (auto &row : db.rows(Table::Records))
+    if (integer_text(parse(row.second), "deadline") <= now)
+      expired.push_back(row.first);
   if (!expired.empty()) {
-    sql("BEGIN IMMEDIATE");
+    db.begin();
     try {
       for (auto &key : expired)
         delete_ban(key, "EXPIRED");
-      sql("COMMIT");
+      db.commit();
     } catch (...) {
-      sql("ROLLBACK");
+      db.rollback();
       throw;
     }
   }
-  {
-    Statement q(db, "DELETE FROM evidence WHERE observed<?");
-    q.bind(1, now - conf.window * 1000000);
-    q.done();
-    Statement d(db, "DELETE FROM requests WHERE observed<?");
-    d.bind(1, now - (conf.window + conf.event_age) * 1000000);
-    d.done();
+  db.begin();
+  try {
+    for (auto &row : db.rows(Table::Evidence))
+      if (std::stoll(row.second) < now - conf.window * 1000000)
+        db.erase(Table::Evidence, row.first);
+    for (auto &row : db.rows(Table::Requests))
+      if (integer_text(parse(row.second), "observed") <
+          now - (conf.window + conf.event_age) * 1000000)
+        db.erase(Table::Requests, row.first);
+    meta_set("recovery_utc", scalar(utc()));
+    meta_set("recovery_boot_ns", scalar((int64_t)ban_now()));
+    db.commit();
+  } catch (...) {
+    db.rollback();
+    throw;
   }
-  meta_set("recovery_utc", scalar(utc()));
-  meta_set("recovery_boot_ns", scalar((int64_t)ban_now()));
   try {
     reconcile();
   } catch (...) {
@@ -693,13 +752,23 @@ J Engine::status() {
   set(out, "node_id", conf.node);
   set(out, "kernel_ready", kernel->ready ? 1 : 0);
   set(out, "active", count("records"));
-  {
-    Statement q(
-        db,
-        "SELECT COUNT(*) FROM records WHERE json_extract(value,'$.applied')=0");
-    require(q.row(), "pending_count");
-    set(out, "pending_enforcement", q.integer(0));
-  }
+  int64_t pending = 0;
+  for (auto &row : db.rows(Table::Records))
+    if (!num(parse(row.second), "applied"))
+      pending++;
+  set(out, "pending_enforcement", pending);
+  auto storage = object();
+  const auto &stats = db.stats();
+  set(storage, "mode", std::string(stats.persistent ? "persistent" : "memory"));
+  set(storage, "durable", stats.persistent ? 1 : 0);
+  set(storage, "entries", (int64_t)stats.entries);
+  set(storage, "accounted_bytes", (int64_t)stats.bytes);
+  set(storage, "log_bytes", (int64_t)stats.log_bytes);
+  set(storage, "transactions", (int64_t)stats.transactions);
+  set(storage, "syncs", (int64_t)stats.syncs);
+  set(storage, "checkpoints", (int64_t)stats.checkpoints);
+  set(storage, "checkpoint_error", stats.checkpoint_error);
+  set(out, "storage", storage);
   set(out, "logs_durable", logs_ok ? 1 : 0);
   set(out, "policy_generation", scalar(generation));
   set(out, "cluster_revision", scalar(accepted_revision));
@@ -711,10 +780,12 @@ J Engine::status() {
     int64_t revision = std::stoll(meta("revision", "1")), pending = 0;
     auto digest = meta("snapshot_digest");
     for (auto &node : conf.members) {
-      Statement q(db, "SELECT revision,digest,state FROM results WHERE node=?");
-      q.bind(1, node);
-      if (!q.row() || q.integer(0) != revision || q.text(1) != digest ||
-          q.text(2) != "applied" || std::stoll(meta("result_seen:"+node,"0")) < utc()-std::max<int64_t>(10000,conf.poll_ms*3))
+      auto result = data(Table::Results, node);
+      if (!result || integer_text(result, "revision") != revision ||
+          str(result, "digest") != digest ||
+          str(result, "state") != "applied" ||
+          std::stoll(meta("result_seen:" + node, "0")) <
+              utc() - std::max<int64_t>(10000, conf.poll_ms * 3))
         pending++;
     }
     set(out, "desired_revision", scalar(revision));
@@ -725,6 +796,16 @@ J Engine::status() {
 }
 J Engine::query(const J &j) {
   auto operation = str(j, "operation");
+  if (operation == "snapshot") {
+    keys(j, "operation");
+    require(conf.role == "master", "authority_required");
+    return snapshot();
+  }
+  if (operation == "checkpoint") {
+    keys(j, "operation");
+    db.checkpoint();
+    return status();
+  }
   if (operation == "status") {
     keys(j, "operation");
     return status();
@@ -732,41 +813,36 @@ J Engine::query(const J &j) {
   if (operation == "list") {
     keys(j, "operation");
     auto out = object(), list = own(json_object_new_array());
-    Statement q(db, "SELECT value FROM records ORDER BY key");
-    while (q.row())
+    for (auto &row : db.rows(Table::Records))
       json_object_array_add(list.get(),
-                            json_object_get(parse(q.text(0)).get()));
+                            json_object_get(parse(row.second).get()));
     set(out, "records", list);
     return out;
   }
   if (operation == "unban") {
     keys(j, "operation ip ban_id");
     auto ip = ip_text(ip_parse(str(j, "ip"))), id = str(j, "ban_id");
-    sql("BEGIN IMMEDIATE");
+    db.begin();
     try {
-      Statement q(
-          db,
-          "SELECT key,value FROM records WHERE json_extract(value,'$.ip')=?");
-      q.bind(1, ip);
       std::vector<std::string> remove;
-      while (q.row())
-        if (str(parse(q.text(1)), "ban_id") == id) {
-          require(conf.role == "master" || num(parse(q.text(1)), "layer") == 7,
+      for (auto &row : db.rows(Table::Records)) {
+        auto r = parse(row.second);
+        if (str(r, "ip") == ip && str(r, "ban_id") == id) {
+          require(conf.role == "master" || num(r, "layer") == 7,
                   "global_unban_requires_authority");
-          remove.push_back(q.text(0));
+          remove.push_back(row.first);
         }
+      }
       require(!remove.empty(), "ban_id_mismatch");
       for (auto &key : remove)
         delete_ban(key, "UNBAN");
       if (conf.role == "master") {
-        Statement d(db, "DELETE FROM globals WHERE ip=?");
-        d.bind(1, ip);
-        d.done();
+        db.erase(Table::Globals, ip);
         meta_set("revision", scalar(std::stoll(meta("revision")) + 1));
       }
-      sql("COMMIT");
+      db.commit();
     } catch (...) {
-      sql("ROLLBACK");
+      db.rollback();
       throw;
     }
     reconcile();
@@ -779,18 +855,32 @@ J Engine::query(const J &j) {
 }
 void Engine::reload(const Config &next) {
   require(next.immutable == conf.immutable, "reload_requires_maintenance");
-  generation++;
-  meta_set("policy", scalar(generation));
+  require(next.storage.max_entries == conf.storage.max_entries &&
+              next.storage.max_bytes == conf.storage.max_bytes &&
+              next.storage.checkpoint_bytes == conf.storage.checkpoint_bytes,
+          "storage_options_require_restart");
+  require(generation < INT64_MAX, "policy_sequence_exhausted");
+  auto candidate = generation + 1;
+  db.begin();
+  try {
+    meta_set("policy", std::to_string(candidate));
+    db.clear(Table::Evidence);
+    db.clear(Table::Requests);
+    auto r = object();
+    set(r, "generation", std::to_string(candidate));
+    audit("POLICY_UPDATED", r);
+    db.commit();
+  } catch (...) {
+    db.rollback();
+    throw;
+  }
+  generation = candidate;
   conf.l7 = next.l7;
   conf.l3 = next.l3;
   conf.window = next.window;
   conf.threshold = next.threshold;
   conf.event_age = next.event_age;
   policy_error.clear();
-  sql("DELETE FROM evidence; DELETE FROM requests;");
-  auto r = object();
-  set(r, "generation", scalar(generation));
-  audit("POLICY_UPDATED", r);
   reconcile();
   project();
 }

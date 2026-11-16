@@ -19,7 +19,7 @@ PRIVATE_DIRS = {
 }
 PRIVATE_SUFFIXES = {
     '.pem', '.key', '.crt', '.cer', '.p12', '.pfx', '.jks', '.token',
-    '.ljbc', '.luac', '.pyc', '.log', '.bak', '.dump', '.sql',
+    '.ljbc', '.luac', '.pyc', '.log', '.bak', '.dump', '.sql', '.aof', '.sqlite',
     '.zip', '.gz', '.tar', '.tgz', '.exe', '.dll', '.so', '.o',
     '.journal', '.checkpoint', '.owner',
 }
@@ -45,6 +45,8 @@ def git(*args):
 def blocked_path(name):
     path = PurePosixPath(name)
     basename = path.name.lower()
+    if basename == 'ban-store.lock' or (basename.startswith('.ban-store-') and basename.endswith('.tmp')) or '.sqlite-' in basename:
+        return True
     if any(part.lower() in PRIVATE_DIRS for part in path.parts):
         return True
     if path.suffix.lower() in PRIVATE_SUFFIXES or basename in PRIVATE_NAMES:

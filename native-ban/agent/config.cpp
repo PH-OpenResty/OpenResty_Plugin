@@ -36,13 +36,34 @@ Config config_read(const std::string &file) {
   auto j = c.json;
   keys(j, "version node_id runtime_dir state_dir event_socket admin_socket "
           "event_log ip_log worker_uid worker_gid sync_uid instances "
-          "trusted_rules policy datapath services allowlist cluster");
+          "trusted_rules policy datapath services allowlist cluster storage");
   require(num(j, "version") == 1, "config_version");
   c.node = str(j, "node_id");
   require(id_valid(c.node), "node_id");
   c.boot = boot_id();
   c.runtime = path(j, "runtime_dir");
   c.state = path(j, "state_dir");
+  c.storage.directory = c.state;
+  json_object *storage = nullptr;
+  if (json_object_object_get_ex(j.get(), "storage", &storage)) {
+    auto s = own(json_object_get(storage));
+    keys(s, "mode max_entries max_memory_mb checkpoint_mb");
+    auto mode = str(s, "mode");
+    require(mode == "persistent" || mode == "memory", "storage_mode");
+    c.storage.persistent = mode == "persistent";
+    json_object *option = nullptr;
+    if (json_object_object_get_ex(s.get(), "max_entries", &option))
+      c.storage.max_entries =
+          (size_t)bounded(s, "max_entries", 65536, 16000000);
+    if (json_object_object_get_ex(s.get(), "max_memory_mb", &option))
+      c.storage.max_bytes =
+          (size_t)bounded(s, "max_memory_mb", 16, 4096) * 1024 * 1024;
+    if (json_object_object_get_ex(s.get(), "checkpoint_mb", &option))
+      c.storage.checkpoint_bytes =
+          (size_t)bounded(s, "checkpoint_mb", 1, 1024) * 1024 * 1024;
+    c.storage.max_log_bytes =
+        std::max<size_t>(2ull * 1024 * 1024 * 1024, c.storage.max_bytes * 4);
+  }
   c.event_socket = path(j, "event_socket");
   c.admin_socket = path(j, "admin_socket");
   c.event_log = path(j, "event_log");
@@ -135,6 +156,8 @@ Config config_read(const std::string &file) {
           "signing_key verify_key socket members poll_ms clock_uncertainty_ms");
   c.role = str(p, "role");
   require(c.role == "master" || c.role == "node", "cluster_role");
+  require(c.role != "master" || c.storage.persistent,
+          "authority_requires_persistent_storage");
   c.cluster = str(p, "cluster_id");
   c.epoch = str(p, "authority_epoch");
   uint8_t id[16];
@@ -171,6 +194,11 @@ Config config_read(const std::string &file) {
   }
   auto immutable = parse(dump(j));
   json_object_object_del(immutable.get(), "policy");
+  json_object_object_del(immutable.get(), "storage");
+  auto ownership = object();
+  set(ownership, "mode",
+      std::string(c.storage.persistent ? "persistent" : "memory"));
+  set(immutable, "storage", ownership);
   c.immutable = dump(immutable);
   return c;
 }

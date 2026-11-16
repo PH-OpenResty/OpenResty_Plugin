@@ -44,42 +44,29 @@ J Engine::proposal(const std::string &node, const J &j) {
               decided <= utc() + conf.skew_ms,
           "proposal_time");
   auto digest = sha(dump(j));
-  {
-    Statement q(db, "SELECT seq FROM origin_high WHERE node=?");
-    q.bind(1, node);
-    if (q.row())
-      high = q.integer(0);
-  }
+  if (auto value = db.get(Table::OriginHigh, node))
+    high = std::stoll(*value);
   if (seq <= high) {
-    Statement q(
-        db,
-        "SELECT digest,revision FROM origin_receipts WHERE node=? AND seq=?");
-    q.bind(1, node);
-    q.bind(2, seq);
-    require(q.row() && q.text(0) == digest, "proposal_replay_conflict");
+    auto receipt =
+        data(Table::OriginReceipts, node + "|" + ban_store::number_key(seq));
+    require(receipt && str(receipt, "digest") == digest,
+            "proposal_replay_conflict");
     auto out = object();
-    set(out, "revision", scalar(q.integer(1)));
+    set(out, "revision", str(receipt, "revision"));
     return out;
   }
   require(seq == high + 1 && count("origin_receipts") < 200000,
           "proposal_sequence_or_capacity");
-  sql("BEGIN IMMEDIATE");
+  db.begin();
   int64_t revision = std::stoll(meta("revision", "1"));
   try {
     bool allowed =
         expires > utc() + conf.skew_ms && !exempt(conf, ip_parse(ip));
-    {
-      Statement q(db, "SELECT utc FROM fences WHERE ip=?");
-      q.bind(1, ip);
-      if (q.row() && decided <= q.integer(0))
+    if (auto fence = data(Table::Fences, ip))
+      if (decided <= integer(fence, "utc"))
         allowed = false;
-    }
     if (allowed) {
-      J previous;
-      Statement q(db, "SELECT value FROM globals WHERE ip=?");
-      q.bind(1, ip);
-      if (q.row())
-        previous = parse(q.text(0));
+      auto previous = data(Table::Globals, ip);
       J r;
       if (previous && integer(previous, "expires") > utc()) {
         r = previous;
@@ -98,28 +85,19 @@ J Engine::proposal(const std::string &node, const J &j) {
         set(r, "expires", scalar(expires));
         revision++;
       }
-      Statement s(db, "INSERT INTO globals VALUES(?,?) ON CONFLICT(ip) DO "
-                      "UPDATE SET value=excluded.value");
-      s.bind(1, ip);
-      s.bind(2, dump(r));
-      s.done();
+      save(Table::Globals, ip, r);
       audit("CLUSTER_ACCEPTED", r);
     }
-    Statement h(db, "INSERT INTO origin_high VALUES(?,?) ON CONFLICT(node) DO "
-                    "UPDATE SET seq=excluded.seq");
-    h.bind(1, node);
-    h.bind(2, seq);
-    h.done();
-    Statement receipt(db, "INSERT INTO origin_receipts VALUES(?,?,?,?)");
-    receipt.bind(1, node);
-    receipt.bind(2, seq);
-    receipt.bind(3, digest);
-    receipt.bind(4, revision);
-    receipt.done();
+    db.put(Table::OriginHigh, node, scalar(seq));
+    auto receipt = object();
+    set(receipt, "digest", digest);
+    set(receipt, "revision", scalar(revision));
+    save(Table::OriginReceipts, node + "|" + ban_store::number_key(seq),
+         receipt);
     meta_set("revision", scalar(revision));
-    sql("COMMIT");
+    db.commit();
   } catch (...) {
-    sql("ROLLBACK");
+    db.rollback();
     throw;
   }
   publish_snapshot();
@@ -131,28 +109,25 @@ J Engine::proposal(const std::string &node, const J &j) {
 void Engine::publish_snapshot() {
   require(conf.role == "master", "authority_required");
   int64_t revision = std::stoll(meta("revision", "1"));
-  Statement q(db, "SELECT ip,value FROM globals ORDER BY ip");
   std::vector<std::string> expired;
   auto records = own(json_object_new_array());
-  while (q.row()) {
-    auto r = parse(q.text(1));
+  for (auto &row : db.rows(Table::Globals)) {
+    auto r = parse(row.second);
     if (integer(r, "expires") <= utc())
-      expired.push_back(q.text(0));
+      expired.push_back(row.first);
     else
       json_object_array_add(records.get(), json_object_get(r.get()));
   }
   if (!expired.empty()) {
-    sql("BEGIN IMMEDIATE");
+    db.begin();
     try {
       for (auto &ip : expired) {
-        Statement d(db, "DELETE FROM globals WHERE ip=?");
-        d.bind(1, ip);
-        d.done();
+        db.erase(Table::Globals, ip);
       }
       meta_set("revision", scalar(++revision));
-      sql("COMMIT");
+      db.commit();
     } catch (...) {
-      sql("ROLLBACK");
+      db.rollback();
       throw;
     }
   }
@@ -172,24 +147,23 @@ void Engine::publish_snapshot() {
     json_object_array_add(members.get(), json_object_new_string(node.c_str()));
   set(payload, "members", members);
   auto fences = own(json_object_new_array());
-  Statement f(db, "SELECT ip,utc FROM fences ORDER BY ip");
-  while (f.row()) {
-    auto r = object();
-    set(r, "ip", f.text(0));
-    set(r, "time", scalar(f.integer(1)));
+  for (auto &row : db.rows(Table::Fences)) {
+    auto f = parse(row.second), r = object();
+    set(r, "ip", row.first);
+    set(r, "time", str(f, "utc"));
     json_object_array_add(fences.get(), json_object_get(r.get()));
   }
   set(payload, "fences", fences);
   auto text = dump(payload), signed_text = sign_snapshot(conf, text);
   require(signed_text.size() <= BAN_MAX_FRAME, "snapshot_capacity");
-  sql("BEGIN IMMEDIATE");
+  db.begin();
   try {
     meta_set("snapshot", signed_text);
     meta_set("snapshot_digest", sha(text));
     meta_set("published_revision", scalar(revision));
-    sql("COMMIT");
+    db.commit();
   } catch (...) {
-    sql("ROLLBACK");
+    db.rollback();
     throw;
   }
 }
@@ -217,15 +191,16 @@ void Engine::apply_snapshot(const std::string &envelope) {
           "cluster_allowlist_mismatch");
   if (revision == accepted_revision) {
     require(meta("accepted_digest") == digest, "snapshot_revision_conflict");
-    Statement pending(db,
-                      "SELECT COUNT(*) FROM records WHERE "
-                      "json_extract(value,'$.origin')='local' AND "
-                      "json_extract(value,'$.layer')=3 AND "
-                      "CAST(json_extract(value,'$.accepted') AS INTEGER)>0 AND "
-                      "CAST(json_extract(value,'$.accepted') AS INTEGER)<=?");
-    pending.bind(1, revision);
-    require(pending.row(), "pending_local_count");
-    if (!pending.integer(0)) {
+    bool pending = false;
+    for (auto &row : db.rows(Table::Records)) {
+      auto r = parse(row.second);
+      if (str(r, "origin") == "local" && num(r, "layer") == 3 &&
+          integer(r, "accepted") > 0 && integer(r, "accepted") <= revision) {
+        pending = true;
+        break;
+      }
+    }
+    if (!pending) {
       reconcile();
       project();
       return;
@@ -268,13 +243,13 @@ void Engine::apply_snapshot(const std::string &envelope) {
           "snapshot_preflight_capacity");
   std::map<std::string, J> previous;
   {
-    Statement q(db, "SELECT value FROM records WHERE key LIKE 'cluster|%'");
-    while (q.row()) {
-      auto r = parse(q.text(0));
-      previous[str(r, "ip")] = r;
-    }
+    for (auto &row : db.rows(Table::Records))
+      if (row.first.rfind("cluster|", 0) == 0) {
+        auto r = parse(row.second);
+        previous[str(r, "ip")] = r;
+      }
   }
-  sql("BEGIN IMMEDIATE");
+  db.begin();
   try {
     // Persist the entire desired set before any kernel mutation.
     meta_set("pending_snapshot", envelope);
@@ -289,45 +264,47 @@ void Engine::apply_snapshot(const std::string &envelope) {
       auto age = std::max<int64_t>(0, utc() - time - conf.skew_ms);
       auto now = (int64_t)ban_now();
       auto cutoff = age >= now / 1000000 ? 0 : now - age * 1000000;
-      Statement q(db, "INSERT INTO fences VALUES(?,?,?) ON CONFLICT(ip) DO "
-                      "UPDATE SET boot=CASE WHEN excluded.utc>utc THEN "
-                      "MAX(boot,excluded.boot) ELSE boot END,utc=MAX(utc,excluded.utc)");
-      q.bind(1, ip);
-      q.bind(2, time);
-      q.bind(3, cutoff);
-      q.done();
-      Statement evidence(db, "DELETE FROM evidence WHERE ip=? AND observed<=?");
-      evidence.bind(1, ip); evidence.bind(2, cutoff); evidence.done();
+      auto old = data(Table::Fences, ip);
+      auto fence = object();
+      if (old) {
+        if (time <= integer(old, "utc"))
+          cutoff = integer(old, "boot");
+        else
+          cutoff = std::max(cutoff, integer(old, "boot"));
+        time = std::max(time, integer(old, "utc"));
+      }
+      set(fence, "utc", scalar(time));
+      set(fence, "boot", scalar(cutoff));
+      save(Table::Fences, ip, fence);
+      for (auto &row : db.range(Table::Evidence, ip + "|", ip + "}"))
+        if (std::stoll(row.second) <= cutoff)
+          db.erase(Table::Evidence, row.first);
     }
     std::vector<std::string> remove;
-    Statement q(db, "SELECT key,value FROM records");
-    while (q.row()) {
-      auto r = parse(q.text(1));
+    for (auto &row : db.rows(Table::Records)) {
+      auto r = parse(row.second);
       auto ip = str(r, "ip");
-      Statement fence(db, "SELECT utc FROM fences WHERE ip=?");
-      fence.bind(1, ip);
-      bool fenced = fence.row() && integer(r, "decided") <= fence.integer(0);
+      auto fence = data(Table::Fences, ip);
+      bool fenced = fence && integer(r, "decided") <= integer(fence, "utc");
       if (num(r, "layer") != 3 && !fenced)
         continue;
       bool global = str(r, "origin") == "cluster";
       int64_t accepted = integer(r, "accepted");
       if (global || fenced || (accepted && accepted <= revision))
-        remove.push_back(q.text(0));
+        remove.push_back(row.first);
     }
     for (auto &key : remove) {
       auto old = record(key);
       if (old && !incoming.count(str(old, "ip")))
         audit(integer(old, "expires") <= utc() ? "EXPIRED" : "CLUSTER_REMOVED",
               old);
-      Statement d(db, "DELETE FROM records WHERE key=?");
-      d.bind(1, key);
-      d.done();
+      db.erase(Table::Records, key);
     }
     for (auto &entry : incoming) {
       auto r = parse(dump(entry.second));
-      int64_t remaining =
-          std::max<int64_t>(0, std::min(integer(r, "expires") - integer(r, "decided"),
-                                      integer(r, "expires") - utc() - conf.skew_ms));
+      int64_t remaining = std::max<int64_t>(
+          0, std::min(integer(r, "expires") - integer(r, "decided"),
+                      integer(r, "expires") - utc() - conf.skew_ms));
       if (!remaining)
         continue;
       auto old = previous.count(entry.first) ? previous[entry.first] : J{};
@@ -355,22 +332,22 @@ void Engine::apply_snapshot(const std::string &envelope) {
         audit("CLUSTER_PREPARE", r);
     }
     require(count("records") <= BAN_CAPACITY, "snapshot_active_capacity");
-    sql("COMMIT");
+    db.commit();
   } catch (...) {
-    sql("ROLLBACK");
+    db.rollback();
     throw;
   }
   reconcile();
   project();
   accepted_revision = revision;
-  sql("BEGIN IMMEDIATE");
+  db.begin();
   try {
     meta_set("accepted_revision", scalar(revision));
     meta_set("accepted_digest", digest);
     meta_set("pending_snapshot", "");
-    sql("COMMIT");
+    db.commit();
   } catch (...) {
-    sql("ROLLBACK");
+    db.rollback();
     throw;
   }
 }
@@ -395,17 +372,19 @@ J Engine::bridge(const std::string &node, const std::string &operation,
     require(revision == current && digest == meta("snapshot_digest") &&
                 (state == "applied" || state == "failed"),
             "result_revision_conflict");
-    Statement q(
-        db,
-        "INSERT INTO results VALUES(?,?,?,?) ON CONFLICT(node) DO UPDATE SET "
-        "revision=excluded.revision,digest=excluded.digest,state=excluded."
-        "state");
-    q.bind(1, node);
-    q.bind(2, revision);
-    q.bind(3, digest);
-    q.bind(4, state);
-    q.done();
-    meta_set("result_seen:"+node,scalar(utc()));
+    auto result = object();
+    set(result, "revision", scalar(revision));
+    set(result, "digest", digest);
+    set(result, "state", state);
+    db.begin();
+    try {
+      save(Table::Results, node, result);
+      meta_set("result_seen:" + node, scalar(utc()));
+      db.commit();
+    } catch (...) {
+      db.rollback();
+      throw;
+    }
     return status();
   }
   throw std::runtime_error("unknown_bridge_operation");
@@ -416,11 +395,15 @@ void Engine::cluster_cycle() {
   {
     std::lock_guard<std::mutex> lock(mutex);
     settings = conf;
-    Statement q(
-        db,
-        "SELECT seq,value FROM outbox WHERE accepted=0 ORDER BY seq LIMIT 32");
-    while (q.row())
-      outbox.push_back({q.integer(0), q.text(1)});
+    for (auto &row : db.range(Table::Outbox, "")) {
+      auto r = parse(row.second);
+      if (integer(r, "accepted") == 0) {
+        outbox.push_back(
+            {(int64_t)std::stoll(row.first), dump(get(r, "value"))});
+        if (outbox.size() == 32)
+          break;
+      }
+    }
   }
   try {
     struct timex clock_state{};
@@ -440,27 +423,27 @@ void Engine::cluster_cycle() {
       }
       int64_t revision = integer(response, "revision");
       std::lock_guard<std::mutex> lock(mutex);
-      sql("BEGIN IMMEDIATE");
+      db.begin();
       try {
-        Statement q(db, "UPDATE outbox SET accepted=? WHERE seq=?");
-        q.bind(1, revision);
-        q.bind(2, item.first);
-        q.done();
-        Statement records(db, "SELECT key,value FROM records");
+        auto key = ban_store::number_key(item.first);
+        auto out = data(Table::Outbox, key);
+        require((bool)out, "outbox_missing");
+        set(out, "accepted", scalar(revision));
+        save(Table::Outbox, key, out);
         std::vector<std::pair<std::string, J>> update;
-        while (records.row()) {
-          auto r = parse(records.text(1));
+        for (auto &row : db.rows(Table::Records)) {
+          auto r = parse(row.second);
           if (str(r, "origin") == "local" &&
               integer(r, "proposal_seq") == item.first)
-            update.push_back({records.text(0), r});
+            update.push_back({row.first, r});
         }
         for (auto &r : update) {
           set(r.second, "accepted", scalar(revision));
           save_record(r.first, r.second);
         }
-        sql("COMMIT");
+        db.commit();
       } catch (...) {
-        sql("ROLLBACK");
+        db.rollback();
         throw;
       }
     }
@@ -480,9 +463,19 @@ void Engine::cluster_cycle() {
       set(result, "revision", meta("accepted_revision"));
       set(result, "digest", meta("accepted_digest"));
       set(result, "state", std::string("applied"));
-      Statement gc(db, "DELETE FROM outbox WHERE accepted>0 AND accepted<=?");
-      gc.bind(1, accepted_revision);
-      gc.done();
+      db.begin();
+      try {
+        for (auto &row : db.range(Table::Outbox, "")) {
+          auto r = parse(row.second);
+          if (integer(r, "accepted") > 0 &&
+              integer(r, "accepted") <= accepted_revision)
+            db.erase(Table::Outbox, row.first);
+        }
+        db.commit();
+      } catch (...) {
+        db.rollback();
+        throw;
+      }
       sync_error.clear();
     }
     if (settings.role == "master") {

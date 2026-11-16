@@ -271,30 +271,6 @@ bool reason_valid(const std::string &s) {
       return false;
   return true;
 }
-Statement::Statement(sqlite3 *d, const char *s) {
-  require(sqlite3_prepare_v2(d, s, -1, &p, nullptr) == SQLITE_OK,
-          "database_prepare");
-}
-Statement::~Statement() { sqlite3_finalize(p); }
-void Statement::bind(int i, const std::string &v) {
-  require(sqlite3_bind_text(p, i, v.c_str(), (int)v.size(), SQLITE_TRANSIENT) ==
-              SQLITE_OK,
-          "database_bind");
-}
-void Statement::bind(int i, int64_t v) {
-  require(sqlite3_bind_int64(p, i, v) == SQLITE_OK, "database_bind");
-}
-bool Statement::row() {
-  int n = sqlite3_step(p);
-  require(n == SQLITE_ROW || n == SQLITE_DONE, "database_step");
-  return n == SQLITE_ROW;
-}
-void Statement::done() { require(!row(), "database_result"); }
-std::string Statement::text(int c) {
-  auto *s = sqlite3_column_text(p, c);
-  return s ? (const char *)s : "";
-}
-int64_t Statement::integer(int c) { return sqlite3_column_int64(p, c); }
 static std::string b64(const std::string &s) {
   std::string out(4 * ((s.size() + 2) / 3), '\0');
   EVP_EncodeBlock((unsigned char *)out.data(), (const unsigned char *)s.data(),

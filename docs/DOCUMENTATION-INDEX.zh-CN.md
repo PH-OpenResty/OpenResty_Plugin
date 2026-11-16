@@ -23,3 +23,5 @@
 Ban 0.1.0 的当前配置、事件/权限、全量同步、日志持久化与运行验收见 [运行手册](../native-ban/RUNTIME.zh-CN.md)，历史设计字段不直接用于启动。
 
 [2026-11-16 独立安全与性能复审](AUDIT-REVIEW-2026-11-16.zh-CN.md)逐项记录 CNB issue #2/#3–#10 的确认、修复与不同意结论。
+
+[Ban Store](../native-ban-store/README.zh-CN.md) 是 Ban 0.2.0 的当前状态存储：Agent 直接集成，无 SQLite，支持持久化和内存 Node。历史验证与审查记录中的 SQLite 指当时实现。

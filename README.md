@@ -1,6 +1,6 @@
 # OpenResty Plugin
 
-七个纯 C 的 Nginx/OpenResty HTTP 插件：Sync 提供 Master/Node 身份、站点/证书加密发布与热应用、缓存刷新与预热任务；Config/Edge 读取站点数据热更新路由、证书和缓存策略；API 自动识别动态 API、AI 与流式请求；Purge 提供持久化失效、源站校验及过时复用。Nginx/BPF 为 C，Ban Agent 为 C++17。这些原生模块不依赖 Lua，不生成站点 Lua、字节码或 `nginx.conf`。
+七个纯 C 的 Nginx/OpenResty HTTP 插件：Sync 提供 Master/Node 身份、站点/证书加密发布与热应用、缓存刷新与预热任务；Config/Edge 读取站点数据热更新路由、证书和缓存策略；API 自动识别动态 API、AI 与流式请求；Purge 提供持久化失效、源站校验及过时复用。Nginx/BPF 为 C，Ban Agent 与专用 Ban Store 为 C++17。这些原生模块不依赖 Lua，不生成站点 Lua、字节码或 `nginx.conf`。
 
 | 插件 | 职责 | 文档 |
 | --- | --- | --- |
@@ -9,6 +9,7 @@
 | `ngx_http_scdn_api_module.so` | 请求/响应自动识别、API/AI 代理策略、缓存绕过、流式响应与 TLS 连接复用身份检查 | [API 完整手册](native-api/README.zh-CN.md) |
 | `ngx_http_scdn_edge_module.so` | Host 与最长前缀路由、启停、静态目录、SNI 证书选择、缓存层/可选热度、规则回源头/响应诊断、Prometheus 指标 | [Edge 完整手册](native-edge/README.zh-CN.md) |
 | `ngx_http_scdn_ban_module.so` | 可信 WAF/CC 事件、固定期限 L7/L3、独立 Agent/eBPF、所有节点完整封禁快照 | [Ban 运行手册](native-ban/RUNTIME.zh-CN.md) |
+| `libscdn-ban-store.a` | Ban Agent 专用 IP 状态存储，内存索引、可选持久化、批量事务与恢复 | [Ban Store 手册](native-ban-store/README.zh-CN.md) |
 | `ngx_http_scdn_tier_module.so` | 原生热度选层、L1 → L2 → 源站、晋升/冷层保留、对象大小准入与原始到期 | [Tier 完整手册](native-tier/README.zh-CN.md) |
 | `ngx_http_scdn_purge_module.so` | 持久化精确/批量/通配符/正则/后缀/目录/整站/节点失效、源站条件校验、有界过时复用 | [Purge 完整手册](native-purge/README.zh-CN.md) |
 
@@ -109,3 +110,5 @@ flowchart LR
 仓库示例只使用保留域名、本机地址和通用路径。运行配置、站点数据、证书、私钥、token、日志及构建二进制应保存在受限的部署目录或忽略目录中。
 
 当前修复把配置与应用记录纳入同一恢复事务，补充真实 I/O 故障和进程中断回归；原生模块与剩余 Lua 按功能交接，保留 WAF/限流执行，见 [Lua 交接](docs/LUA-HANDOFF.zh-CN.md)。
+
+Ban 0.2.0 已去除 SQLite，新增直接集成到 Agent 的 [Ban Store](native-ban-store/README.zh-CN.md)。七个 HTTP 模块之外的该存储组件不增加 Nginx 加载顺序或外部存储服务。Node 可选 memory，权威 Master 保留持久化；执行容量与存储容量独立。
