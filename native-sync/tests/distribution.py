@@ -151,7 +151,7 @@ class Review(RoleReview):
         return self.until(lambda: s if (s := self.state(node))['sync_state'] == 'applied'
                           and int(s['sequence']) > after else None, 'applied Node ' + str(node))
 
-    def run(self):
+    def start(self):
         token = f'scdn_sync_control_token_file {self.root}/control.token;'
         control = 'location /__scdn_sync/v1/ { scdn_sync_api control; }'
         master = f'''scdn_sync_role master; scdn_sync_id master-a; {token}
@@ -207,6 +207,9 @@ class Review(RoleReview):
             self.node_configs.append(config)
         self.launch('master', self.master_config)
         self.launch('node-a', self.node_configs[0]); self.launch('node-b', self.node_configs[1])
+
+    def run(self):
+        self.start()
         workers = [worker_pids(process.pid) for process in self.processes]
         a, b = self.applied(), self.applied(1)
         self.check('Master automatically publishes a complete snapshot to both Nodes', int(a['sequence']) == 1 and int(b['sequence']) == 1)

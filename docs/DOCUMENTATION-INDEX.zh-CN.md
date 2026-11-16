@@ -13,6 +13,7 @@
 | 分层缓存 | [Tier](../native-tier/README.zh-CN.md) | Lua 选层/flush 对应、L1/L2 读取链、晋升/降温/绝对到期和恢复 |
 | 缓存清理 | [Purge](../native-purge/README.zh-CN.md)、[机制](CACHE-MECHANISM.zh-CN.md)、[再验证研究](CACHE-REVALIDATION-RESEARCH.zh-CN.md) | 两层共同失效、原生回收、穿透 L2 的条件校验与边界 |
 | HTTP 头 | [约定](HTTP-HEADERS.zh-CN.md)、[缓存头](CACHE-HEADERS.zh-CN.md) | X-Clinet-IP、缓存诊断/回源头、私有 X-Tier 和 X-Config 控制元数据 |
+| 原生/Lua 交接 | [迁移工具与安全桥接](LUA-HANDOFF.zh-CN.md) | 仅退役模块已接管的脚本，保留 WAF/限流，统一请求策略与证书来源 |
 | 运维和 Lua 迁移 | [运维](OPERATIONS.zh-CN.md)、[迁移](MIGRATION.zh-CN.md) | 单写者、备份/回退、停止旧 tier/flush 的前提、受管事务 |
 | Ban/eBPF | [Ban](../native-ban/README.zh-CN.md)、[集群合同](../native-ban/design/CLUSTER-SYNC.zh-CN.md) | 仍是设计，未宣称 Agent、BPF 或全节点运行同步已经实现 |
 | 验证/来源/隐私 | [验证](VALIDATION.zh-CN.md)、[来源](../SOURCE.md)、[发布规则](../PUBLISHING.md) | 当前测试与历史证据分开，源码清单、文档和实际索引检查 |

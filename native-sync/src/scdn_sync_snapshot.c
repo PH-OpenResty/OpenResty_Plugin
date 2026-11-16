@@ -6,6 +6,7 @@
 #define scdn_config_lookup scdn_sync_snapshot_lookup
 #include "../../native-config/src/scdn_config_parse.c"
 #define scdn_config_recover scdn_sync_recover
+#define scdn_config_recover_locked scdn_sync_recover_locked
 #include "../../native-config/src/scdn_config_transaction.c"
 #include "scdn_sync_snapshot.h"
 
@@ -115,6 +116,14 @@ u_char *scdn_sync_snapshot_export(scdn_config_snapshot_t *snapshot,
         field(&out, "upstream", site->upstream); field(&out, "root", site->root);
         field(&out, "cache", site->cache); field(&out, "origin_host", site->origin_host);
         headers(&out, &site->cache_request_headers, site->cache_headers);
+        literal(&out, site->security.waf ? "waf on;\n" : "waf off;\n");
+        snprintf(line, sizeof(line), "waf_threshold %lu;\n", (unsigned long) site->security.threshold);
+        literal(&out, line);
+        for (j = 0; j < site->security.group_count; j++) field(&out, "waf_group", site->security.groups[j]);
+        if (site->security.rate_limit) {
+            snprintf(line, sizeof(line), "rate_limit %lu %lu;\n", (unsigned long) site->security.rate,
+                     (unsigned long) site->security.burst); literal(&out, line);
+        } else literal(&out, "rate_limit off;\n");
         if (site->tier_hits) {
             snprintf(line, sizeof(line), "tier %lu %lu;\n", (unsigned long) site->tier_hits,
                      (unsigned long) site->tier_window); literal(&out, line);

@@ -412,7 +412,7 @@ static void node_cycle(ngx_http_scdn_main_conf_t *main)
     uint64_t sequence = 0;
     u_char *envelope = NULL, *plain = NULL, *config = NULL, *previous = NULL;
     u_char highest[DIST_STATE], applied[DIST_STATE], rejected[DIST_STATE], reported[DIST_STATE];
-    u_char marker[40], digest[32], zero[32] = {0};
+    u_char marker[SCDN_CONFIG_PENDING_BYTES], digest[32], zero[32] = {0};
     scdn_config_snapshot_t *candidate = NULL, *old = NULL;
     EVP_PKEY *verify = NULL, *decrypt = NULL;
     dist_response response;
@@ -420,8 +420,10 @@ static void node_cycle(ngx_http_scdn_main_conf_t *main)
     char url[2304], active_path[1600], tag[128], hash_text[65];
     const char *error = "configuration_sync_unavailable";
     dir = directory_open((char *) conf->directory.data); if (dir < 0) return;
-    if (!scdn_sync_recover((char *) conf->directory.data)) { error = "transaction_recovery_failed"; goto failed; }
     lock = lock_directory(dir, "apply.lock"); if (lock < 0) goto finish;
+    committed = 1;
+    if (!scdn_sync_recover_locked(dir, 1)) { error = "transaction_recovery_failed"; goto failed; }
+    committed = 0;
     state = state_read(dir, "applied.state", applied);
     if (state < 0) { error = "applied_state_corrupt"; goto failed; }
     if (!state) memset(applied, 0, sizeof(applied));
@@ -500,18 +502,24 @@ already_applied:
     old = scdn_sync_snapshot_load(active_path, &error);
     previous = read_at(dir, "active.conf", SCDN_CONFIG_BYTES, &previous_size);
     if (!old || !previous) { error = "previous_configuration_unavailable"; goto failed; }
+    if ((scdn_sync_u64(applied + 8) && memcmp(applied + 48, old->digest, 32))
+        || !active_wait(conf, old->digest)) { error = "previous_runtime_mismatch"; goto failed; }
     if (!scdn_sync_write_file(dir, "previous.conf", previous, previous_size)) { error = "backup_write_failed"; goto failed; }
-    memcpy(marker, "SCNDP01", 8); scdn_sync_digest(previous, previous_size, marker + 8);
-    if (!scdn_sync_write_file(dir, "apply.pending", marker, 40)) { error = "prepare_write_failed"; goto failed; }
+    memcpy(marker, "SCNDP02", 8); scdn_sync_digest(previous, previous_size, marker + 8);
+    memcpy(marker + 40, applied, DIST_STATE);
+    scdn_sync_digest(marker, sizeof(marker) - 32, marker + sizeof(marker) - 32);
     committed = 1;
+    if (!scdn_sync_write_file(dir, "apply.pending", marker, sizeof(marker))) { error = "prepare_write_failed"; goto failed; }
     if (!scdn_sync_write_file(dir, "active.conf", config, config_size)) { error = "configuration_commit_failed"; goto rollback; }
     status_write(dir, "applying", "", sequence, scdn_sync_u64(applied + 8) ? applied + 48 : NULL, 0);
     if (!active_wait(conf, candidate->digest)) { error = "worker_apply_timeout"; goto rollback; }
     if (!probe_business(conf)) { error = "business_probe_failed"; health = -1; goto rollback; }
     health = conf->probes.nelts ? 1 : 0;
-    if (unlinkat(dir, "apply.pending", 0) || fsync(dir)) { error = "finalize_failed"; goto rollback; }
+    if (!state_write(dir, "applied.state", sequence, digest, candidate->digest)) { error = "applied_record_failed"; goto rollback; }
+    /* A visible unlink keeps the new durable pair. Recovery reconciles either
+     * the surviving marker or its durable absence after a directory I/O error. */
+    if (unlinkat(dir, "apply.pending", 0) || fsync(dir)) { error = "finalize_pending"; goto failed; }
     committed = 0;
-    if (!state_write(dir, "applied.state", sequence, digest, candidate->digest)) { error = "applied_record_pending"; goto failed; }
     if (health) (void) state_write(dir, "probe.state", sequence, digest, candidate->digest);
     status_write(dir, "applied", "", sequence, candidate->digest, health);
     if (report_result(conf, sequence, digest, "applied", "none", candidate->digest))
@@ -519,7 +527,7 @@ already_applied:
     release_gc(dir);
     goto finish;
 rollback:
-    if (!scdn_sync_write_file(dir, "active.conf", previous, previous_size) || !active_wait(conf, old->digest)) {
+    if (!scdn_sync_recover_locked(dir, 0) || !active_wait(conf, old->digest)) {
         error = "rollback_pending"; goto failed;
     }
     if (unlinkat(dir, "apply.pending", 0) || fsync(dir)) { error = "rollback_pending"; goto failed; }
@@ -528,9 +536,9 @@ rollback:
 failed:
     state = state_read(dir, "applied.state", applied);
     status_write(dir, committed ? "recovery_required" : "failed", error, sequence,
-                 state == 1 ? applied + 48 : NULL, health);
+                 !committed && state == 1 ? applied + 48 : NULL, committed ? 0 : health);
     (void) scdn_sync_write_file(dir, "failed.error", error, strlen(error));
-    if (plain && sequence) (void) report_result(conf, sequence, digest, "failed", error, state == 1 ? applied + 48 : NULL);
+    if (plain && sequence) (void) report_result(conf, sequence, digest, "failed", error, !committed && state == 1 ? applied + 48 : NULL);
 finish:
     EVP_PKEY_free(verify); EVP_PKEY_free(decrypt);
     scdn_sync_snapshot_destroy(candidate); scdn_sync_snapshot_destroy(old);

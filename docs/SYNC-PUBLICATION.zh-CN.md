@@ -26,7 +26,7 @@ sequenceDiagram
     N->>M: 回报实际 applied 或失败；ACK 丢失可重报
 ```
 
-传输对象包含完整站点列表、Host/别名、enabled、upstream、root 引用、前缀路由、cache/tier、origin_host、缓存请求/响应头设置，以及启用站点的证书链和私钥。删除/停用依据完整集合生效；不上传静态内容文件、任意 Nginx 指令、WAF/限速实现或缓存文件。静态 root 引用的内容必须由部署在各节点预先准备，Node 会校验本机路径可用。
+传输对象包含完整站点列表、Host/别名、enabled、upstream、root 引用、前缀路由、cache/tier、origin_host、缓存请求/响应头设置、保留 Lua 引擎使用的有类型 WAF/限流策略，以及启用站点的证书链和私钥。删除/停用依据完整集合生效；不上传静态内容文件、任意 Nginx 指令、WAF/限流程序或缓存文件；安全执行与迁移见 [Lua 交接](LUA-HANDOFF.zh-CN.md)。静态 root 引用的内容必须由部署在各节点预先准备，Node 会校验本机路径可用。
 
 ## 启动配置
 
@@ -79,13 +79,13 @@ Master 签名使用 Ed25519 私钥，Node 配置对应固定信任公钥；每�
 
 Node 持久保存最高已验证序号和摘要，拒绝旧序号以及相同序号不同内容。回退到旧业务内容由 Master 发布**新的序号**，不能把旧 desired 文件当作回退。`If-None-Match` 仅节省相同已应用对象的下载；本机最高水位仍核对，不绕过反回滚。协议依靠真实 mTLS 和序号/摘要约束报告，未声称兼容旧 Lua 的 HTTP 请求签名/nonce 合同。
 
-每次完整对象落入 `releases/r<sequence>/`。Node 将证书路径改为本机版本目录，再重新验证配置。`previous.conf`、其校验摘要和 `apply.pending` 在改 active.conf 前持久化。Config 启动遇到未完成标记时先校验并恢复 previous.conf；错误 marker/backup 会拒绝启动，不能静默使用半完成候选。在线 `nginx -t` 或 reload 与正在应用的事务发生锁冲突时会拒绝恢复操作，待事务结束重试。
+每次完整对象落入 `releases/r<sequence>/`。Node 将证书路径改为本机版本目录，再重新验证配置。`previous.conf`、其校验摘要和 `apply.pending` 在改 active.conf 前持久化。新版 SCNDP02 标记同时保存旧 applied.state（首次应用则记录不存在），并校验整个标记摘要。Config 启动遇到未完成标记时恢复 previous.conf 和旧应用记录；错误 marker/backup 会拒绝启动，不能静默使用半完成候选。旧 SCNDP01 标记仍可恢复。root 主进程启动恢复时，应用锁与恢复文件保持状态目录的 Worker 属主。在线 `nginx -t` 或 reload 与正在应用的事务发生锁冲突时会拒绝恢复操作，待事务结束重试。
 
 Config 已有的全 Worker 准备屏障负责热切换。Node 另等待全部 Worker 的实际活动摘要与预期一致，等待预算约 15 秒加最后一次本机请求的超时。可选探测失败时恢复上一有效文件并等待回退；回退无法确认时保留 marker 并报告 `recovery_required/rollback_pending`。因校验、Worker 应用超时或探测而拒绝的版本保存失败收据，不每秒反复切换同一候选；需要修正源文件并发布新序号。
 
 可选 `scdn_sync_config_probe URL STATUS` 最多 32 个，只支持 HTTP/HTTPS，禁止 URL 凭据和重定向，HTTPS 验证 CA/主机名。它校验管理员指定路径及状态，不证明全部业务健康；配置停用/删除也要考虑探测路径的预期。未配置探测时 business_health 为 unknown。缓存任务不代替配置应用结果。
 
-成功后持久 applied.state，再回报 Master。报告 ACK 丢失会从本机收据重报，不重做配置切换。正常更新后 GC 只清理不被 active.conf/previous.conf 引用的已识别版本文件，每轮有界；当前和回退版本保留。异常临时文件和未知目录由运维检查处理，不递归删除未知内容。磁盘满、日志/状态写入失败不回报假成功。任意旧备份恢复都须包含一致的源配置、证书版本、最高水位及状态，不能单独回滚最高序号文件。
+Worker 确认和探测成功后，先持久 applied.state，最后删除 apply.pending 并同步目录，才视为提交完成并回报 Master。应用记录 write/fsync/rename 失败会恢复旧配置和旧记录，失败收据阻止同一候选重复切换；无法确认恢复时保留标记并显示 recovery_required，applied_revision 为 null。删除标记后的目录同步失败不盲目回退：下一轮先确认标记状态；存在则恢复旧对，不存在且目录同步成功则保留新对。不得只恢复其中一个文件。报告 ACK 丢失会从本机收据重报，不重做配置切换。正常更新后 GC 只清理不被 active.conf/previous.conf 引用的已识别版本文件，每轮有界；当前和回退版本保留。异常临时文件和未知目录由运维检查处理，不递归删除未知内容。磁盘满、日志/状态写入失败不回报假成功。任意旧备份恢复都须包含一致的源配置、证书版本、最高水位及状态，不能单独回滚最高序号文件。
 
 ## API 与观察
 
@@ -105,3 +105,5 @@ Config 已有的全 Worker 准备屏障负责热切换。Node 另等待全部 Wo
 先让原 Lua 同步继续作为现有部署的唯一写者，在独立目录/端口验证原生 v2。确认 Node 收到正确站点、删除/停用、TLS、在途连接和回退后，再交接配置写入权并停止旧 publisher/Node apply。不要让两者写同一个 active.conf。此仓库变更不自动修改生产服务、证书或进程。
 
 `python native-sync/tests/distribution.py --prefix /isolated/runtime` 用一个真实 Master、两个真实 Node、每实例两个 Worker 验证发布、密文隔离、路由/证书热变更、异常源、篡改/重放、探测回退、ACK 恢复、Master 离线和启动回退；静态构建增加 `--static`。容量、跨地域网络、完整磁盘/掉电矩阵和自动密钥轮换需在部署环境另验收。
+
+收据与进程中断回归见 `native-sync/tests/recovery.py`。不能将有未完成 SCNDP02 事务的目录直接交给不识别它的旧二进制；升级统一编译 Config/Edge/Sync 及其依赖，先更新 Node，再发布使用新策略字段的 Master。

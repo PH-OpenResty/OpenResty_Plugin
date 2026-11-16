@@ -306,6 +306,46 @@ scdn_headers(scdn_parser_t *p, ngx_str_t *field, scdn_config_headers_t *headers,
     headers->configured = 1; return 1;
 }
 
+/* Typed data for retained Lua security engines; never executable Lua or paths. */
+static int
+scdn_security(scdn_parser_t *p, ngx_str_t *field, scdn_config_security_t *security,
+    ngx_uint_t *fields)
+{
+    ngx_str_t value, second;
+    ngx_uint_t bit = 0, i;
+    ngx_int_t number, burst;
+    if (scdn_is(field, "waf")) bit = 512;
+    else if (scdn_is(field, "waf_threshold")) bit = 1024;
+    else if (scdn_is(field, "rate_limit")) bit = 2048;
+    else if (!scdn_is(field, "waf_group")) return -1;
+    if ((*fields & bit) || !scdn_value(p, &value)) return 0;
+    if (bit == 512) {
+        if (!scdn_is(&value, "on") && !scdn_is(&value, "off")) return 0;
+        security->waf = scdn_is(&value, "on");
+    } else if (bit == 1024) {
+        number = ngx_atoi(value.data, value.len);
+        if (number < 1 || number > 1000000) return 0;
+        security->threshold = (ngx_uint_t) number;
+    } else if (bit == 2048) {
+        if (scdn_is(&value, "off")) security->rate_limit = 0;
+        else {
+            number = ngx_atoi(value.data, value.len);
+            if (number < 1 || number > 1000000 || !scdn_value(p, &second)) return 0;
+            burst = ngx_atoi(second.data, second.len);
+            if (burst < 0 || burst > 1000000) return 0;
+            security->rate_limit = 1; security->rate = (ngx_uint_t) number;
+            security->burst = (ngx_uint_t) burst;
+        }
+    } else {
+        if (!scdn_identifier(&value) || security->group_count == SCDN_CONFIG_WAF_GROUPS) return 0;
+        for (i = 0; i < security->group_count; i++)
+            if (security->groups[i].len == value.len && !memcmp(security->groups[i].data, value.data, value.len)) return 0;
+        security->groups[security->group_count++] = value;
+    }
+    *fields |= bit;
+    return scdn_symbol(p, ';');
+}
+
 static int
 scdn_site(scdn_parser_t *p, scdn_config_site_t *site)
 {
@@ -317,11 +357,16 @@ scdn_site(scdn_parser_t *p, scdn_config_site_t *site)
 
     site->enabled = 1;
     site->cache_headers = 1;
+    site->security.threshold = 5;
+    site->security.rate = 50; site->security.burst = 100;
     ngx_str_set(&site->cache, "off");
     if (!scdn_value(p, &site->id) || !scdn_identifier(&site->id)
         || !scdn_symbol(p, '{')) { return 0; }
     while (scdn_next(p) && p->symbol == 0) {
         field = p->token;
+        header = scdn_security(p, &field, &site->security, &fields);
+        if (header == 0) return 0;
+        if (header == 1) continue;
         if (scdn_is(&field, "cache_headers") && (fields & 256)) return 0;
         if (scdn_is(&field, "cache_headers")) fields |= 256;
         header = scdn_headers(p, &field, &site->cache_request_headers, &site->cache_headers);
@@ -387,7 +432,8 @@ scdn_site(scdn_parser_t *p, scdn_config_site_t *site)
     if (p->symbol != '}' || site->host_count == 0
         || (site->upstream.len == 0 && site->root.len == 0)
         || (site->certificate.len == 0) != (site->certificate_key.len == 0)
-        || (scdn_is(&site->cache, "auto") && site->tier_hits == 0)) { return 0; }
+        || (scdn_is(&site->cache, "auto") && site->tier_hits == 0)
+        || (site->security.waf && site->security.group_count == 0)) { return 0; }
     return 1;
 }
 
