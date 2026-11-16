@@ -1,0 +1,22 @@
+[Unit]
+Description=Native IP ban Agent and eBPF enforcement
+After=network-online.target time-sync.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/scdn-ban-agent --config /etc/scdn-ban/policy.json
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=2
+UMask=0077
+User=root
+Group=root
+NoNewPrivileges=true
+LimitMEMLOCK=infinity
+# The Agent needs the configured tmpfs, state/log directories and its own bpffs
+# pin directory. Prepare ownership/modes before enabling; do not auto-detach BPF
+# on stop, because fixed kernel deadlines remain valid while the Agent recovers.
+
+[Install]
+WantedBy=multi-user.target

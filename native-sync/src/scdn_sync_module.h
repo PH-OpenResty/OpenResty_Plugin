@@ -38,6 +38,7 @@ typedef struct {
     ngx_array_t peers, endpoints;
     scdn_sync_tasks_conf_t cache;
     void *distribution;
+    void *ban_bridge;
 } ngx_http_scdn_main_conf_t;
 
 extern ngx_module_t ngx_http_scdn_sync_module;
@@ -61,5 +62,8 @@ ngx_int_t scdn_sync_distribution_process(ngx_cycle_t *cycle);
 ngx_flag_t scdn_sync_distribution_health(ngx_http_scdn_main_conf_t *conf);
 ngx_int_t scdn_sync_distribution_handler(ngx_http_request_t *r,
     ngx_http_scdn_main_conf_t *conf, ngx_http_scdn_peer_t *peer, ngx_flag_t exchange);
+char *scdn_sync_ban_directive(ngx_conf_t *cf, ngx_command_t *cmd, void *conf);
+ngx_int_t scdn_sync_ban_handler(ngx_http_request_t *r,ngx_http_scdn_main_conf_t *conf,
+    ngx_http_scdn_peer_t *peer,ngx_flag_t exchange);
 
 #endif

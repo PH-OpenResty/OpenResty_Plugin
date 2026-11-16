@@ -8,7 +8,7 @@
 
 ## 1. 构建与接入
 
-统一构建脚本编译 Sync、Config、API、Edge、Tier、Purge 六个插件，也可以只使用本模块目录构建动态模块。Purge 不依赖其他模块加载；需要 Linux 64 位、PCRE2 开发库、HTTP SSL/OpenSSL 和线程池支持，并与目标 Nginx/OpenResty ABI 匹配。新增正则不支持使用旧 PCRE1 构建。
+统一构建脚本编译 Sync、Config、Ban、API、Edge、Tier、Purge 七个插件，也可以只使用本模块目录构建动态模块。Purge 不依赖其他模块加载；需要 Linux 64 位、PCRE2 开发库、HTTP SSL/OpenSSL 和线程池支持，并与目标 Nginx/OpenResty ABI 匹配。新增正则不支持使用旧 PCRE1 构建。
 
 ```sh
 sh tools/build-runtime.sh /tmp/scdn-purge nginx
@@ -211,3 +211,5 @@ status 新增 `worker_revalidate`：probes、not_modified、fetched、failures�
 Config/Edge 已支持 [缓存响应头与规则回源头](../docs/CACHE-HEADERS.zh-CN.md)。与 Edge 共用时由原生响应过滤器输出 X-Cache，删除重复 add_header；仅 Purge 独立使用时仍按原模板设置 X-Cache。API/私有/流式绕过优先，配置头不提供缓存权限。
 
 与 [Tier](../native-tier/README.zh-CN.md) 配合时，front/backend 都接入相同 scope、完整基础 key、逻辑 resource 和 `$scdn_purge_key`；一次 epoch 失效覆盖两层。上层再验证使用 Tier 的验证标记穿透 L2，保留原有 ETag/Last-Modified 和有限 stale 语义。
+
+当前统一构建包含原生 [Ban](../native-ban/RUNTIME.zh-CN.md)。一起编译时 Ban 必须先于 API/Edge 动态加载；未配置 scdn_ban on 时不启用封禁。其 Agent/eBPF 和全节点快照是独立运行路径，Sync 桥接需显式 scdn_sync_ban_agent。

@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "node_id": "node-a",
+  "runtime_dir": "/run/scdn-ban",
+  "state_dir": "/var/lib/scdn-ban",
+  "event_socket": "/run/scdn-ban/events.sock",
+  "admin_socket": "/run/scdn-ban/admin.sock",
+  "event_log": "/var/log/scdn-ban/events.jsonl",
+  "ip_log": "/var/log/scdn-ban/banned-ips.jsonl",
+  "worker_uid": 1001,
+  "worker_gid": 1001,
+  "sync_uid": 1001,
+  "instances": ["00000000-0000-0000-0000-000000000100"],
+  "trusted_rules": [
+    {"source": "waf", "reason": "942100"},
+    {"source": "cc", "reason": "cc:confirmed-rate"}
+  ],
+  "policy": {
+    "l7_seconds": 600,
+    "l3_seconds": 3600,
+    "window_ms": 60000,
+    "threshold": 20,
+    "event_age_ms": 2000,
+    "renew_on_hit": false
+  },
+  "datapath": {
+    "mode": "tcx_ingress",
+    "interfaces": ["eth0"],
+    "object_file": "/usr/local/lib/scdn-ban/ban.bpf.o",
+    "pin_root": "/sys/fs/bpf/scdn-ban-node-a"
+  },
+  "services": [
+    {"ip": "192.0.2.10", "protocol": "tcp", "port": 80},
+    {"ip": "192.0.2.10", "protocol": "tcp", "port": 443},
+    {"ip": "192.0.2.10", "protocol": "udp", "port": 443},
+    {"ip": "192.0.2.10", "protocol": "tcp", "port": 9000},
+    {"ip": "2001:db8::10", "protocol": "tcp", "port": 443}
+  ],
+  "allowlist": ["203.0.113.0/28", "2001:db8:ffff::/64"],
+  "cluster": {
+    "role": "node",
+    "cluster_id": "00000000-0000-0000-0000-000000001000",
+    "authority_epoch": "00000000-0000-0000-0000-000000001001",
+    "master_url": "https://sync.example.com:8443",
+    "ca": "/etc/scdn-ban/pki/master-ca.crt",
+    "certificate": "/etc/scdn-ban/pki/node.crt",
+    "key": "/etc/scdn-ban/pki/node.key",
+    "signing_key": "",
+    "verify_key": "/etc/scdn-ban/trust/authority.pub",
+    "socket": "/run/scdn-ban/sync.sock",
+    "members": ["master-a", "node-a", "node-b"],
+    "poll_ms": 1000,
+    "clock_uncertainty_ms": 1000
+  }
+}

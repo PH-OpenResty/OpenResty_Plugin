@@ -1,4 +1,7 @@
 #include "scdn_api.h"
+#if (NGX_SCDN_BAN)
+#include "ngx_scdn_ban.h"
+#endif
 
 enum { API_WEB, API_DYNAMIC, API_AI, API_STREAM, API_GRPC, API_WEBSOCKET, API_KINDS };
 
@@ -359,6 +362,10 @@ api_body_ready(ngx_http_request_t *r)
 ngx_int_t
 ngx_http_scdn_api_prepare(ngx_http_request_t *r)
 {
+#if (NGX_SCDN_BAN)
+    ngx_int_t ban_rc = ngx_http_scdn_ban_precheck(r);
+    if (ban_rc != NGX_DECLINED) return ban_rc;
+#endif
     ngx_int_t rc;
     api_location_t *conf = ngx_http_get_module_loc_conf(r, ngx_http_scdn_api_module);
     api_request_t *ctx;

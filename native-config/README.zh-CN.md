@@ -193,6 +193,8 @@ site/prefix 可设置 `cache_headers on|off;`（站点默认 on、前缀继承�
 
 完整站点快照会携带 cache/tier 及请求/响应头字段；L1/L2 读取链使用 [Tier](../native-tier/README.zh-CN.md)，源站正文和缓存文件不通过配置 Sync 发布。
 
+当前统一构建包含原生 [Ban](../native-ban/RUNTIME.zh-CN.md)。一起编译时 Ban 必须先于 API/Edge 动态加载；未配置 scdn_ban on 时不启用封禁。其 Agent/eBPF 和全节点快照是独立运行路径，Sync 桥接需显式 scdn_sync_ban_agent。
+
 ## 保留 Lua 安全策略
 
 site 可配置 `waf on|off`、`waf_threshold`、最多 16 个 `waf_group` 和 `rate_limit off|RATE BURST`。它们是原生快照中的有类型数据，随 Sync 发布；WAF/限流执行仍使用现有 Lua 引擎。语法、fail-closed 处理和退出旧 registry/发布路径的方法见 [Lua 交接](../docs/LUA-HANDOFF.zh-CN.md)。

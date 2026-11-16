@@ -264,7 +264,7 @@ site prefix {{ host prefix.example.test; upstream http://pooled-origin; cache of
 }}'''
 
     def config(self):
-        names=('config','api','edge')+ (('purge',) if self.purge else ()) + (('sync',) if self.sync else ())
+        names=('config','ban','api','edge')+ (('purge',) if self.purge else ()) + (('sync',) if self.sync else ())
         modules = '' if self.static else '\n'.join(
             f'load_module {self.prefix}/modules/ngx_http_scdn_{name}_module.so;'
             for name in names)

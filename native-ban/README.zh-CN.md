@@ -1,51 +1,21 @@
-# IP 封禁与 eBPF 联动：详细设计 v2
+# Ban：原生 IP 封禁、eBPF 与全节点同步
 
-状态：**设计草案**，尚无可加载的 Ban 模块、Agent 或 BPF 执行程序。此目录提供实现契约，不加入当前六个运行模块的构建或加载流程。
+版本 0.1.0。已提供纯 C 的 `ngx_http_scdn_ban_module`、C++17 单写 Agent、XDP native/TCX ingress 内核程序和原生 Sync 桥接。运行路径不依赖 Lua 或 Python；Python 只用于测试和可选管理客户端。完整安装、配置、状态和验证见 [运行手册](RUNTIME.zh-CN.md)。
 
-已确认：客户端直连节点；业务范围是 Web 与负载均衡入口；确认 CC 直接申请 L3；WAF 确认拦截先 L7，频繁时升级 L3；时长固定配置；保留指定文件中的封禁事件与 IP 历史。
+客户端直连节点。可信 CC 事件直接申请 L3；WAF 首次建立 `(site, IP)` L7 封禁，窗口内 WAF/L7_HIT 达到阈值后升级 L3。期限按配置固定，命中、重试、重启和跨节点复制都不重新起算。L3 只保护配置列出的 Web/LB VIP、协议和端口；不无条件封掉整机所有服务。
 
-设计确定为 C 的 HTTP 模块、本机单写 Agent、XDP/TCX 入站执行程序。Nginx stream 的纯 TCP/UDP 入口由薄适配执行应用侧兜底。WAF/CC 判定器通过受信事件接入；业务状态码或 API/AI 类型标签不直接产生封禁。
+任意登记设备（包括 Master 所在设备）的 L3 原始决策进入持久 outbox，由 Master 汇总成签名完整有效 IP 快照。所有登记 Node 接收同一完整集合，来源设备也接收；断线恢复后重新核验最新全量。只有各节点真实内核应用和日志持久化都确认，Master 才显示 ALL_APPLIED。离线、Map 或日志失败显示未收敛，不把下载成功当成内核生效。
 
-| 设计材料 | 内容 |
+| 组件 | 代码与职责 |
 | --- | --- |
-| [研究背景](design/RESEARCH.zh-CN.md) | XDP/TC、计数、日志与源站直连的依据；具体 v2 取舍以详细设计为准 |
-| [集群全量同步](design/CLUSTER-SYNC.zh-CN.md) | 任意设备上报、全节点完整快照、固定期限、逐节点内核确认与离线恢复 |
-| [集群对象 ABI](design/scdn_ban_cluster.h) | 192 字节签名清单、160 字节有效 IP 记录；尚无运行实现 |
-| [详细设计](design/DESIGN.zh-CN.md) | 状态、固定期限、共享视图、进程协议、内核执行、日志事务与恢复 |
-| [策略 Schema](design/policy.schema.json) | 严格字段、数值和类型边界，基于 JSON Schema 2020-12 |
-| [策略示例](examples/ban-policy.toml.example) | 独立 TOML 文件草案，只使用保留地址和示意参数 |
-| [IPC ABI](design/scdn_ban_wire.h) | 64 字节帧头、272 字节安全事件、确认及视图交换 |
-| [Map ABI](design/scdn_ban_map.h) | IPv4/IPv6 键、32 字节封禁值、服务元组和计数 |
-| [只读视图 ABI](design/scdn_ban_view.h) | Agent 单写、所有 Worker 共用的固定布局与原子双缓冲记录 |
-| [验收矩阵](design/ACCEPTANCE.zh-CN.md) | 后续必须实现的功能、协议、恢复与性能用例 |
-| [事件日志示例](examples/ban-events.jsonl.example)与[IP 台账示例](examples/ban-ips.jsonl.example) | 合成记录，展示封禁、升级、固定到期及 64 位字符串字段 |
+| Nginx Ban | src/ngx_http_scdn_ban_module.c；真实连接 IP、只读视图查询、受信 WAF/CC 上报、L7 拒绝 |
+| 共享协议/视图 | src/ban_common.h、ban_common.c；有界 IPC、SipHash 索引、原子双 bank、完整键比较 |
+| Agent | agent/；配置/事件去重、固定期限、SQLite WAL、内核 Map、两份日志、全量同步 |
+| eBPF | bpf/ban.bpf.c；IPv4/IPv6、VLAN、分片、业务入口、BOOTTIME 过期、真实 DROP |
+| Sync 桥 | native-sync/src/scdn_sync_ban.c；实际 mTLS 身份绑定、受限 Unix Agent RPC、全量/结果 API |
+| 运行配置/运维 | examples/policy.json.example、http.conf、sync-master.conf、systemd 示例、tools/banctl.py |
+| 真实验收 | tests/runtime.py、producer.c、packet-test.c；隔离 netns/veth、实际 Nginx/Agent/内核和多节点 |
 
-普通请求只读本机内存视图；控制事件才通过非阻塞 Unix Socket 交给 Agent。Agent 先持久化意图再发布正式封禁；XDP 自行判断 BOOTTIME 到期，流量命中不延长 TTL。L7 的站点级封禁与 L3 的节点业务入口作用域分开记录。
+原 v1/v2 设计文档、TOML 和四个草案 ABI 保留在 design/ 供追溯。实际 0.1.0 使用严格 JSON 配置、SQLite WAL 和 src/ 中的新运行 ABI；旧 TOML/草案结构不能直接作为运行配置或线协议使用。实现取舍与仍需部署验收的范围均写入运行手册。
 
-原生 [Sync](../native-sync/README.zh-CN.md) 已收录在本仓库，当前已提供角色/身份、站点/证书发布与缓存任务，来源见 SOURCE。Ban 的本机执行与配置发布独立；v2 要求任意登记设备产生的 L3 IP 进入 Master 权威集合，所有节点按完整快照收敛；这部分仍是待实现的合同，见 [全节点同步](design/CLUSTER-SYNC.zh-CN.md)。日志保留在指定文件，不直接用日志文件互相覆盖。
-
-集群日志合成示例见 [事件日志](examples/ban-cluster-events.jsonl.example)与 [IP 台账](examples/ban-cluster-ips.jsonl.example)，展示来源设备、全局 ban_id、revision、相同绝对期限和非循环导入。
-
-## 设计校验
-
-在隔离 WSL2/Linux 上完成：三个头文件的 C11 严格编译与静态布局断言、Schema 结构、TOML/字段语义、日志投影关联和固定期限示例校验。示例只读视图精确计算为 73,400,576 字节。UID 隔离原型验证 Worker 无法写入/重开可写映射，替代 Agent 可重新打开同一 tmpfs inode 并让旧读者看到更新；memfd 的 FUTURE_WRITE 限制也单独核对过。它们不构成运行模块或真实内核丢包验收。
-
-协议布局可直接复现：
-
-```sh
-cc -std=c11 -Wall -Wextra -Werror -I native-ban/design -x c -fsyntax-only - <<'C'
-#include "scdn_ban_wire.h"
-#include "scdn_ban_map.h"
-#include "scdn_ban_view.h"
-#include "scdn_ban_cluster.h"
-int main(void) { return 0; }
-C
-```
-
-策略是 TOML 解码后的 JSON Schema 2020-12。可在独立 Python 环境安装 `jsonschema==4.25.1`，用 `Draft202012Validator.check_schema` 和带 `FormatChecker` 的 validator 校验示例；CIDR、文件别名、内存及 UID 等跨字段/运行环境约束仍按详细设计单独检查。
-
-## HTTP 头与缓存任务联动
-
-自定义客户端 IP 头统一采用 `X-Clinet-IP`，代理端从可信的 `$remote_addr` 覆盖；Purge 使用 `X-Purge-Mode` / `X-Purge-Scope`。完整命名与信任边界见 [HTTP 头约定](../docs/HTTP-HEADERS.zh-CN.md)。Sync 0.3.0 保留的缓存刷新/预热任务及配置同步的边界见 [缓存任务手册](../docs/CACHE-TASKS.zh-CN.md)。
-
-结构和四个 ABI 可使用 `python -m pip install -r native-ban/tests/requirements.txt` 后运行 `python native-ban/tests/check-design.py` 验证；它只验证设计材料，不证明多机同步或内核 DROP 已实现。
+模块执行封禁，不实现 WAF 引擎、CC 检测器、业务限速或账户鉴权。API/Edge 会在 API 正文准备和业务转发前显式检查 Ban；TCP/UDP 负载均衡流量由内核入口规则保护，应用侧兜底仅覆盖 HTTP。

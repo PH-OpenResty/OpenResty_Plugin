@@ -4,6 +4,6 @@ ngx_module_type=HTTP_FILTER
 ngx_module_name=ngx_http_scdn_api_module
 ngx_module_order="ngx_http_scdn_api_module ngx_http_copy_filter_module"
 ngx_module_srcs="$ngx_addon_dir/src/ngx_http_scdn_api_module.c $ngx_addon_dir/src/scdn_api_json.c"
-ngx_module_incs="$ngx_addon_dir/src"
+ngx_module_incs="$ngx_addon_dir/../native-ban/src $ngx_addon_dir/src"
 ngx_module_deps="$ngx_addon_dir/src/scdn_api.h"
 . auto/module

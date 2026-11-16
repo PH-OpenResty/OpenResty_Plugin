@@ -25,3 +25,5 @@ Purge 调用方、测试和示例必须同时改用 `X-Purge-Mode`、`X-Purge-Sc
 缓存配置还可热更新静态回源元数据，并由 Edge 输出 X-Cache、X-Cache-Layer、X-Cache-Policy、X-Cache-Revision；配置语法和继承见 [缓存头手册](CACHE-HEADERS.zh-CN.md)。Ban 的全节点 IP 同步使用独立 mTLS/签名合同，不能从任何 HTTP 自报 IP/节点头授予封禁发布权限，见 [Ban 集群设计](../native-ban/design/CLUSTER-SYNC.zh-CN.md)。
 
 Sync 配置发布新增 X-Config-Sequence/Digest/State/Error/Applied；Config 本机就绪接口提供 X-Config-Revision/Ready/Managed，具体信任边界见 [发布手册](SYNC-PUBLICATION.zh-CN.md)。Tier 使用仅本机 Unix 通道的 X-Tier-*，front 覆盖、backend 剥离，业务侧只显示 X-Cache/X-Cache-Layer；见 [Tier 手册](../native-tier/README.zh-CN.md)。
+
+Ban 运行时不采用客户端头部决定封禁 IP、规则或来源。Nginx 从真实 socket 对端取地址，trusted detector 通过 C API/受控变量上报；Sync 在 mTLS 校验后向本机 Agent 传递已绑定 Node ID。实际接入见 [Ban 运行手册](../native-ban/RUNTIME.zh-CN.md)。
