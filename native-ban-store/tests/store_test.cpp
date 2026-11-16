@@ -219,10 +219,12 @@ int main(int argc, char **argv) {
       rejected([&] { Store s(permissions); },
                "public state file permissions are rejected");
       auto links = directory(root + "/links");
-      symlink((o.directory + "/ban-store.aof").c_str(),
-              (links.directory + "/ban-store.aof").c_str());
+      if (symlink((o.directory + "/ban-store.aof").c_str(),
+                  (links.directory + "/ban-store.aof").c_str()))
+        throw std::runtime_error("fixture_file_symlink");
       rejected([&] { Store s(links); }, "state file symlink is rejected");
-      symlink(o.directory.c_str(), (root + "/parent-link").c_str());
+      if (symlink(o.directory.c_str(), (root + "/parent-link").c_str()))
+        throw std::runtime_error("fixture_parent_symlink");
       auto linked = o;
       linked.directory = root + "/parent-link";
       rejected([&] { Store s(linked); },
