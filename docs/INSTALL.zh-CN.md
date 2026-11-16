@@ -152,4 +152,6 @@ Config/Edge 按相同源码版本一起重编译后，可在站点数据启用 [
 
 站点/证书同步的额外线程池、私有目录、RSA/Ed25519/mTLS 和受管 bootstrap 见 [发布手册](SYNC-PUBLICATION.zh-CN.md)。L1/L2 缓存读取链和停用 Lua flush 的条件见 [Tier 手册](../native-tier/README.zh-CN.md)。七模块及 Agent/BPF 源摘要均在 SOURCE-SHA256SUMS，完整业务共存测试为 native-tier/tests/coexist.py。
 
+Tier 0.1.1 同时更新 front/backend 模板、条件头变量、L2 限额协议和默认缓存键。升级先使用独立实例/Socket 与新 cache zone/path 验证，不能让旧、新 Worker 混用同一个后端协议。新增验收为 `native-tier/tests/boundaries.py` 与 `native-sync/tests/cache_tasks.py --tier`；参数同样支持 `--prefix`、`--static`、`--report`。
+
 Ban 额外构建依赖和私有目录、capabilities、bpffs/时间同步要求见 [运行手册](../native-ban/RUNTIME.zh-CN.md)。Agent 可执行文件与 BPF 对象独立于 Nginx .so 构建；默认不自动挂载到生产接口。

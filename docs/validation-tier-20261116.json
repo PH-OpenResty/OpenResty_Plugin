@@ -1,0 +1,70 @@
+{
+  "date_utc": "2026-11-16",
+  "environment": "isolated WSL2 Alpine Linux x86_64",
+  "native_tier_version": "0.1.1",
+  "tier_source_sha256": "8a8dd4bf31bd056a7235d53059c0a2ff18fb6ac41a1bf349cf6f033fe46ebed3",
+  "matrix": [
+    {
+      "runtime": "nginx-1.31.8",
+      "linkage": "dynamic",
+      "sanitizer": "UBSan trap mode",
+      "checks": {
+        "tier": 48,
+        "boundaries": 73,
+        "coexist": 51,
+        "tier-tasks": 102,
+        "tasks": 99,
+        "revalidate": 45,
+        "headers": 32
+      },
+      "passed": 450
+    },
+    {
+      "runtime": "openresty-1.31.8.1",
+      "linkage": "dynamic",
+      "sanitizer": "none",
+      "checks": {
+        "tier": 48,
+        "boundaries": 73,
+        "coexist": 51,
+        "tier-tasks": 102,
+        "tasks": 99,
+        "revalidate": 45,
+        "headers": 32
+      },
+      "passed": 450
+    },
+    {
+      "runtime": "openresty-1.31.8.1",
+      "linkage": "static",
+      "sanitizer": "none",
+      "checks": {
+        "tier": 48,
+        "boundaries": 73,
+        "coexist": 51,
+        "tier-tasks": 102,
+        "tasks": 99,
+        "revalidate": 45,
+        "headers": 32
+      },
+      "passed": 450
+    }
+  ],
+  "total_passed": 1350,
+  "coverage": [
+    "ETag, Last-Modified and unconditional origin refresh",
+    "304 without freshness headers renews metadata and serves the next HIT",
+    "private, no-store, cookie and X-Accel-Expires zero do not renew old public objects with Purge",
+    "fixed L2 absolute expiry survives L1 promotion",
+    "finite stale-if-error and concurrent background update",
+    "HEAD, Range, If-Range, client 304 and truncated responses",
+    "route and backend object limits, reserved header isolation and length-framed keys",
+    "real mTLS Master/Node cache refresh and preheat through both tiers",
+    "loss of L1 recovers from preheated persistent L2 after Node restart",
+    "API, AI, SSE, WebSocket and gRPC coexistence"
+  ],
+  "limits": [
+    "Local Alpine GCC lacks ASan libraries; latest GitHub Ubuntu matrix runs ASan and UBSan.",
+    "No production deployment, throughput benchmark, physical power-loss matrix or NIC/offload claim."
+  ]
+}

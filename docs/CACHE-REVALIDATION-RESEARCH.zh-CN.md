@@ -67,3 +67,5 @@ Nginx 的 `proxy_cache_use_stale updating/error/...` 是条件开关，不自带
 ## 与 Tier 读取链配合
 
 [Tier](../native-tier/README.zh-CN.md) 的 frontend 再验证请求通过内部验证标记绕过 L2 的普通 HIT 并到达源站；backend 本身也可启用相同 Purge 再验证。晋升使用底层缓存的绝对到期，避免重新赋予整个 max-age。普通 Vary/私有响应及无限流的限制仍适用。
+
+Tier 0.1.1 的实际检查发现：给转发的 304 一律加 X-Accel-Expires: 0 会使有效的未修改响应被拒绝；把晋升时的绝对期限保存在该 Nginx 控制头中，又会在未携带新鲜度头的 304 中重新读出过期时间。当前实现仅在入库阶段应用内部 X-Tier-Expires，304 保留源站策略并让原生缓存/Purge 处理续期。L2 普通过期使用自己的校验器，上层校验才传递上层校验器。`native-tier/tests/boundaries.py` 通过真实源站 304、下一次 HIT、修改后的 200、私有化拒绝和有界 stale 验证这些路径。

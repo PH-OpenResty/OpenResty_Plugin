@@ -71,6 +71,8 @@ server {
 
 Edge 自身仍负责路由和策略选层；新增 [Tier](../native-tier/README.zh-CN.md) 实现 L1 miss 后读取 L2、热对象晋升与冷层保留，接替旧 Lua 选层/flush 流程。写入、锁、过期与清理由 Nginx 管理。支持 HTTP/HTTPS、括号 IPv6、命名 upstream 及 origin_host 字段；TLS 验证与连接池定义由原生代理配置实施。命名池成员不通过站点文件热更新。
 
+Tier 0.1.1 的两端模板同时传递 L2 限额、隔离 X-Tier-*，并保持 304 续期和真实 L2 过时状态。Edge 提供的 scope/key 必须保留站点/版本隔离；独立 Tier 使用长度编码键，联动清理时使用 Purge 版本键。升级细节见 Tier 手册。
+
 变量 proxy_pass 的域名解析需要配置 resolver。上游连接池和 DNS 行为仍按 Nginx 变量代理语义执行，不能假定它和静态命名 upstream 的 keepalive 行为完全相同。默认保留原 URI 和查询串，匹配 prefix 不剥离路径。
 
 ## 4. TLS 证书选择

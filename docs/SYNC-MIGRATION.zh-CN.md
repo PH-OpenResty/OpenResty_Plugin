@@ -26,6 +26,8 @@ python native-sync/tests/integration.py --prefix /tmp/scdn-native
 python native-sync/tests/distribution.py --prefix /tmp/scdn-native
 python native-sync/tests/cache_tasks.py --prefix /tmp/scdn-native
 python native-tier/tests/integration.py --prefix /tmp/scdn-native
+python native-tier/tests/boundaries.py --prefix /tmp/scdn-native
+python native-sync/tests/cache_tasks.py --prefix /tmp/scdn-native --tier
 python native-tier/tests/coexist.py --prefix /tmp/scdn-native --report /tmp/scdn-six.json
 ```
 
@@ -35,7 +37,7 @@ python native-tier/tests/coexist.py --prefix /tmp/scdn-native --report /tmp/scdn
 2. 用新端口/Socket/目录部署原生 Master 和 Node；先验证身份，再验证完整配置发布、源站请求、TLS、停用/删除与失败恢复。
 3. 核对 Node 的 config_state 与 scdn_config_managed 指向同一目录，status_socket 提供 Config /status；普通 scdn_config_watch 不同时使用。
 4. 确认所有目标 Node 的目标序号与实际 applied 后，明确交接唯一配置写入权，再停止旧 Lua publisher/apply 对该配置源的写入。缓存任务可以独立启用。
-5. Tier 使用新 cache zone/path 或已验收的预热流程；接入完整读取链后停用旧 tier Lua 和维护 flush 脚本。旧 L1 独有对象不会自动成为新 L2 副本。
+5. Tier 使用新 cache zone/path 或已验收的预热流程；接入完整读取链后停用旧 tier Lua 和维护 flush 脚本。旧 L1 独有对象不会自动成为新 L2 副本。0.1.1 的模块与 front/backend 模板一起升级，切换时隔离旧 Socket 协议及缓存元数据。
 
 Node applied 与业务健康分开。未配置 probe 时 health=unknown，配置了 probe 也只证明相应 URL/状态。Master 离线不会删除已应用的路由/证书；恢复按持久序号续发。不要单独回滚 highest.state、desired 或证书目录。
 

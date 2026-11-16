@@ -17,6 +17,8 @@ Config/Edge 增加站点和前缀规则的 HTTP 头配置。规则随站点快�
 
 Edge 输出时替换源站同名诊断头。原有 Nginx `add_header X-Cache ...` 等配置需删除，避免后续 headers_filter 再添加第二份；普通 `X-Clinet-IP` 的回源设置保留。只加载 Purge 时仍需 Nginx 的 `add_header X-Cache $upstream_cache_status always;`；Purge 不依赖 Edge。
 
+启用 [Tier](../native-tier/README.zh-CN.md) 时，由 Tier 生成两层合并后的 X-Cache/X-Cache-Layer，来源可为 l1/l2/origin/off。L2 的 STALE/UPDATING/REVALIDATED 会保留，不统一折算为 HIT。Edge 的 cache_headers off 仅控制 Edge 诊断，不关闭 Tier 自身的这两个头。X-Tier-* 为受限 Unix 通道的保留字段，不用于站点业务回源头。
+
 ## 回源请求头
 
 在 site 内使用 `cache_request_header NAME VALUE;`，最多 8 个，名称 3～64 字节，值最多 1024 字节。为保持热更新不碰 HTTP 协议和身份控制，仅允许由 ASCII 字母、数字和连字符组成的 `X-` 自定义字段；不支持标准 Host/Authorization/Cookie/Connection/Content-Length，也拒绝客户端 IP、转发链、API key、X-Accel 控制和已废弃产品前缀。值按原始文本发送，`$name` 不执行变量替换，不允许 CR/LF/控制字符。

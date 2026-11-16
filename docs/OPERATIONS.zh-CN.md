@@ -143,3 +143,7 @@ Sync 0.3.0 保留的持久化缓存任务投递、状态、删除、Node 后台�
 站点/prefix 中的缓存诊断开关和静态回源头可热更新，使用 [缓存头手册](CACHE-HEADERS.zh-CN.md)的字段，并确认缓存 key 保留配置 revision。Ban v2 的 [全节点同步](../native-ban/design/CLUSTER-SYNC.zh-CN.md)规定任意设备上报、完整有效表、固定期限和逐节点内核 ACK，现已由独立 Ban Agent、eBPF 与 Sync 桥实现，仍不能把缓存任务 ACK 当作封禁全量完成。
 
 Ban 0.1.0 的当前配置、事件/权限、全量同步、日志持久化与运行验收见 [运行手册](../native-ban/RUNTIME.zh-CN.md)，历史设计字段不直接用于启动。
+
+## 分层缓存的条件校验与升级
+
+Tier 0.1.1 的 L2 STALE/UPDATING/REVALIDATED 会反映到 X-Cache。304 后持续 EXPIRED/REVALIDATED、前端限额未生效或请求暴露 X-Tier-* 时，应核对模块和 front/backend 模板是否为同一版本。0.1.0 的旧绝对到期元数据需通过新路径/冷启动或新链路预热隔离；不要混用旧、新 Worker 的同一后端 Socket。模块升级按独立实例验证/切换处理，普通站点缓存规则仍可由 Config 热更新。细节见 [Tier 手册](../native-tier/README.zh-CN.md)。

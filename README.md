@@ -27,6 +27,8 @@ Purge 可独立加载，不依赖其他插件，也不修改 Nginx 核心或私�
 - [站点配置与证书加密发布/应用](docs/SYNC-PUBLICATION.zh-CN.md)：真实 Master/Node 发布、热更新、回退、身份与序号边界。
 - [原生 L1/L2 分层缓存](native-tier/README.zh-CN.md)：接替 Lua 选层及维护落盘流程。
 
+Tier 0.1.1 完善分层 ETag/Last-Modified 校验与 304 续期、路由大小限制、内部头隔离及无歧义缓存键。升级时模块和两份代理模板同时更新，并使用新链路隔离旧缓存元数据；详见 Tier 手册的升级说明。
+
 - [缓存刷新/预热任务](docs/CACHE-TASKS.zh-CN.md)：Master 持久队列、Node 原生 mTLS 拉取、刷新/预热执行、租约与结果。
 - [Sync 角色与身份接口](native-sync/README.zh-CN.md)、[安装/共存迁移](docs/SYNC-MIGRATION.zh-CN.md)、[原生化路线与缺口](docs/SYNC-ROADMAP.zh-CN.md)。
 - [安装、编译和最小运行](docs/INSTALL.zh-CN.md)：依赖、独立构建、现有安装接入、权限与 ABI。
@@ -60,6 +62,10 @@ python native-sync/tests/distribution.py --prefix /tmp/scdn-plugin-nginx \
   --report /tmp/scdn-distribution-results.json
 python native-tier/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
   --report /tmp/scdn-tier-results.json
+python native-tier/tests/boundaries.py --prefix /tmp/scdn-plugin-nginx \
+  --report /tmp/scdn-tier-boundary-results.json
+python native-sync/tests/cache_tasks.py --prefix /tmp/scdn-plugin-nginx --tier \
+  --report /tmp/scdn-tier-task-results.json
 python native-tier/tests/coexist.py --prefix /tmp/scdn-plugin-nginx \
   --report /tmp/scdn-six-module-results.json
 python native-sync/tests/cache_tasks.py --prefix /tmp/scdn-plugin-nginx \

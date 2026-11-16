@@ -107,3 +107,5 @@ curl --config /etc/scdn-sync-native/master/control.curl.conf \
 ## 当前边界
 
 缓存任务的 mTLS、Node/scope 校验、摘要、持久队列和幂等结果属于独立任务协议。Sync 0.3.0 新增站点/证书的 [原生发布与应用](SYNC-PUBLICATION.zh-CN.md)，不使用缓存队列冒充配置事务。旧 Lua JWE/JWS/HTTP nonce API 仍不与 native v2 直接兼容。预热可走 [Tier](../native-tier/README.zh-CN.md) 的同一业务入口；先确认配置已应用，再刷新/预热相应版本。验收入口为 `python native-sync/tests/cache_tasks.py --prefix /isolated/runtime`，静态构建加 `--static`。
+
+加 `--tier` 可运行真实双层缓存任务验收：mTLS Master/Node 向业务入口刷新/预热、验证 L1 HIT、各模式同时失效、HTTP/HTTPS、丢失 L1 后从持久 L2 恢复并重新晋升。此模式同时使用 Tier 的正式 front/backend 模板，能验证两层联动，而不只验证单层缓存任务协议。

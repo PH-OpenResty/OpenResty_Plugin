@@ -2,6 +2,16 @@
 
 统一构建和 CI 包含 Sync、Config、Ban、API、Edge、Tier、Purge 七个插件。Sync 角色/身份见 [Sync 验证](../native-sync/tests/VALIDATION.zh-CN.md)，Purge 见 [清理模块验证](../native-purge/tests/VALIDATION.zh-CN.md)和[基准报告](../native-purge/bench/README.zh-CN.md)。本页保留历史基线，并单独记录当前整合结果。
 
+## Tier 0.1.1 条件校验与双层缓存补全
+
+修复有效 304 被变成 502、旧绝对期限阻止续期、L2 自身校验器丢失、路由 L2 上限未传递、保留头透传和默认键分隔歧义；L2 stale/revalidated 状态按实际返回。原有晋升绝对到期和私有请求隔离继续保留。
+
+2026-11-16 UTC 在隔离 WSL2/Alpine x86_64 完成 Nginx 1.31.8 动态、OpenResty 1.31.8.1 动态/静态三种新构建，各 450 项，共 1,350 项。每种包含 Tier 原有 48、HTTP 边界 73、业务共存 51、真实双层 Sync 缓存任务 102、原有缓存任务 99、Purge 再验证 45、缓存头 32。结构化结果和 Tier 源码 SHA-256 见 [validation-tier-20261116.json](validation-tier-20261116.json)。
+
+新增边界测试覆盖 ETag/Last-Modified/无校验器、304 后下一次 HIT、源站内容变更、304 私有化拒绝、HEAD/Range、大小边界、未知长度/截断/错误响应、有限 stale 与并发单次后台更新。`cache_tasks.py --tier` 使用真实 mTLS Master/Node，验证两层刷新、HTTP/HTTPS 预热、各清理模式及丢失 L1 后从预热的持久 L2 恢复。
+
+本地 Nginx 使用 UBSan trap 模式；Alpine GCC 环境缺少 ASan 运行库，未把本地结果称为 ASan 通过。GitHub Ubuntu 的 Nginx 动态矩阵继续启用 ASan/UBSan，并运行完整七模块回归与真实 Ban/eBPF 测试。新增两组测试进入所有 CI 构建，最终状态以对应提交 Actions 为准。本次没有部署生产，也没有声称生产容量、吞吐或物理掉电矩阵已验收。
+
 ## Ban 0.1.0 当前运行验收
 
 新增 native-ban 的 Nginx 模块、C++ Agent、XDP/TCX 内核对象和原生 Sync 桥，统一构建现为七模块。`native-ban/tests/runtime.py` 使用真正的 root netns/veth/bpffs、三个 Agent/节点和已登记 mTLS，权限不足直接失败；不以 Schema/ABI 或模拟 Map 替代内核 DROP。

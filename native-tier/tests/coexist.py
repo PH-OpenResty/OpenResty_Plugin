@@ -21,7 +21,7 @@ class Review(fixture.Review):
         templates = ROOT / 'native-tier/examples'
         backend = (templates / 'backend.conf').read_text().replace(
             '/etc/ssl/certs/ca-certificates.crt', str(self.root / 'origin.crt')).replace(
-            'proxy_cache_key "$scdn_tier_scope|$scdn_tier_key";',
+            'proxy_cache_key $scdn_tier_cache_key;',
             'scdn_purge_key $scdn_tier_scope $scdn_tier_key $scdn_tier_resource; proxy_cache_key $scdn_purge_key;')
         extra = f'''scdn_tier_zone hierarchy 1m; scdn_tier_socket {self.root}/tier.sock;
             proxy_cache_path {self.root}/cache-l2 keys_zone=l2:1m;
