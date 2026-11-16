@@ -77,6 +77,8 @@ jobs:
           sudo --preserve-env=ASAN_OPTIONS,UBSAN_OPTIONS "$(command -v python)" native-ban/tests/runtime.py --prefix "$RUNNER_TEMP/scdn-plugin" --agent-build "$RUNNER_TEMP/scdn-ban" "${extra[@]}" --report "$RUNNER_TEMP/ban-tcx-results.json"
           if [ "$PLUGIN_RUNTIME" = nginx ]; then
             sudo --preserve-env=ASAN_OPTIONS,UBSAN_OPTIONS "$(command -v python)" native-ban/tests/runtime.py --prefix "$RUNNER_TEMP/scdn-plugin" --agent-build "$RUNNER_TEMP/scdn-ban" --mode xdp_native --report "$RUNNER_TEMP/ban-xdp-results.json"
+          else
+            sudo --preserve-env=ASAN_OPTIONS,UBSAN_OPTIONS "$(command -v python)" native-ban/tests/lua_waf.py --prefix "$RUNNER_TEMP/scdn-plugin" --agent-build "$RUNNER_TEMP/scdn-ban" "${extra[@]}" --report "$RUNNER_TEMP/ban-lua-waf-results.json"
           fi
       - name: Staggered worker startup and readiness deadlines
         env:
@@ -208,6 +210,7 @@ jobs:
             ${{ runner.temp }}/startup-results.json
             ${{ runner.temp }}/ban-tcx-results.json
             ${{ runner.temp }}/ban-xdp-results.json
+            ${{ runner.temp }}/ban-lua-waf-results.json
             ${{ runner.temp }}/sync-results.json
             ${{ runner.temp }}/distribution-results.json
             ${{ runner.temp }}/receipt-recovery-results.json

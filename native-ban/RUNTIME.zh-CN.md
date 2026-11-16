@@ -140,3 +140,5 @@ kernel_ready 表示所有配置接口已附着；pending_enforcement 表示尚�
 覆盖真实 HTTP/UDP 丢包、IPv4/IPv6、固定过期、L7 升级、任意设备全量发布、成员 ACK、解封、Master 断线、Agent kill/重启、只读 FD、过时/重复事件、CIDR 豁免、策略热更新、日志失败/补投，以及内核 BPF_PROG_TEST_RUN 的 VLAN/分片/边界语料。既有七模块回归同时执行。生产 NIC offload/多缓冲区、HTTP/3 L7、所有跨地域时钟/断电组合、全容量压力和 p99 收敛延迟需要目标环境验收，不能由隔离用例推导吞吐承诺。
 
 保留的 compat/lib/security_guard 在真实 WAF 命中且 `$scdn_ban_enabled=1` 时自动上报该引擎返回的 rule ID；Agent trusted_rules 必须登记相同 ID。普通限流 429 不会自动变成 CC，CC 检测器仍须显式确认。主分支的 Sync 收据恢复/Lua 交接逻辑已合并保留。
+
+`tests/lua_waf.py` 在 OpenResty 中执行保留的真实 SQL 注入规则和 security_guard，验证原生 scope/rule 上报、L7 和三节点内核 L3；该 4 项联动套件只在实际含 Lua 的 OpenResty 运行，不在纯 Nginx 冒报。

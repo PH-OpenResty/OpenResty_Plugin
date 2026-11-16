@@ -170,7 +170,7 @@ class Test:
               server {{ listen 8081; location / {{ return 200 "management-alive"; }} }}
             }}'''
         (root/'html').mkdir(exist_ok=True);(root/'html/index.html').write_text('public-content');(root/'html/index.html').chmod(0o644)
-        write(root/'nginx.conf',configuration)
+        write(root/'nginx.conf',self.custom_nginx(node,configuration))
         log=(root/'nginx-output.txt').open('ab');self.logs.append(log)
         process=subprocess.Popen(['ip','netns','exec',ns,str(self.prefix/'sbin/nginx'),'-p',str(root)+'/', '-c',str(root/'nginx.conf'),'-g','daemon off;'],stdout=log,stderr=log)
         self.processes.append(process);self.nginx[node]=process
@@ -188,6 +188,8 @@ while True:
 '''
             p=subprocess.Popen(['ip','netns','exec',ns,sys.executable,'-c',script],stdout=log,stderr=log);self.processes.append(p)
 
+    def custom_nginx(self,node,configuration):return configuration
+
     def status(self,node):return rpc(self.configs[node][1]['admin_socket'],{'operation':'status'})[1]
     def records(self,node):return rpc(self.configs[node][1]['admin_socket'],{'operation':'list'})[1]['records']
     def request(self,node,path='/',port=8080,ipv6=False):
@@ -195,7 +197,7 @@ while True:
         address=f'2001:db8:1::{index}' if ipv6 else f'192.0.2.{index}'
         script='''import http.client,json,sys
 try:
- c=http.client.HTTPConnection(sys.argv[1],int(sys.argv[2]),timeout=.4);c.request('GET',sys.argv[3]);r=c.getresponse();print(json.dumps([r.status,r.read().decode()]));c.close()
+ c=http.client.HTTPConnection(sys.argv[1],int(sys.argv[2]),timeout=.4);c.request('GET',sys.argv[3],headers={'Host':'www.example.test'});r=c.getresponse();print(json.dumps([r.status,r.read().decode()]));c.close()
 except OSError:print('[0,"blocked"]')
 '''
         return json.loads(self.ns(self.lab,sys.executable,'-c',script,address,str(port),path))

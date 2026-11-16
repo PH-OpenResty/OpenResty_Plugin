@@ -8,7 +8,7 @@
 
 当前 Ban 运行套件为 64 项，涵盖 L7/CC、固定期限、IPv4/IPv6/UDP、任意来源设备的完整表、内核 ACK、全局解封、签名篡改/旧快照拒绝、离线 outbox、Agent kill/原 inode 恢复、内核独立过期、事件重放、只读 FD、CIDR 豁免、策略热更新、日志故障补投、VLAN/IPv4 分片及报文边界。XDP native 和 TCX ingress 分别执行；Nginx 动态 CI 同时为 Nginx/模块和 Agent 启用 ASan/UBSan。
 
-既有 646 项回归、主分支新增的 47 项 Sync 恢复和 OpenResty 的 27 项 Lua 交接继续执行；每种构建新增 64 项 TCX，Nginx 动态另执行 64 项 XDP。实际完成状态以最新提交 Actions 和报告为准。本地/CI 结果不代表生产 NIC offload、全容量压力、所有时钟/断电组合或已在真实节点部署。
+既有 646 项回归、主分支新增的 47 项 Sync 恢复和 OpenResty 的 27 项 Lua 交接继续执行；每种构建新增 64 项 TCX，Nginx 动态另执行 64 项 XDP，两种 OpenResty 另执行 4 项真实 Lua WAF → Ban → 全节点 eBPF 联动。实际完成状态以最新提交 Actions 和报告为准。本地/CI 结果不代表生产 NIC offload、全容量压力、所有时钟/断电组合或已在真实节点部署。
 
 历史设计检查仍用于草案追溯，0.1.0 实际配置、SQLite WAL 和运行 ABI 以 [运行手册](../native-ban/RUNTIME.zh-CN.md)为准。
 
