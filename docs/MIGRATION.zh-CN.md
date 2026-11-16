@@ -69,3 +69,7 @@ Sync 0.3.0 保留的持久化缓存任务投递、状态、删除、Node 后台�
 旧 tier.lua 和 flush_l1_to_l2.lua 的原生替代是 [Tier](../native-tier/README.zh-CN.md)：L1 miss 读取 L2、L2 miss 回源、热对象晋升、冷层副本保留；不再需要维护时扫描拷贝活动缓存文件。
 
 Ban 0.1.0 的当前配置、事件/权限、全量同步、日志持久化与运行验收见 [运行手册](../native-ban/RUNTIME.zh-CN.md)，历史设计字段不直接用于启动。
+
+## 原生模块与 Lua 的功能交接
+
+只让已由模块接管的 Lua 实现退出运行路径；保留 WAF/限流及未被替代的其他 Lua。新的类型化策略、security_guard 桥接器、一次性转换和暂存清理工具见 [Lua 交接](LUA-HANDOFF.zh-CN.md)。必须同时退出旧 registry/native_export 的启动写入与 Lua SNI 回调，不能只停 timer。

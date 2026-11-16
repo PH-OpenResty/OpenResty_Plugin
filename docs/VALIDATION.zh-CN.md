@@ -12,6 +12,12 @@
 
 历史设计检查仍用于草案追溯，0.1.0 实际配置、SQLite WAL 和运行 ABI 以 [运行手册](../native-ban/RUNTIME.zh-CN.md)为准。
 
+## 应用记录恢复与原生/Lua 交接修复
+
+本轮独立 OpenResty 静态构建通过原有 646 项，以及新增 47 项应用记录/恢复检查和 27 项 Lua 交接检查，共 720 项。新测试真实注入 write/fsync/rename/unlink 错误，在提交窗口终止进程，并核对活动配置、旧应用记录、回退点、重启恢复及文件属主。Lua 测试保留原引擎文件，验证新 Host、WAF 403、限流 429、原生 TLS 热更新、内部子请求、缺失处理器拒绝和受限暂存清理。
+
+结构化本地记录见 [validation-sync-recovery-lua-20261115.json](validation-sync-recovery-lua-20261115.json)。CI 新增 recovery.py（三种构建）和 lua_handoff.py（两种 OpenResty 构建）；完整上游结果以 PR 对应提交为准。纯 Nginx 不执行 Lua，引擎交接检查不在那里冒报通过。没有部署生产节点，也没有声称完整断电/磁盘故障矩阵或性能验收。
+
 ## PR #9 合并审查补充
 
 审查补齐 Tier 独立运行时的 Api-Key、Proxy-Authorization 和 Pragma: no-cache 绕过，并修复重复凭据/缓存控制头不能被识别的问题。新增 9 项实际回源/隔离检查，覆盖已存在的匿名缓存、不同调用者凭据和重复字段；Tier 套件增为 48 项，当前每种构建矩阵为 646 项，三种合计 1,938 项。旧 637 项结果仍按初次交付基线保留，最新提交的全部 Actions 成功才允许合并。

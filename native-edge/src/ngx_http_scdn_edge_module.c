@@ -19,6 +19,8 @@ static ngx_int_t edge_postconfiguration(ngx_conf_t *cf);
 static ngx_int_t edge_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t edge_access(ngx_http_request_t *r);
 static ngx_int_t edge_header_filter(ngx_http_request_t *r);
+static ngx_int_t edge_security_gate(ngx_http_request_t *r);
+static void edge_security_checked(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_http_output_header_filter_pt edge_next_header;
 
 static ngx_command_t edge_commands[] = {
@@ -28,6 +30,9 @@ static ngx_command_t edge_commands[] = {
     { ngx_string("scdn_edge_tls"), NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
       ngx_conf_set_flag_slot, NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(scdn_edge_server_t, tls), NULL },
+    { ngx_string("scdn_edge_tls_fallback"), NGX_HTTP_SRV_CONF|NGX_CONF_FLAG,
+      ngx_conf_set_flag_slot, NGX_HTTP_SRV_CONF_OFFSET,
+      offsetof(scdn_edge_server_t, tls_fallback), NULL },
     { ngx_string("scdn_edge_proxy_location"), NGX_HTTP_SRV_CONF|NGX_CONF_TAKE1,
       ngx_conf_set_str_slot, NGX_HTTP_SRV_CONF_OFFSET,
       offsetof(scdn_edge_server_t, proxy_location), NULL },
@@ -58,7 +63,7 @@ static void *
 edge_server(ngx_conf_t *cf)
 {
     scdn_edge_server_t *conf = ngx_pcalloc(cf->pool, sizeof(*conf));
-    if (conf != NULL) { conf->enabled = NGX_CONF_UNSET; conf->tls = NGX_CONF_UNSET; }
+    if (conf != NULL) { conf->enabled = NGX_CONF_UNSET; conf->tls = NGX_CONF_UNSET; conf->tls_fallback = NGX_CONF_UNSET; }
     return conf;
 }
 
@@ -75,9 +80,10 @@ edge_merge_server(ngx_conf_t *cf, void *parent, void *child)
     (void) cf;
     ngx_conf_merge_value(conf->enabled, previous->enabled, 0);
     ngx_conf_merge_value(conf->tls, previous->tls, 0);
+    ngx_conf_merge_value(conf->tls_fallback, previous->tls_fallback, 0);
     ngx_conf_merge_str_value(conf->proxy_location, previous->proxy_location, "@scdn_edge_proxy");
     if (conf->proxy_location.len == 0 || conf->proxy_location.data[0] != '@'
-        || (conf->tls && !conf->enabled))
+        || (conf->tls && !conf->enabled) || (conf->tls_fallback && !conf->tls))
     {
         return "scdn_edge requires a named proxy location and TLS requires scdn_edge on";
     }
@@ -334,14 +340,17 @@ edge_preconfiguration(ngx_conf_t *cf)
         ngx_string("scdn_edge_site"), ngx_string("scdn_edge_upstream"),
         ngx_string("scdn_edge_root"), ngx_string("scdn_edge_cache"),
         ngx_string("scdn_edge_revision"), ngx_string("scdn_edge_origin_host"),
-        ngx_string("scdn_edge_origin_sni"), ngx_string("scdn_edge_grpc_upstream")
+        ngx_string("scdn_edge_origin_sni"), ngx_string("scdn_edge_grpc_upstream"),
+        ngx_string("scdn_edge_security"), ngx_string("scdn_edge_security_checked")
     };
     ngx_http_variable_t *variable;
     ngx_uint_t i;
     for (i = 0; i < sizeof(names) / sizeof(names[0]); i++) {
-        variable = ngx_http_add_variable(cf, &names[i], NGX_HTTP_VAR_NOCACHEABLE);
+        variable = ngx_http_add_variable(cf, &names[i], NGX_HTTP_VAR_NOCACHEABLE
+            | (i == 9 ? NGX_HTTP_VAR_CHANGEABLE : 0));
         if (variable == NULL) { return NGX_ERROR; }
         variable->get_handler = edge_variable; variable->data = i;
+        if (i == 9) variable->set_handler = edge_security_checked;
     }
     return NGX_OK;
 }
@@ -390,6 +399,27 @@ edge_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t dat
             out = ngx_cpymem(value.data, start == 8 ? "grpcs://" : "grpc://", start);
             ngx_memcpy(out, request->upstream.data + start, request->upstream.len - start);
         }
+    } else if (data == 9) {
+        if (request->security_checked) { ngx_str_set(&value, "1"); }
+        else { ngx_str_set(&value, "0"); }
+    } else if (data == 8) {
+        scdn_config_security_t *security = &request->site->security;
+        ngx_uint_t i;
+        u_char *end;
+        if (!request->site->enabled) { v->not_found = 1; return NGX_OK; }
+        if (!request->security_json.data) {
+            request->security_json.data = ngx_pnalloc(r->pool, 4096);
+            if (!request->security_json.data) return NGX_ERROR;
+            end = ngx_snprintf(request->security_json.data, 4096,
+                "{\"name\":\"%V\",\"waf\":{\"enabled\":%s,\"threshold\":%ui,\"groups\":[",
+                &request->site->id, security->waf ? "true" : "false", security->threshold);
+            for (i = 0; i < security->group_count; i++)
+                end = ngx_snprintf(end, 256, "%s\"%V\"", i ? "," : "", &security->groups[i]);
+            end = ngx_snprintf(end, 256, "]},\"rate_limit\":{\"enabled\":%s,\"req_per_sec\":%ui,\"burst\":%ui}}",
+                security->rate_limit ? "true" : "false", security->rate, security->burst);
+            request->security_json.len = end - request->security_json.data;
+        }
+        value = request->security_json;
     }
     else {
         value = request->cache;
@@ -403,6 +433,32 @@ edge_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t dat
     return NGX_OK;
 }
 
+static void
+edge_security_checked(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data)
+{
+    scdn_edge_request_t *request = scdn_edge_request(r);
+    (void) data;
+    if (request) request->security_checked = v->len == 1 && v->data[0] == '1';
+}
+
+static ngx_int_t
+edge_security_gate(ngx_http_request_t *r)
+{
+    scdn_edge_request_t *request = scdn_edge_request(r);
+    scdn_edge_request_t *parent;
+    /* Nginx skips ACCESS handlers for internal subrequests. Native cache
+     * revalidation may inherit the already checked, identical site snapshot. */
+    if (request && r != r->main && !request->security_checked) {
+        parent = scdn_edge_request(r->main);
+        if (parent && parent->security_checked && parent->snapshot == request->snapshot
+            && parent->site == request->site) request->security_checked = 1;
+    }
+    if (request && request->site && request->site->enabled
+        && (request->site->security.waf || request->site->security.rate_limit)
+        && !request->security_checked) return NGX_HTTP_SERVICE_UNAVAILABLE;
+    return NGX_DECLINED;
+}
+
 static int
 edge_certificate(SSL *ssl, void *data)
 {
@@ -410,13 +466,16 @@ edge_certificate(SSL *ssl, void *data)
     scdn_config_site_t *site;
     ngx_str_t host;
     const char *name;
+    scdn_edge_server_t *server = data;
     int result = 0, i;
-    (void) data;
     name = SSL_get_servername(ssl, TLSEXT_NAMETYPE_host_name);
-    if (name == NULL) { return 0; }
+    if (name == NULL) { return server->tls_fallback ? 1 : 0; }
     host.data = (u_char *) name; host.len = strlen(name);
     snapshot = scdn_config_acquire();
     site = scdn_config_lookup(snapshot, &host);
+    if (snapshot && (site == NULL || !site->enabled || site->leaf == NULL) && server->tls_fallback) {
+        scdn_config_release(snapshot); return 1;
+    }
     if (site != NULL && site->enabled && site->leaf != NULL
         && X509_cmp_current_time(X509_get0_notAfter(site->leaf)) > 0
         && SSL_use_certificate(ssl, site->leaf) == 1
@@ -460,11 +519,13 @@ edge_postconfiguration(ngx_conf_t *cf)
                     "scdn_edge_tls requires a static bootstrap certificate and its own TLS callback");
                 return NGX_ERROR;
             }
-            SSL_CTX_set_cert_cb(ssl->ssl.ctx, edge_certificate, NULL);
+            SSL_CTX_set_cert_cb(ssl->ssl.ctx, edge_certificate, server);
         }
     }
     handler = ngx_array_push(&core->phases[NGX_HTTP_PREACCESS_PHASE].handlers);
     if (handler == NULL) { return NGX_ERROR; } *handler = edge_access;
+    handler = ngx_array_push(&core->phases[NGX_HTTP_PRECONTENT_PHASE].handlers);
+    if (handler == NULL) { return NGX_ERROR; } *handler = edge_security_gate;
     handler = ngx_array_push(&core->phases[NGX_HTTP_LOG_PHASE].handlers);
     if (handler == NULL) { return NGX_ERROR; } *handler = scdn_edge_record;
     edge_next_header = ngx_http_top_header_filter;

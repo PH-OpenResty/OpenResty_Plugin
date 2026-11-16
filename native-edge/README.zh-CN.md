@@ -155,3 +155,11 @@ Edge 按当前请求持有的配置版本生成 `X-Cache`、`X-Cache-Layer`、`X
 Edge 现在以 HTTP_FILTER 类型注册，确保静态和动态构建均在 Nginx 基础 header filter 之后接入原生缓存诊断；动态加载仍保持 Config → Ban → API → Edge，三个模块需同源码版本一起编译。
 
 当前统一构建包含原生 [Ban](../native-ban/RUNTIME.zh-CN.md)。一起编译时 Ban 必须先于 API/Edge 动态加载；未配置 scdn_ban on 时不启用封禁。其 Agent/eBPF 和全节点快照是独立运行路径，Sync 桥接需显式 scdn_sync_ban_agent。
+
+Edge 现在以 HTTP_FILTER 类型注册，确保静态和动态构建均在 Nginx 基础 header filter 之后接入原生缓存诊断；动态加载仍保持 Config → API → Edge，三个模块需同源码版本一起编译。
+
+## 原生策略与保留 Lua 的衔接
+
+`$scdn_edge_security` 从当前请求持有的原生快照提供安全策略，`$scdn_edge_security_checked` 由已配置的安全处理器成功检查后置 1。策略开启但未经过处理器时，内容阶段返回 503。新桥接器不查询旧 Lua registry；详见 [Lua 交接](../docs/LUA-HANDOFF.zh-CN.md)。
+
+`scdn_edge_tls_fallback on` 可显式保留未知/无 SNI 的 bootstrap 证书行为，默认 off。它要求 `scdn_edge_tls on`；HTTP Host 仍由 Edge 检查，已配置站点的过期或不可用证书不会降级。迁移后移除 Lua SSL 回调。

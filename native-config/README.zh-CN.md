@@ -177,7 +177,7 @@ prefix /api/private/ {
 
 插件本身没有远程同步、Master/Node 角色、HTTP 编辑器、WAF、限速、程序升级和持久化发布历史。外部发布者可以交付该文件，但应保证只有一套权威配置来源。
 
-同仓库 [native-sync](../native-sync/README.zh-CN.md)独立提供 Master/Node 角色与身份基础；其 0.1.0 尚不发布/拉取或提交本站点文件。安装、共存与后续切换见 [Sync 迁移说明](../docs/SYNC-MIGRATION.zh-CN.md)，Config 的代际不能替代远程同步序号。
+同仓库 [native-sync](../native-sync/README.zh-CN.md)独立提供 Master/Node 角色与身份基础；其 0.3.0 已发布/拉取并事务应用本站点文件。安装、共存与后续切换见 [Sync 迁移说明](../docs/SYNC-MIGRATION.zh-CN.md)，Config 的代际不能替代远程同步序号。
 
 ## HTTP 头与缓存任务联动
 
@@ -189,8 +189,12 @@ site/prefix 可设置 `cache_headers on|off;`（站点默认 on、前缀继承�
 
 ## Sync 受管配置与启动回退
 
-普通 scdn_config_watch 仍只读源文件。使用 `scdn_config_managed /private/state;` 时，文件固定为 state/active.conf，与 Sync 0.3.0 的持久事务配合；启动会校验并恢复未完成 apply.pending 对应的 previous.conf，然后才加载 bootstrap。两种指令互斥，真实目录需 Worker 所有 0700。状态接口增加 X-Config-Revision、X-Config-Ready（全 Worker 确认）及受管目录摘要；完整协议见 [发布手册](../docs/SYNC-PUBLICATION.zh-CN.md)。
+普通 scdn_config_watch 仍只读源文件。使用 `scdn_config_managed /private/state;` 时，文件固定为 state/active.conf，与 Sync 0.3.0 的持久事务配合；启动会校验并恢复未完成 apply.pending 对应的 previous.conf 和旧 applied.state，然后才加载 bootstrap。两种指令互斥，真实目录需 Worker 所有 0700。状态接口增加 X-Config-Revision、X-Config-Ready（全 Worker 确认）及受管目录摘要；完整协议见 [发布手册](../docs/SYNC-PUBLICATION.zh-CN.md)。
 
 完整站点快照会携带 cache/tier 及请求/响应头字段；L1/L2 读取链使用 [Tier](../native-tier/README.zh-CN.md)，源站正文和缓存文件不通过配置 Sync 发布。
 
 当前统一构建包含原生 [Ban](../native-ban/RUNTIME.zh-CN.md)。一起编译时 Ban 必须先于 API/Edge 动态加载；未配置 scdn_ban on 时不启用封禁。其 Agent/eBPF 和全节点快照是独立运行路径，Sync 桥接需显式 scdn_sync_ban_agent。
+
+## 保留 Lua 安全策略
+
+site 可配置 `waf on|off`、`waf_threshold`、最多 16 个 `waf_group` 和 `rate_limit off|RATE BURST`。它们是原生快照中的有类型数据，随 Sync 发布；WAF/限流执行仍使用现有 Lua 引擎。语法、fail-closed 处理和退出旧 registry/发布路径的方法见 [Lua 交接](../docs/LUA-HANDOFF.zh-CN.md)。

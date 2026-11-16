@@ -41,3 +41,7 @@
 本地 Alpine 工具链未提供 ASan 运行库，因此本地未宣称 ASan 通过。GitHub Actions 在 Ubuntu 上配置 AddressSanitizer 与 UndefinedBehaviorSanitizer 的核心检查，以及 nginx/OpenResty 两种构建；远程结果以对应提交的 Actions 记录为准。
 
 历史迁入记录不证明配置快照加密分发、Node 拉取、应用事务或业务健康检查已经迁移，也不证明生产容量、ARM64、HTTP/3 或所有目标 OpenResty 构建的 ABI 兼容。部署产物需按目标构建重新生成。
+
+## 应用收据与 Lua 交接修复
+
+新增 `recovery.py` 的 47 项检查覆盖收据写入/同步/重命名、提交标记删除、目录同步、真实进程终止、损坏标记、首次应用和恢复属主。`lua_handoff.py` 在 OpenResty 中新增 27 项检查，验证旧执行器保留、原生 Host/证书接管以及同步安全策略。最新结果和复现入口见 [统一验证](../../docs/VALIDATION.zh-CN.md)。

@@ -25,3 +25,5 @@ sha256sum -c SOURCE-SHA256SUMS
 Sync 0.3.0 的原生配置封装、RSA-OAEP/AES-GCM/Ed25519 处理、发布/应用/回退和 Tier 0.1.0 均为本仓库新增实现。Sync 通过私有符号编译同一份 Config 数据解析器和恢复代码，防止独立加载时引入第二套较弱语法；不复制第三方分层缓存模块源码。Tier 对旧 Lua tier/flush 行为的迁移说明见 [手册](native-tier/README.zh-CN.md)。
 
 Ban 0.1.0 的 IPC/共享视图、Agent、内核解析/Map 和 Sync 桥为本仓库实现，使用系统 libbpf/SQLite/json-c/OpenSSL/libcurl。Agent 为 C++17，Nginx 和 BPF 为 C。源码摘要包含实际运行文件，设计 ABI 不混算为已验收执行实现。
+
+`compat/lua/lib/security_guard.lua` 是原生快照到保留 Lua 安全引擎的桥接代码；转换器与暂存工具仅用于退出旧写入路径。测试 fixtures 保留既有 Lua WAF/限流和规则接口，以验证没有因迁移删除或绕过安全执行。它们不构成新原生 WAF/Ban 实现，真实部署目录和策略仍不进入仓库。

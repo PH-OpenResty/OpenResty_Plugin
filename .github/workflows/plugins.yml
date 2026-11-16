@@ -101,6 +101,23 @@ jobs:
           extra=()
           if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
           python native-sync/tests/distribution.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/distribution-results.json"
+      - name: Application receipt durability and interrupted commit recovery
+        env:
+          ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+          PLUGIN_LINKAGE: ${{ matrix.linkage }}
+        run: |
+          extra=()
+          if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
+          python native-sync/tests/recovery.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/receipt-recovery-results.json"
+      - name: Retained Lua security with native site and TLS ownership
+        if: matrix.runtime == 'openresty'
+        env:
+          PLUGIN_LINKAGE: ${{ matrix.linkage }}
+        run: |
+          extra=()
+          if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
+          python native-sync/tests/lua_handoff.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/lua-handoff-results.json"
       - name: Durable Master Node cache refresh and verified preheat tasks
         env:
           ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
@@ -193,6 +210,8 @@ jobs:
             ${{ runner.temp }}/ban-xdp-results.json
             ${{ runner.temp }}/sync-results.json
             ${{ runner.temp }}/distribution-results.json
+            ${{ runner.temp }}/receipt-recovery-results.json
+            ${{ runner.temp }}/lua-handoff-results.json
             ${{ runner.temp }}/tier-results.json
             ${{ runner.temp }}/six-module-results.json
             ${{ runner.temp }}/cache-task-results.json

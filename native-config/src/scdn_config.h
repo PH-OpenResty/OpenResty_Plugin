@@ -12,6 +12,14 @@
 #define SCDN_CONFIG_WORKERS 128
 #define SCDN_CONFIG_BYTES (4 * 1024 * 1024)
 #define SCDN_CONFIG_HEADERS 8
+#define SCDN_CONFIG_PENDING_BYTES 184
+#define SCDN_CONFIG_WAF_GROUPS 16
+
+typedef struct {
+    ngx_flag_t waf, rate_limit;
+    ngx_uint_t threshold, group_count, rate, burst;
+    ngx_str_t groups[SCDN_CONFIG_WAF_GROUPS];
+} scdn_config_security_t;
 
 typedef struct {
     ngx_str_t name, value;
@@ -39,6 +47,7 @@ typedef struct {
     ngx_flag_t cache_headers;
     ngx_uint_t tier_hits;
     ngx_msec_t tier_window;
+    scdn_config_security_t security;
     X509 *leaf;
     STACK_OF(X509) *chain;
     EVP_PKEY *key;
@@ -67,5 +76,6 @@ scdn_config_site_t *scdn_config_lookup(scdn_config_snapshot_t *snapshot,
 ngx_flag_t scdn_config_local(ngx_http_request_t *r);
 ngx_flag_t scdn_config_enabled(ngx_conf_t *cf);
 int scdn_config_recover(const char *directory);
+int scdn_config_recover_locked(int directory, int finalize);
 
 #endif

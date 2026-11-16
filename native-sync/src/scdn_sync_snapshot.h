@@ -12,4 +12,5 @@ u_char *scdn_sync_read_file(const char *path, size_t limit, size_t *length, int 
 int scdn_sync_write_file(int directory, const char *name, const void *bytes, size_t length);
 void scdn_sync_digest(const void *bytes, size_t length, u_char digest[32]);
 int scdn_sync_recover(const char *directory);
+int scdn_sync_recover_locked(int directory, int finalize);
 #endif
