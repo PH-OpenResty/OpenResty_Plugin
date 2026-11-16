@@ -578,7 +578,7 @@ static int authorize(ngx_http_request_t *r,scdn_purge_main_t *main)
     ngx_table_elt_t *header=r->headers_in.authorization;
     size_t i;
     volatile u_char different=0;
-    if(header==NULL || header->value.len!=main->token.len+7
+    if(main->token.len==0 || header==NULL || header->value.len!=main->token.len+7
        || ngx_strncasecmp(header->value.data,(u_char *)"Bearer ",7)!=0)return 0;
     for(i=0;i<main->token.len;i++)different|=header->value.data[i+7]^main->token.data[i];
     return different==0;

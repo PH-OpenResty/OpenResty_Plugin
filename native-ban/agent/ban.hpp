@@ -108,6 +108,7 @@ struct Engine {
   bool stopping = false;
   int64_t accepted_revision = 0;
   bool logs_ok = true;
+  bool enforcement_pending = true;
   explicit Engine(Config c);
   ~Engine();
   void sql(const char *s);

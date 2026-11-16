@@ -165,3 +165,11 @@ Edge 现在以 HTTP_FILTER 类型注册，确保静态和动态构建均在 Ngin
 `$scdn_edge_security` 从当前请求持有的原生快照提供安全策略，`$scdn_edge_security_checked` 由已配置的安全处理器成功检查后置 1。策略开启但未经过处理器时，内容阶段返回 503。新桥接器不查询旧 Lua registry；详见 [Lua 交接](../docs/LUA-HANDOFF.zh-CN.md)。
 
 `scdn_edge_tls_fallback on` 可显式保留未知/无 SNI 的 bootstrap 证书行为，默认 off。它要求 `scdn_edge_tls on`；HTTP Host 仍由 Edge 检查，已配置站点的过期或不可用证书不会降级。迁移后移除 Lua SSL 回调。
+
+## 本次复审后的运行约束
+
+counter 使用有界 Worker 本地查找缓存，Host 使用 Config 准备的排序索引。预声明的命名池 URL 使用 http://pool_name / https://pool_name，变量 proxy_pass 可以匹配该组，裸池名会被拒绝。新增大表、权限和同一 TCP keepalive 字节增量回归见 tests/audit_regressions.py。
+
+status/metrics 放在未启用 scdn_edge 的独立受限 server；业务 server 不按 URL 名称自动绕过 Host 或安全策略。metrics 成功响应附 no-store，本机反向代理若公开路径须另行鉴权。动态证书回调独占所属 SSL_CTX，不与另一 Lua/第三方证书回调同时启用。
+
+Edge-only 示例已补齐 HTTPS 的 SNI、验证、CA 和 Host，并关闭可变身份的 TLS session reuse。实际 CA 路径按部署配置，命名池复用也可使用 API 模块的身份检查。完整结论见[独立复审](../docs/AUDIT-REVIEW-2026-11-16.zh-CN.md)。

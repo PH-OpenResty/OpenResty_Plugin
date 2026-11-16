@@ -204,12 +204,35 @@ jobs:
           extra=()
           if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
           python native-purge/tests/revalidate.py --prefix "$RUNNER_TEMP/scdn-plugin" --report "$RUNNER_TEMP/revalidate-results.json" "${extra[@]}"
+      - name: Audit identity, receipt capacity, indexed routes and Ban recovery regressions
+        env:
+          ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+          PLUGIN_LINKAGE: ${{ matrix.linkage }}
+          PLUGIN_RUNTIME: ${{ matrix.runtime }}
+        run: |
+          extra=()
+          sanitizer=()
+          if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
+          if [ "$PLUGIN_RUNTIME" = nginx ]; then sanitizer+=(--sanitize); fi
+          python native-sync/tests/identity_reassignment.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/identity-reassignment-results.json"
+          python native-sync/tests/receipt_capacity.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/receipt-capacity-results.json"
+          python native-edge/tests/audit_regressions.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/edge-audit-results.json"
+          python native-tier/tests/custom_cache.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/tier-custom-cache-results.json"
+          python native-purge/tests/regex_cache.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/regex-cache-results.json"
+          sudo --preserve-env=ASAN_OPTIONS,UBSAN_OPTIONS "$(command -v python)" native-ban/tests/recovery.py --agent-build "$RUNNER_TEMP/scdn-ban" "${sanitizer[@]}" --report "$RUNNER_TEMP/ban-recovery-results.json"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: all-plugins-${{ matrix.runtime }}-${{ matrix.linkage }}-results
           path: |
             ${{ runner.temp }}/startup-results.json
+            ${{ runner.temp }}/identity-reassignment-results.json
+            ${{ runner.temp }}/receipt-capacity-results.json
+            ${{ runner.temp }}/edge-audit-results.json
+            ${{ runner.temp }}/tier-custom-cache-results.json
+            ${{ runner.temp }}/regex-cache-results.json
+            ${{ runner.temp }}/ban-recovery-results.json
             ${{ runner.temp }}/ban-tcx-results.json
             ${{ runner.temp }}/ban-xdp-results.json
             ${{ runner.temp }}/ban-lua-waf-results.json

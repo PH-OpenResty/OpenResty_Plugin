@@ -485,6 +485,10 @@ static ngx_int_t header_filter(ngx_http_request_t *r)
             && r->upstream->cacheable && r->headers_out.content_length_n >= 0
             && r->headers_out.content_length_n <= ctx->l2_limit;
         if (store) {
+            /* Custom static proxy_cache/key configurations may not evaluate a
+             * Tier variable before cached headers are parsed. Without the
+             * original deadline, serve L2 but do not admit a fresh L1 copy. */
+            if (r->cached && !ctx->stored_expiry) store = 0;
             expiry = r->cache->valid_sec;
             if (ctx->stored_expiry && (!expiry || ctx->stored_expiry < expiry)) expiry = ctx->stored_expiry;
             if (!expiry && (valid = ngx_http_file_cache_valid(r->upstream->conf->cache_valid, 200))) expiry = ngx_time() + valid;
@@ -544,6 +548,8 @@ static ngx_int_t status_handler(ngx_http_request_t *r)
     if (!(r->method & (NGX_HTTP_GET|NGX_HTTP_HEAD))) return NGX_HTTP_NOT_ALLOWED;
     if (r->args.len || r->headers_in.content_length_n > 0 || r->headers_in.chunked) return NGX_HTTP_BAD_REQUEST;
     if (!main->shared) return NGX_HTTP_SERVICE_UNAVAILABLE;
+    { ngx_str_t policy = ngx_string("no-store");
+      if (set_header(r, "Cache-Control", policy) != NGX_OK) return NGX_ERROR; }
     buffer = ngx_create_temp_buf(r->pool, 512); if (!buffer) return NGX_HTTP_INTERNAL_SERVER_ERROR;
     buffer->last = ngx_snprintf(buffer->last, 512,
         "{\"version\":\"0.1.1\",\"l1_hits\":%uA,\"l2_hits\":%uA,\"origin_reads\":%uA,\"bypasses\":%uA,\"lua_required\":false}\n",

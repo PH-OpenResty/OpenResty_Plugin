@@ -55,9 +55,16 @@ typedef struct {
 } scdn_config_site_t;
 
 typedef struct {
+    ngx_str_t host;
+    ngx_uint_t site;
+} scdn_config_host_t;
+
+typedef struct {
     ngx_uint_t refs, count;
-    scdn_config_site_t sites[SCDN_CONFIG_SITES];
-    u_char digest[32], revision[65];
+    scdn_config_site_t *sites;
+    scdn_config_host_t *hosts;
+    ngx_uint_t host_count;
+    u_char digest[32], source_digest[32], revision[65];
     u_char *source;
     size_t source_size;
 } scdn_config_snapshot_t;
@@ -68,6 +75,7 @@ extern ngx_module_t ngx_http_scdn_config_module;
 scdn_config_snapshot_t *scdn_config_load(const char *path, const char **error);
 scdn_config_snapshot_t *scdn_config_load_cached(const char *path,
     const char **error, const scdn_config_snapshot_t *cache);
+int scdn_config_matches(const char *path, const scdn_config_snapshot_t *cache);
 void scdn_config_destroy(scdn_config_snapshot_t *snapshot);
 scdn_config_snapshot_t *scdn_config_acquire(void);
 void scdn_config_release(scdn_config_snapshot_t *snapshot);

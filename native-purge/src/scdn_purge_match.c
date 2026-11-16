@@ -6,7 +6,7 @@
 #define PCRE2_CODE_UNIT_WIDTH 8
 #include <pcre2.h>
 
-#define REGEX_CACHE 64
+#define REGEX_CACHE SCDN_PURGE_PREFIXES
 #define REGEX_LENGTH 1024
 #define MATCH_BUDGET 100000
 
@@ -109,7 +109,10 @@ wildcard_match(const ngx_str_t *pattern, const ngx_str_t *key)
         if(++steps>MATCH_BUDGET)return NGX_ERROR;
         if(p<pattern->len) {
             byte=pattern->data[p];literal=0;
-            if(byte=='\\') { literal=1;byte=pattern->data[++p]; }
+            if(byte=='\\') {
+                if (++p == pattern->len) return NGX_ERROR;
+                literal=1;byte=pattern->data[p];
+            }
             if(!literal && byte=='*') { star=++p;retry=k;continue; }
             if((!literal && byte=='?') || byte==key->data[k]) { p++;k++;continue; }
             /* Restore the escape prefix when retrying from a star. */

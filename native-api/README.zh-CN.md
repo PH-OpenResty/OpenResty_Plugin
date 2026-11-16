@@ -175,3 +175,11 @@ Config/Edge 已支持 [缓存响应头与规则回源头](../docs/CACHE-HEADERS.
 六模块完整共存测试为 `python native-tier/tests/coexist.py --prefix /isolated/runtime --report /tmp/six.json`，实际启用 L1/L2 层级缓存和原有 API/流式路径。站点/证书加密发布的独立端到端测试为 native-sync/tests/distribution.py。
 
 当前统一构建包含原生 [Ban](../native-ban/RUNTIME.zh-CN.md)。一起编译时 Ban 必须先于 API/Edge 动态加载；未配置 scdn_ban on 时不启用封禁。其 Agent/eBPF 和全节点快照是独立运行路径，Sync 桥接需显式 scdn_sync_ban_agent。
+
+## 分类优先级与本机指标边界
+
+请求头分类一次遍历，重复 Cache-Control/Pragma/Accept 都参与判断。profile 优先级为 WebSocket → gRPC → AI → SSE → 普通 API → web；stream/private 是独立标记，AI 覆盖 SSE profile 不会清除流式或私有绕过。
+
+Accept SSE 是自动识别提示，不是授权或总资源预算。应在允许的 server/location 启用自动识别，按业务配置读空闲超时、连接/并发限制和既有安全执行策略；模块不提供模型配额或总时长限制。命名池在站点中用完整 http://pool_name / https://pool_name 表达。
+
+metrics 成功响应带 no-store；本机代理如公开该路径须另行鉴权，或使用受限 Unix Socket 目录。完整结论见[独立复审](../docs/AUDIT-REVIEW-2026-11-16.zh-CN.md)。

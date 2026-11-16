@@ -109,3 +109,9 @@ curl --config /etc/scdn-sync-native/master/control.curl.conf \
 缓存任务的 mTLS、Node/scope 校验、摘要、持久队列和幂等结果属于独立任务协议。Sync 0.3.0 新增站点/证书的 [原生发布与应用](SYNC-PUBLICATION.zh-CN.md)，不使用缓存队列冒充配置事务。旧 Lua JWE/JWS/HTTP nonce API 仍不与 native v2 直接兼容。预热可走 [Tier](../native-tier/README.zh-CN.md) 的同一业务入口；先确认配置已应用，再刷新/预热相应版本。验收入口为 `python native-sync/tests/cache_tasks.py --prefix /isolated/runtime`，静态构建加 `--static`。
 
 加 `--tier` 可运行真实双层缓存任务验收：mTLS Master/Node 向业务入口刷新/预热、验证 L1 HIT、各模式同时失效、HTTP/HTTPS、丢失 L1 后从持久 L2 恢复并重新晋升。此模式同时使用 Tier 的正式 front/backend 模板，能验证两层联动，而不只验证单层缓存任务协议。
+
+## 未确认收据与升级
+
+X-Task-Lease 是领取 attempt，不是本地回执可淘汰标记。Node 执行前保存非零 lease 保留标记；终态收据在 Master ACK 成功后才清零，容量不足时不能删除尚未确认的收据。真实 120 秒租约与 128 条容量压力回归见 native-sync/tests/receipt_capacity.py。
+
+旧版本已有 lease=0 的终态记录无法仅靠本机文件区分 ACK 成功与丢失；升级前让两端正常连通并完成在途任务，保留队列和回执备份。本次修复不追溯保证此前已被淘汰的记录。完整结论见[独立复审](AUDIT-REVIEW-2026-11-16.zh-CN.md)。

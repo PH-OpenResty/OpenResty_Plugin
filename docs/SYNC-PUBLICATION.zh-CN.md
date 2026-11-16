@@ -107,3 +107,11 @@ Worker 确认和探测成功后，先持久 applied.state，最后删除 apply.p
 `python native-sync/tests/distribution.py --prefix /isolated/runtime` 用一个真实 Master、两个真实 Node、每实例两个 Worker 验证发布、密文隔离、路由/证书热变更、异常源、篡改/重放、探测回退、ACK 恢复、Master 离线和启动回退；静态构建增加 `--static`。容量、跨地域网络、完整磁盘/掉电矩阵和自动密钥轮换需在部署环境另验收。
 
 收据与进程中断回归见 `native-sync/tests/recovery.py`。不能将有未完成 SCNDP02 事务的目录直接交给不识别它的旧二进制；升级统一编译 Config/Edge/Sync 及其依赖，先更新 Node，再发布使用新策略字段的 Master。
+
+## 复审后的发布复用与超时配置
+
+新增 http 指令 scdn_sync_config_apply_timeout，范围 1s–10m、默认 15s；应用与回退使用相同的全 Worker 确认预算，轮询从 50ms 退避到 800ms。业务探测最多四项并发，每项 3 秒、响应上限 1MiB，禁止重定向；任一失败仍触发原有回退。
+
+Master 只缓存最近一份 source 的不可变快照/payload，仍完整读取和哈希配置及证书材料；已验证对象绑定 Node、scope、登记指纹、RSA 加密公钥和签名公钥。文件 metadata 或绑定改变后重新验证/发布。缓冲按实际内容增长，协议上限不变。
+
+单独缺少 sequence.state 时，仅从当前签名密钥验证成功的 desired.bundle 恢复下界并递增；损坏 state、签名不符、整套状态丢失不能据此降低水位。保留可信一致备份，不通过清空 Node highest/applied 恢复通信。完整结论见[独立复审](AUDIT-REVIEW-2026-11-16.zh-CN.md)。

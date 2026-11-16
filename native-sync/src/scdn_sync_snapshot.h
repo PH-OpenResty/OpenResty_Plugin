@@ -3,6 +3,7 @@
 #include "scdn_config.h"
 
 scdn_config_snapshot_t *scdn_sync_snapshot_load(const char *path, const char **error);
+int scdn_sync_snapshot_matches(const char *path, const scdn_config_snapshot_t *cache);
 void scdn_sync_snapshot_destroy(scdn_config_snapshot_t *snapshot);
 /* Canonical site configuration; only certificate paths are relocated. */
 u_char *scdn_sync_snapshot_export(scdn_config_snapshot_t *snapshot,
