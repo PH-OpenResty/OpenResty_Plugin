@@ -243,6 +243,9 @@ except OSError:print('blocked')
             initial_snapshot=db.execute("SELECT value FROM meta WHERE key='snapshot'").fetchone()[0]
         self.until(lambda:all(self.request(n)[0]==200 for n in self.configs),'public requests')
         self.check('unbanned clients reach all three protected HTTP endpoints',all(self.request(n)[0]==200 for n in self.configs))
+        # IPv6 addresses are tentative until duplicate-address detection and
+        # bridge neighbor discovery finish. IPv4 readiness is not IPv6 readiness.
+        self.until(lambda:all(self.request(n,ipv6=True)[0]==200 for n in self.configs),'IPv6 address and neighbor readiness',timeout=12)
         self.check('unbanned IPv6 client can reach protected HTTP',self.request('node-a',ipv6=True)[0]==200)
         ns,conf=self.configs['node-a']
         def producer(ip,mode):return json.loads(self.ns(ns,str(self.root/'producer'),conf['event_socket'],conf['runtime_dir']+'/view',ip,mode))

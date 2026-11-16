@@ -238,6 +238,10 @@ View::~View() {
     close(readonly);
 }
 void View::publish(const ban_record &r, bool remove) {
+  ban_record current{};
+  int found=ban_view_lookup(data,&r.ip,r.scope,0,&current);
+  if(!remove&&found==1&&!memcmp(&current,&r,sizeof(r)))return;
+  if(remove&&found==0)return;
   require(ban_view_write(data, &r, remove), "view_capacity_or_unstable");
 }
 } // namespace ban
