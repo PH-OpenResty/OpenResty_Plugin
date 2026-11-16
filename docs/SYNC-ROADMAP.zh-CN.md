@@ -20,10 +20,12 @@
 - 旧 Lua JWE/JWS 与 HTTP 请求签名/nonce 协议的双向兼容：当前采用独立固定二进制封装，不能宣称无缝互通。
 - 自动密钥轮换、多权威 Master 的 fencing/容灾切换、跨地域大规模性能与完整磁盘/掉电故障矩阵。
 - 管理员指定探测以外的全站业务健康、静态内容文件发布、证书自动签发和程序自动升级。
-- [Ban 全节点 L3 同步](../native-ban/design/CLUSTER-SYNC.zh-CN.md)：任意设备上报、完整有效集合、逐节点内核确认，目前仍是设计。站点配置已能同步不代表 Ban Agent/BPF 已实现。
+- [Ban 全节点 L3 同步](../native-ban/design/CLUSTER-SYNC.zh-CN.md)：任意设备上报、完整有效集合、逐节点内核确认，已由 Ban 0.1.0 实现。站点/缓存任务通道与 Ban 的完整快照分别核验。
 
 ## 配置与缓存生命周期
 
 Config/Edge 保持唯一活动站点版本，Sync 通过受管事务交付，不另造一份在 Worker 中独立切换的路由表。普通 Config watcher 与受管写入模式互斥，源文件只允许一个权威写者。Purge 维护自己的失效 journal；[Tier](../native-tier/README.zh-CN.md) 建立 L1/L2 读取链；两者不充当配置发布序号或事务日志。
 
 新能力须以真实进程、失败恢复和对应角色的证据验收。历史 Lua 或仅 Schema/ABI 检查不计入原生运行验收。
+
+Ban 0.1.0 的当前配置、事件/权限、全量同步、日志持久化与运行验收见 [运行手册](../native-ban/RUNTIME.zh-CN.md)，历史设计字段不直接用于启动。

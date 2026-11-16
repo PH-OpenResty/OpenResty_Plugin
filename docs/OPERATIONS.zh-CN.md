@@ -140,4 +140,6 @@ Sync 0.3.0 保留的持久化缓存任务投递、状态、删除、Node 后台�
 
 ## 规则缓存头与全节点封禁设计
 
-站点/prefix 中的缓存诊断开关和静态回源头可热更新，使用 [缓存头手册](CACHE-HEADERS.zh-CN.md)的字段，并确认缓存 key 保留配置 revision。Ban v2 的 [全节点同步](../native-ban/design/CLUSTER-SYNC.zh-CN.md)规定任意设备上报、完整有效表、固定期限和逐节点内核 ACK，目前仍是待实现合同，不能把缓存任务 ACK 当作封禁全量完成。
+站点/prefix 中的缓存诊断开关和静态回源头可热更新，使用 [缓存头手册](CACHE-HEADERS.zh-CN.md)的字段，并确认缓存 key 保留配置 revision。Ban v2 的 [全节点同步](../native-ban/design/CLUSTER-SYNC.zh-CN.md)规定任意设备上报、完整有效表、固定期限和逐节点内核 ACK，现已由独立 Ban Agent、eBPF 与 Sync 桥实现，仍不能把缓存任务 ACK 当作封禁全量完成。
+
+Ban 0.1.0 的当前配置、事件/权限、全量同步、日志持久化与运行验收见 [运行手册](../native-ban/RUNTIME.zh-CN.md)，历史设计字段不直接用于启动。

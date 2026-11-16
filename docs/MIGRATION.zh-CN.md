@@ -37,7 +37,7 @@
 ## 3. 推荐迁移步骤
 
 1. 记录现有 Nginx 构建、模块、业务配置、站点集合、证书和可验证的回退点。
-2. 在独立目录与端口使用统一六模块构建，先验证需要启用的业务模块；Sync 单独验证角色/mTLS，Purge 单独验证持久失效。
+2. 在独立目录与端口使用统一七模块构建，先验证需要启用的业务模块；Sync 单独验证角色/mTLS，Purge 单独验证持久失效。
 3. 从可信配置来源导出完整站点文件，逐个核对 Host、回源、root、缓存和证书；不要执行不可信 Lua 来转换数据。
 4. 使用真实 Worker 账户核对全部文件和父目录可读，缓存/运行目录可写，消除旧证书 symlink 路径依赖。
 5. 在隔离实例观察状态、业务 HTTP/TLS、缓存与指标；对照启停、删除、证书轮换及回退行为。
@@ -64,6 +64,8 @@ Sync 0.3.0 保留的持久化缓存任务投递、状态、删除、Node 后台�
 
 ## 缓存头升级
 
-站点/前缀缓存策略可增加 cache_headers、cache_request_header，继承和优先级见 [手册](CACHE-HEADERS.zh-CN.md)。删除旧 X-Cache 等重复 add_header，缓存 key 保留配置 revision；错误候选仍保留旧活动版本。Ban 的节点本地设计已改为 [全节点完整有效表合同](../native-ban/design/CLUSTER-SYNC.zh-CN.md)，跨机运行实现仍待对应 Agent/执行器完成。
+站点/前缀缓存策略可增加 cache_headers、cache_request_header，继承和优先级见 [手册](CACHE-HEADERS.zh-CN.md)。删除旧 X-Cache 等重复 add_header，缓存 key 保留配置 revision；错误候选仍保留旧活动版本。Ban 的节点本地设计已改为 [全节点完整有效表合同](../native-ban/design/CLUSTER-SYNC.zh-CN.md)，运行入口为 Ban 0.1.0 的 JSON 配置、原生 Agent/eBPF 和 Sync 桥。
 
 旧 tier.lua 和 flush_l1_to_l2.lua 的原生替代是 [Tier](../native-tier/README.zh-CN.md)：L1 miss 读取 L2、L2 miss 回源、热对象晋升、冷层副本保留；不再需要维护时扫描拷贝活动缓存文件。
+
+Ban 0.1.0 的当前配置、事件/权限、全量同步、日志持久化与运行验收见 [运行手册](../native-ban/RUNTIME.zh-CN.md)，历史设计字段不直接用于启动。

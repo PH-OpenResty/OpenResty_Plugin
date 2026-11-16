@@ -1,4 +1,7 @@
 #include "scdn_edge.h"
+#if (NGX_SCDN_BAN)
+#include "ngx_scdn_ban.h"
+#endif
 #include <ngx_http_ssl_module.h>
 #if (NGX_SCDN_API)
 #include "scdn_api.h"
@@ -303,6 +306,10 @@ edge_access(ngx_http_request_t *r)
     request = scdn_edge_request(r);
     if (request == NULL || request->snapshot == NULL) { return NGX_HTTP_SERVICE_UNAVAILABLE; }
     if (request->site == NULL || !request->site->enabled) { return NGX_HTTP_FORBIDDEN; }
+#if (NGX_SCDN_BAN)
+    { ngx_int_t ban_rc = ngx_http_scdn_ban_precheck(r);
+      if (ban_rc != NGX_DECLINED) return ban_rc; }
+#endif
     if (!request->routed && request->upstream.len != 0) {
         location = &server->proxy_location;
 #if (NGX_SCDN_API)

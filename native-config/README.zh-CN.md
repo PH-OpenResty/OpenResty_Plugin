@@ -192,3 +192,5 @@ site/prefix 可设置 `cache_headers on|off;`（站点默认 on、前缀继承�
 普通 scdn_config_watch 仍只读源文件。使用 `scdn_config_managed /private/state;` 时，文件固定为 state/active.conf，与 Sync 0.3.0 的持久事务配合；启动会校验并恢复未完成 apply.pending 对应的 previous.conf，然后才加载 bootstrap。两种指令互斥，真实目录需 Worker 所有 0700。状态接口增加 X-Config-Revision、X-Config-Ready（全 Worker 确认）及受管目录摘要；完整协议见 [发布手册](../docs/SYNC-PUBLICATION.zh-CN.md)。
 
 完整站点快照会携带 cache/tier 及请求/响应头字段；L1/L2 读取链使用 [Tier](../native-tier/README.zh-CN.md)，源站正文和缓存文件不通过配置 Sync 发布。
+
+当前统一构建包含原生 [Ban](../native-ban/RUNTIME.zh-CN.md)。一起编译时 Ban 必须先于 API/Edge 动态加载；未配置 scdn_ban on 时不启用封禁。其 Agent/eBPF 和全节点快照是独立运行路径，Sync 桥接需显式 scdn_sync_ban_agent。

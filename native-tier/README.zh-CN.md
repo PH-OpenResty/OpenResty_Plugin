@@ -46,7 +46,7 @@ L1 HIT 没有层间代理；冷请求和 L1 MISS 增加一次本机 Unix Socket 
 
 ## 配置接入
 
-[完整配置](examples/nginx.conf)依赖 [front.conf](examples/front.conf)和 [backend.conf](examples/backend.conf)。模块可与 Purge 一起独立加载，也能接入 Config/API/Edge。完整运行时动态加载顺序建议 Config → Tier → API → Edge → Purge → Sync；静态编入时不写 load_module。实际 C 接口依赖仍是 Config/API/Edge，Tier 本身不依赖 Lua。
+[完整配置](examples/nginx.conf)依赖 [front.conf](examples/front.conf)和 [backend.conf](examples/backend.conf)。模块可与 Purge 一起独立加载，也能接入 Config/API/Edge。完整运行时动态加载顺序建议 Config → Ban → Tier → API → Edge → Purge → Sync；静态编入时不写 load_module。实际 C 接口依赖仍是 Config/API/Edge，Tier 本身不依赖 Lua。
 
 Edge 的 web 命名代理 location 可配置：
 
@@ -89,3 +89,5 @@ Sync 缓存预热走同一业务入口，能填充相应层。热对象 L1 HIT �
 `native-tier/tests/integration.py` 验证选层、L2 读取晋升、大小准入、私有响应、Vary/查询串、Purge、源站再验证、并发锁、L1 丢失重启和信息边界；`native-tier/tests/coexist.py` 同时启用六模块并运行真实 API/AI/SSE/WebSocket/gRPC 代理检查。两者接受 `--prefix`、`--static` 和 `--report`。缓存管理仍由 Nginx 完成，不保证任意旧二进制 ABI、不同模块过滤顺序或未经验证的代理模板均兼容；真实 tmpfs/SSD 压力、PPS/QPS、磁盘掉电和容量需单独测量。
 
 合并审查补充：凭据字段即使重复出现也始终绕过缓存；重复 Cache-Control/Pragma 保守绕过，不能因严格唯一字段查找失败而退回共享缓存。回归会先填充匿名公共对象，再验证不同凭据请求均真实回源且不会相互复用。
+
+当前统一构建包含原生 [Ban](../native-ban/RUNTIME.zh-CN.md)。一起编译时 Ban 必须先于 API/Edge 动态加载；未配置 scdn_ban on 时不启用封禁。其 Agent/eBPF 和全节点快照是独立运行路径，Sync 桥接需显式 scdn_sync_ban_agent。

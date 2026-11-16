@@ -24,3 +24,5 @@ Sync 缓存任务的队列、Node 收据、目标 URL/缓存键列表和运行�
 Ban 集群的真实 IP 集合、来源设备、签名私钥、快照和 outbox/收据属于私有运行材料；公开日志例子只用保留 IP 和合成 UUID。缓存规则头只展示非敏感合成值，不上传真实源站业务头或凭据。
 
 原生配置发布的 source、desired.bundle、releases、active/previous.conf、highest/applied/rejected/reported 状态及 Node RSA/签名私钥均属于私有运行材料。测试仅生成临时身份/合成站点，报告不保存明文快照。Tier 实例令牌只存在共享内存和受限 Unix 请求，不进入文档、报告或正常访问日志。
+
+Ban 的实际 policy.json、SQLite 主文件/WAL/SHM、共享视图、pin/链接、客户端证书和签名密钥、事件/IP 日志均是私有运行材料，不提交仓库。公开运行示例使用保留 IP、合成身份和通用路径。CI 只上传检查名称/结果，不上传状态目录或签名快照。

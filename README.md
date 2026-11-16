@@ -1,6 +1,6 @@
 # OpenResty Plugin
 
-六个纯 C 的 Nginx/OpenResty HTTP 插件：Sync 提供 Master/Node 身份、站点/证书加密发布与热应用、缓存刷新与预热任务；Config/Edge 读取站点数据热更新路由、证书和缓存策略；API 自动识别动态 API、AI 与流式请求；Purge 提供持久化失效、源站校验及过时复用。这些原生模块不依赖 Lua，不生成站点 Lua、字节码或 `nginx.conf`。
+七个纯 C 的 Nginx/OpenResty HTTP 插件：Sync 提供 Master/Node 身份、站点/证书加密发布与热应用、缓存刷新与预热任务；Config/Edge 读取站点数据热更新路由、证书和缓存策略；API 自动识别动态 API、AI 与流式请求；Purge 提供持久化失效、源站校验及过时复用。Nginx/BPF 为 C，Ban Agent 为 C++17。这些原生模块不依赖 Lua，不生成站点 Lua、字节码或 `nginx.conf`。
 
 | 插件 | 职责 | 文档 |
 | --- | --- | --- |
@@ -8,10 +8,11 @@
 | `ngx_http_scdn_config_module.so` | 后台检测文件内容、校验并预加载候选版本、等待各 Worker 就绪、切换不可变配置版本 | [Config 完整手册](native-config/README.zh-CN.md) |
 | `ngx_http_scdn_api_module.so` | 请求/响应自动识别、API/AI 代理策略、缓存绕过、流式响应与 TLS 连接复用身份检查 | [API 完整手册](native-api/README.zh-CN.md) |
 | `ngx_http_scdn_edge_module.so` | Host 与最长前缀路由、启停、静态目录、SNI 证书选择、缓存层/可选热度、规则回源头/响应诊断、Prometheus 指标 | [Edge 完整手册](native-edge/README.zh-CN.md) |
+| `ngx_http_scdn_ban_module.so` | 可信 WAF/CC 事件、固定期限 L7/L3、独立 Agent/eBPF、所有节点完整封禁快照 | [Ban 运行手册](native-ban/RUNTIME.zh-CN.md) |
 | `ngx_http_scdn_tier_module.so` | 原生热度选层、L1 → L2 → 源站、晋升/冷层保留、对象大小准入与原始到期 | [Tier 完整手册](native-tier/README.zh-CN.md) |
 | `ngx_http_scdn_purge_module.so` | 持久化精确/批量/通配符/正则/后缀/目录/整站/节点失效、源站条件校验、有界过时复用 | [Purge 完整手册](native-purge/README.zh-CN.md) |
 
-Edge 依赖 Config 的 C 接口；一起构建 API 时也调用其判定接口。业务模块必须使用同一源码版本编译，全量动态加载顺序建议 Config → Tier → API → Edge → Purge → Sync；Sync、Tier 与 Purge 可独立加载。代理、静态文件与缓存文件管理继续使用 Nginx 自带模块。WAF、业务限速仍由外部能力承担。
+Edge 依赖 Config 的 C 接口；一起构建 API 时也调用其判定接口。业务模块必须使用同一源码版本编译，全量动态加载顺序建议 Config → Ban → Tier → API → Edge → Purge → Sync；Sync、Tier 与 Purge 可独立加载。代理、静态文件与缓存文件管理继续使用 Nginx 自带模块。WAF、业务限速仍由外部能力承担。
 
 **Sync 0.3.0 已补齐原生站点配置与证书发布/应用。** Master 自动检查完整源快照并按 Node 加密签名，Node 验证、持久准备、热应用并等待全 Worker 确认，失败回退，结果可重报；详见 [发布手册](docs/SYNC-PUBLICATION.zh-CN.md)。这是独立的 native.snapshot.v2 协议，不与旧 Lua JWE/JWS API 混用；迁移需明确交接唯一配置写入权。
 
@@ -38,7 +39,7 @@ Purge 可独立加载，不依赖其他插件，也不修改 Nginx 核心或私�
 - [验证记录](docs/VALIDATION.zh-CN.md)：实测项目、CI、内存检查及未验证范围。
 - [缓存机制调研](docs/CACHE-MECHANISM.zh-CN.md)、[精确清理接入](native-purge/README.zh-CN.md)和[缓存清理基准](native-purge/bench/README.zh-CN.md)。
 - [源站校验、过时复用与匹配清理调研](docs/CACHE-REVALIDATION-RESEARCH.zh-CN.md)：ETag/Last-Modified、两个 stale 窗口、规则预算与节点范围。
-- [IP 封禁与 eBPF 详细设计（草案）](native-ban/README.zh-CN.md)：固定期限、WAF/CC 事件、L7/L3 升级、只读共享视图、内核表、任意设备上报至所有节点的完整封禁快照及两类日志契约；尚未加入运行模块。
+- [IP 封禁与 eBPF 运行模块](native-ban/README.zh-CN.md)：原生 Nginx、单写 Agent、XDP/TCX、任意设备上报及全节点完整同步、两类日志和恢复。
 - [源码来源](SOURCE.md)、[公开发布规则](PUBLISHING.md)、[许可证](LICENSE)。
 
 ## 独立构建与验证
@@ -75,7 +76,7 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-nginx --purge -
   --report /tmp/scdn-five-modules-results.json
 ```
 
-系统构建依赖与 OpenResty 构建方式见 [安装文档](docs/INSTALL.zh-CN.md)。脚本固定下载归档并验证 SHA-256，构建六个插件，拒绝覆盖已有安装。
+系统构建依赖与 OpenResty 构建方式见 [安装文档](docs/INSTALL.zh-CN.md)。脚本固定下载归档并验证 SHA-256，构建七个插件，拒绝覆盖已有安装。
 
 ## 配置如何生效
 
@@ -95,6 +96,6 @@ flowchart LR
 
 ## 仓库边界
 
-本仓库独立提供 Sync、Config、API、Edge、Tier、Purge 源码、模板、测试与构建工具。Config 的普通 watcher 保持只读；启用 scdn_config_managed 后与 Sync 的持久事务及启动回退配合。Sync 0.3.0 已负责原生 v2 站点/证书分发，Tier 负责原生层级缓存；Ban 全节点 L3 同步仍是设计，尚无运行 Agent/BPF。自动证书签发和程序自动升级不属于本次实现。
+本仓库独立提供 Sync、Config、Ban、API、Edge、Tier、Purge 源码、模板、测试与构建工具。Config 的普通 watcher 保持只读；启用 scdn_config_managed 后与 Sync 的持久事务及启动回退配合。Sync 0.3.0 已负责原生 v2 站点/证书分发，Tier 负责原生层级缓存；Ban 已提供独立 Agent、XDP/TCX 和全节点 L3 同步；部署权限与明确支持范围见运行手册。自动证书签发和程序自动升级不属于本次实现。
 
 仓库示例只使用保留域名、本机地址和通用路径。运行配置、站点数据、证书、私钥、token、日志及构建二进制应保存在受限的部署目录或忽略目录中。

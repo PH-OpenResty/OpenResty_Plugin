@@ -31,6 +31,8 @@ static ngx_int_t ngx_http_scdn_handler(ngx_http_request_t *r);
 static ngx_int_t ngx_http_scdn_process(ngx_cycle_t *cycle);
 
 static ngx_command_t ngx_http_scdn_commands[] = {
+    { ngx_string("scdn_sync_ban_agent"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
+      scdn_sync_ban_directive, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
     { ngx_string("scdn_sync_role"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
       ngx_http_scdn_role, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
     { ngx_string("scdn_sync_id"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE1,
@@ -346,6 +348,10 @@ ngx_http_scdn_configure(ngx_conf_t *cf)
 #endif
 
     conf = ngx_http_conf_get_module_main_conf(cf, ngx_http_scdn_sync_module);
+    if (conf->ban_bridge && conf->role != SCDN_SYNC_MASTER) {
+        ngx_conf_log_error(NGX_LOG_EMERG, cf, 0, "scdn_sync_ban_agent requires the master role");
+        return NGX_ERROR;
+    }
     if (scdn_sync_tasks_configure(cf, conf) != NGX_OK) {
         return NGX_ERROR;
     }
@@ -626,7 +632,7 @@ ngx_http_scdn_capabilities(ngx_http_request_t *r,
         "\"mtls_peer_registry\":%s,\"encrypted_distribution\":%s,"
         "\"node_pull\":%s,\"apply_transactions\":%s,"
         "\"business_health\":%s,\"cache_tasks\":%s,"
-        "\"cache_refresh\":%s,\"cache_preheat\":%s}",
+        "\"cache_refresh\":%s,\"cache_preheat\":%s,\"ban_exchange\":%s}",
         scdn_sync_role_name(conf->role), &conf->id,
         conf->role == SCDN_SYNC_MASTER ? "true" : "false",
         conf->distribution ? "true" : "false",
@@ -635,7 +641,8 @@ ngx_http_scdn_capabilities(ngx_http_request_t *r,
         scdn_sync_distribution_health(conf) ? "true" : "false",
         conf->cache.directory.len ? "true" : "false",
         conf->cache.directory.len ? "true" : "false",
-        conf->cache.directory.len ? "true" : "false");
+        conf->cache.directory.len ? "true" : "false",
+        conf->ban_bridge ? "true" : "false");
     if (peer != NULL) {
         end = ngx_snprintf(end, body.data + 1536 - end,
             ",\"peer\":{\"node_id\":\"%V\",\"scope_id\":\"%V\"}",
@@ -747,6 +754,8 @@ ngx_http_scdn_handler(ngx_http_request_t *r)
             return ngx_http_scdn_error(r, NGX_HTTP_FORBIDDEN, "node_forbidden");
         }
     }
+    rc = scdn_sync_ban_handler(r, conf, peer, location->mode == SCDN_API_EXCHANGE);
+    if (rc != NGX_DECLINED) return rc;
     rc = scdn_sync_distribution_handler(r, conf, peer, location->mode == SCDN_API_EXCHANGE);
     if (rc != NGX_DECLINED) return rc;
     rc = scdn_sync_tasks_handler(r, conf, peer,

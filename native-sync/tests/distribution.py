@@ -86,7 +86,7 @@ class Review(RoleReview):
     def config(self, name, directives, servers):
         text = super().config(name, directives, servers)
         modules = '' if self.static else ''.join(f'load_module {self.prefix}/modules/ngx_http_scdn_{module}_module.so;\n'
-                                                for module in ('config', 'api', 'edge'))
+                                                for module in ('config', 'ban', 'api', 'edge'))
         return text.replace('worker_processes 2;', modules + '''worker_processes 2;
             thread_pool scdn_config_reader threads=1 max_queue=2;
             thread_pool scdn_sync_distribution threads=2 max_queue=16;

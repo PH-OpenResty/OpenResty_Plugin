@@ -1,4 +1,4 @@
-name: Native Sync Config API Edge Tier and Purge
+name: Native Sync Config Ban API Edge Tier and Purge
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
       - name: Install build and test dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential perl libpcre2-dev libssl-dev zlib1g-dev libcurl4-openssl-dev curl
+          sudo apt-get install -y build-essential perl libpcre2-dev libssl-dev zlib1g-dev libcurl4-openssl-dev curl clang libbpf-dev libelf-dev libsqlite3-dev libjson-c-dev iproute2
           python -m pip install -r tests/requirements.txt
       - name: Verify implementation checksums
         run: sha256sum -c SOURCE-SHA256SUMS
@@ -48,7 +48,7 @@ jobs:
           if [ "$PLUGIN_RUNTIME" = nginx ]; then
             SCDN_NATIVE_SANITIZERS='-fsanitize=address,undefined -fno-omit-frame-pointer' sh native-sync/tests/check-core.sh
           fi
-      - name: Build isolated runtime and all six plugins
+      - name: Build isolated runtime and all seven plugins
         env:
           PLUGIN_RUNTIME: ${{ matrix.runtime }}
           PLUGIN_LINKAGE: ${{ matrix.linkage }}
@@ -59,6 +59,25 @@ jobs:
             export SCDN_NATIVE_CC="sh $GITHUB_WORKSPACE/tools/sanitizer-cc.sh"
           fi
           sh tools/build-runtime.sh "$RUNNER_TEMP/scdn-plugin" "$PLUGIN_RUNTIME" "$PLUGIN_LINKAGE"
+      - name: Build native Ban Agent and kernel programs
+        env:
+          PLUGIN_RUNTIME: ${{ matrix.runtime }}
+        run: |
+          if [ "$PLUGIN_RUNTIME" = nginx ]; then export BAN_SANITIZERS='-fsanitize=address,undefined -fno-omit-frame-pointer'; fi
+          sh native-ban/tools/build-agent.sh "$RUNNER_TEMP/scdn-ban"
+      - name: Real Ban kernel enforcement and complete cluster synchronization
+        env:
+          ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+          PLUGIN_LINKAGE: ${{ matrix.linkage }}
+          PLUGIN_RUNTIME: ${{ matrix.runtime }}
+        run: |
+          extra=()
+          if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
+          sudo --preserve-env=ASAN_OPTIONS,UBSAN_OPTIONS "$(command -v python)" native-ban/tests/runtime.py --prefix "$RUNNER_TEMP/scdn-plugin" --agent-build "$RUNNER_TEMP/scdn-ban" "${extra[@]}" --report "$RUNNER_TEMP/ban-tcx-results.json"
+          if [ "$PLUGIN_RUNTIME" = nginx ]; then
+            sudo --preserve-env=ASAN_OPTIONS,UBSAN_OPTIONS "$(command -v python)" native-ban/tests/runtime.py --prefix "$RUNNER_TEMP/scdn-plugin" --agent-build "$RUNNER_TEMP/scdn-ban" --mode xdp_native --report "$RUNNER_TEMP/ban-xdp-results.json"
+          fi
       - name: Staggered worker startup and readiness deadlines
         env:
           ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
@@ -170,6 +189,8 @@ jobs:
           name: all-plugins-${{ matrix.runtime }}-${{ matrix.linkage }}-results
           path: |
             ${{ runner.temp }}/startup-results.json
+            ${{ runner.temp }}/ban-tcx-results.json
+            ${{ runner.temp }}/ban-xdp-results.json
             ${{ runner.temp }}/sync-results.json
             ${{ runner.temp }}/distribution-results.json
             ${{ runner.temp }}/tier-results.json

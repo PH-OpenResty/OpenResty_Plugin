@@ -63,7 +63,7 @@ control 同时要求真实传输连接来自 Unix Socket 或 loopback，并验�
 
 ## 构建与验证
 
-模块源码通过 Nginx `auto/module` 接入，支持动态或静态构建；需匹配目标 Nginx/OpenResty 的版本、ABI 和构建条件。统一构建包含 Sync、Config、API、Edge、Tier、Purge 六个模块。Sync 可独立加载；另外三个业务模块仍按 Config → API → Edge 加载，Purge 也独立使用。
+模块源码通过 Nginx `auto/module` 接入，支持动态或静态构建；需匹配目标 Nginx/OpenResty 的版本、ABI 和构建条件。统一构建包含 Sync、Config、Ban、API、Edge、Tier、Purge 七个模块。Sync 可独立加载；另外三个业务模块仍按 Config → Ban → API → Edge 加载，Purge 也独立使用。
 
 ```sh
 # Native helpers, with warnings treated as errors.
@@ -100,3 +100,5 @@ python native-api/tests/integration.py --prefix /tmp/scdn-native-openresty \
 完整的 config_state/source/peer_key/signing/trust/mTLS/managed 配置、实例目录、API、事务恢复和验证见 [站点/证书发布手册](../docs/SYNC-PUBLICATION.zh-CN.md)。对象使用固定 AES-GCM/RSA-OAEP/Ed25519 原生二进制封装；旧 Lua JWE/JWS 互通、HTTP nonce 请求签名、自动密钥轮换与跨地域容量验证未被宣称完成。
 
 Config/Edge 已支持 [缓存响应头与规则回源头](../docs/CACHE-HEADERS.zh-CN.md)，这些字段会随完整站点快照发布。原生 [Tier](../native-tier/README.zh-CN.md) 提供 L1/L2 读取链并与 Purge 版本失效、缓存任务预热配合。Ban 跨机封禁仍按独立设计推进。
+
+当前统一构建包含原生 [Ban](../native-ban/RUNTIME.zh-CN.md)。一起编译时 Ban 必须先于 API/Edge 动态加载；未配置 scdn_ban on 时不启用封禁。其 Agent/eBPF 和全节点快照是独立运行路径，Sync 桥接需显式 scdn_sync_ban_agent。
