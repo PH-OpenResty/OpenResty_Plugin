@@ -19,7 +19,8 @@ class Review(Test):
         config=root/'sites.conf'
         write(config,f'sites {{ site lua-site {{ host www.example.test; root {root}/html; cache off; waf on; waf_group sqli; rate_limit off; }} }}',0o644)
         directives=f'''scdn_config_zone cfg 128k; scdn_config_watch {config}; scdn_edge_zone counters 2m;
-            lua_package_path "{self.root}/lua/?.lua;;"; lua_shared_dict ratelimit_dict 1m;
+            lua_package_path "{self.root}/lua/?.lua;{self.root}/lualib/?.lua;;";
+            lua_package_cpath "{self.root}/lualib/?.so;;"; lua_shared_dict ratelimit_dict 1m;
             server {{ listen 8082; scdn_edge on; scdn_ban on; scdn_ban_scope $scdn_edge_site;
                 access_by_lua_block {{ require("lib.security_guard").run() }}
                 location / {{ root $scdn_edge_root; }} }}'''
@@ -29,6 +30,12 @@ class Review(Test):
         self.setup()
         shutil.copytree(ROOT/'native-sync/tests/fixtures/legacy-security',self.root/'lua')
         shutil.copyfile(ROOT/'compat/lua/lib/security_guard.lua',self.root/'lua/lib/security_guard.lua')
+        # Hosted-runner installation ancestors can be private to the runner.
+        # Copy only public runtime libraries into this fixture's readable tree;
+        # keep Agent PKI/state private and do not change installation permissions.
+        shutil.copytree(self.prefix.parent/'lualib',self.root/'lualib')
+        for path in (self.root/'lualib').rglob('*'):path.chmod(0o755 if path.is_dir() else 0o644)
+        (self.root/'lualib').chmod(0o755)
         for node,(ns,config) in self.configs.items():
             config['trusted_rules'].append({'source':'waf','reason':'942100'})
             index={'authority':10,'node-a':11,'node-b':12}[node]
@@ -55,7 +62,9 @@ def main():
         try:
             checks=review.run();args.report.write_text(json.dumps({'passed':len(checks),'checks':checks},indent=2)+'\n')
         except Exception:
-            for path in root.rglob('*.txt'):print(path.parent.name,path.name,path.read_text(errors='replace')[-5000:].replace(review.token,'[redacted]'))
+            for path in root.rglob('*.txt'):
+                text=path.read_text(errors='replace').replace(review.token,'[redacted]')
+                print(path.parent.name,path.name,text[:5000],text[-2000:] if len(text)>5000 else '')
             raise
         finally:review.close()
 
