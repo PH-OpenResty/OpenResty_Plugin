@@ -394,6 +394,7 @@ J Engine::bridge(const std::string &node, const std::string &operation,
     q.bind(3, digest);
     q.bind(4, state);
     q.done();
+    meta_set("result_seen:"+node,scalar(utc()));
     return status();
   }
   throw std::runtime_error("unknown_bridge_operation");

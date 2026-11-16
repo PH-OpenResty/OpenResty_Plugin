@@ -686,7 +686,7 @@ J Engine::status() {
       Statement q(db, "SELECT revision,digest,state FROM results WHERE node=?");
       q.bind(1, node);
       if (!q.row() || q.integer(0) != revision || q.text(1) != digest ||
-          q.text(2) != "applied")
+          q.text(2) != "applied" || std::stoll(meta("result_seen:"+node,"0")) < utc()-std::max<int64_t>(10000,conf.poll_ms*3))
         pending++;
     }
     set(out, "desired_revision", scalar(revision));

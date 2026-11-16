@@ -104,7 +104,7 @@ Sync 根据真实 TLS 验证和登记指纹取得 Node ID，再经限定 Worker 
 
 首次加入与重连都获取最新完整表。Master 对未变化 revision 复用已签名对象，Node 每 poll_ms 获取完整对象并校验；v0.1.0 尚未加入条件 GET/压缩优化，因此大表/多节点的网络成本需单独测量。不会把缓存任务的有限三次领取当作封禁投递：未确认本机意图保留 outbox，离线恢复后按原期限上报。
 
-Node 将全局副本与尚未确认的本机 L3 意图合并；同 revision 仍会处理新收到的本机 ACK。接收副本、内核 DROP 和重放不会生成新的本地事件。新增/更新先于旧副本删除，不先清空 Map；整表应用不是内核原子切换，只有所有 Map/视图/日志处理完成后 ACK。Master 的 ALL_APPLIED 针对当前 members 和 revision，缺一个节点便为 PARTIAL。
+Node 将全局副本与尚未确认的本机 L3 意图合并；同 revision 仍会处理新收到的本机 ACK。接收副本、内核 DROP 和重放不会生成新的本地事件。新增/更新先于旧副本删除，不先清空 Map；整表应用不是内核原子切换，只有所有 Map/视图/日志处理完成后 ACK。Master 的 ALL_APPLIED 针对当前 members 和 revision，缺一个节点便为 PARTIAL；成员 ACK 超过 max(10 秒, 3×poll_ms) 未刷新也回到 PARTIAL，不以旧 ACK 永久宣称在线。
 
 本机 L7 可在本机解除；L3 只能向 authority 申请全局解除，必须带当前 ban_id。解除保存时间水位，迟到原始决策和旧快照不能复活该轮次。新攻击在解除后仍可产生新决策，长期豁免需另行调整集群策略。跨机使用绝对 UTC 到期，转本机 BOOTTIME 时扣除 clock_uncertainty_ms；同一轮次重放保留更早的本机截止，不复制其他机器的 BOOTTIME。
 
