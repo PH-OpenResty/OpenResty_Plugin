@@ -27,13 +27,11 @@ from cryptography.x509.oid import NameOID
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'tests'))
 from nginx_process import (assert_clean_startup,dump_runtime_logs,
-                           runtime_log_offsets,wait_for_workers,worker_pids)
+                           runtime_log_offsets,wait_for_workers,worker_pids,unused_listen_port)
 
 
 def port():
-    with socket.socket() as sock:
-        sock.bind(('127.0.0.1', 0))
-        return sock.getsockname()[1]
+    return unused_listen_port()
 
 
 def certificate(directory, label, hosts):

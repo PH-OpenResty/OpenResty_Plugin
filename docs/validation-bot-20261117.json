@@ -1,7 +1,7 @@
 {
   "date": "2026-11-17",
   "base_commit": "fb67cddaf64f90d3dbbc8f1f65999be666514330",
-  "local_checks": 1152,
+  "local_checks": 1293,
   "matrix": {
     "nginx": {
       "bot": 44,
@@ -11,7 +11,8 @@
       "protocols": 66,
       "edge": 47,
       "coexist": 54,
-      "distribution": 40
+      "distribution": 40,
+      "receipt_recovery": 47
     },
     "openresty": {
       "bot": 44,
@@ -22,7 +23,8 @@
       "edge": 47,
       "coexist": 54,
       "distribution": 40,
-      "lua-handoff": 27
+      "lua-handoff": 27,
+      "receipt_recovery": 47
     },
     "static": {
       "bot": 44,
@@ -33,7 +35,8 @@
       "edge": 47,
       "coexist": 54,
       "distribution": 40,
-      "lua-handoff": 27
+      "lua-handoff": 27,
+      "receipt_recovery": 47
     }
   },
   "catalog_checks": 21,
@@ -44,5 +47,6 @@
   "automatic_ip_ban": false,
   "auth_guard_implemented": false,
   "security_regression": "Original deny/auth_basic rules execute before Edge/standalone API profile dispatch.",
-  "nginx_sanitizers": "UBSan traps; stock HTTP/2 alignment uses the existing compiler wrapper"
+  "nginx_sanitizers": "UBSan traps; stock HTTP/2 alignment uses the existing compiler wrapper",
+  "fixture_listeners": "Unique planned listeners exclude the operating system ephemeral client-port range."
 }

@@ -3,7 +3,32 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+import secrets
+import socket
 import time
+
+_planned_listeners=set()
+
+
+def unused_listen_port():
+    """Keep planned server listeners outside the client's ephemeral range.
+
+    bind(0) followed by close can choose the same planned port twice or let a
+    health/probe connection consume it before the child Nginx binds it.
+    """
+    try:
+        lower,upper=map(int,Path('/proc/sys/net/ipv4/ip_local_port_range').read_text().split())
+    except (OSError,ValueError):
+        lower,upper=32768,60999
+    for _ in range(1024):
+        port=1024+secrets.randbelow(65536-1024)
+        if lower<=port<=upper or port in _planned_listeners:continue
+        with socket.socket() as listener:
+            try:listener.bind(('127.0.0.1',port))
+            except OSError:continue
+        _planned_listeners.add(port)
+        return port
+    raise AssertionError('no isolated fixture listener port available')
 
 
 def worker_pids(master_pid):
