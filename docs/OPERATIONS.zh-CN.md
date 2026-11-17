@@ -147,3 +147,9 @@ Ban 0.1.0 的当前配置、事件/权限、全量同步、日志持久化与运
 ## 分层缓存的条件校验与升级
 
 Tier 0.1.1 的 L2 STALE/UPDATING/REVALIDATED 会反映到 X-Cache。304 后持续 EXPIRED/REVALIDATED、前端限额未生效或请求暴露 X-Tier-* 时，应核对模块和 front/backend 模板是否为同一版本。0.1.0 的旧绝对到期元数据需通过新路径/冷启动或新链路预热隔离；不要混用旧、新 Worker 的同一后端 Socket。模块升级按独立实例验证/切换处理，普通站点缓存规则仍可由 Config 热更新。细节见 [Tier 手册](../native-tier/README.zh-CN.md)。
+
+## 认证防护接入
+
+[Auth Guard](../native-auth-guard/README.zh-CN.md)需同时安装应用协作 hook、配置私有控制接口和定期更新最小策略快照。先在隔离 checkout 核验版本、审核生成补丁并完成上游自身构建；不要直接套到定制版。监控策略到期、feedback_bad、活动预留和容量拒绝；策略过期只关闭新建号，不把旧账号登录当成注册。密钥变更/realm 列表变更需使用明确的新 zone 交接。
+
+本机认证 IP 短封不持久化、不跨 Node 共享，不会影响普通网站流量或自动升级 L3；人工解封需独立 admin 密钥。重启丢失短封是当前能力边界，不能把该状态当作 Ban Store 的持久封禁或全局 quota。现有 WAF、CAPTCHA、MFA、CSRF 和账号撤销机制继续由各自组件执行。

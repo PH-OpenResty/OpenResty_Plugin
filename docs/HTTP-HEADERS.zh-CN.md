@@ -29,3 +29,5 @@ Sync 配置发布新增 X-Config-Sequence/Digest/State/Error/Applied；Config �
 Tier 0.1.1 删除整个 X-Tier-* 请求/响应命名空间中的外来字段，仅在受信通道生成实例令牌、路由身份、校验标记和 L2 大小上限；后端提供来源、实际缓存状态及入库到期。不要把这些内部头用于业务配置、浏览器输出或日志。模板与模块需同步升级。
 
 Ban 运行时不采用客户端头部决定封禁 IP、规则或来源。Nginx 从真实 socket 对端取地址，trusted detector 通过 C API/受控变量上报；Sync 在 mTLS 校验后向本机 Agent 传递已绑定 Node ID。实际接入见 [Ban 运行手册](../native-ban/RUNTIME.zh-CN.md)。
+
+Auth Guard 的 `X-SCDN-Auth-*` 为专用私有命名空间。业务客户端提交的字段被移除，由 Node 生成 MAC 绑定的 Request；后端只有明确结果才生成 Result，Node 验签后剥离，不向浏览器输出。Control 为私有预创建/管理接口的原始正文 MAC；Time/Nonce/Policy 用于最小邮箱策略导出，响应绑定同一次请求。不得写入访问日志或把这些字段用于普通站点缓存键。具体协议、独立密钥和能力限制见 [Auth 手册](../native-auth-guard/README.zh-CN.md)。

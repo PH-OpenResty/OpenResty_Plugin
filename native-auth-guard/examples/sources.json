@@ -1,0 +1,28 @@
+{
+  "version": 1,
+  "node_id": "node-a",
+  "password_file": "/etc/scdn/auth/weak-passwords.sha256",
+  "admin_key_file": "/etc/scdn/auth/admin.key",
+  "trusted_proxies": ["127.0.0.1/32", "::1/128"],
+  "max_entries": 65536,
+  "max_inflight": 512,
+  "realms": [
+    {
+      "id": "sub2api-main",
+      "adapter": "sub2api",
+      "key_file": "/etc/scdn/auth/sub2api.key",
+      "exporter_url": "https://app.internal.example/api/v1/internal/scdn-auth/policy",
+      "max_age": 1800,
+      "limits": {
+        "per_minute": 60,
+        "burst": 20,
+        "registration_rejections": 20,
+        "distinct_subjects": 5,
+        "window_seconds": 300,
+        "ban_seconds": 600,
+        "login_failures": 5,
+        "cooldown_seconds": 60
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # API 工具链/图片结果、Bot UA 管理与 Sub2API/NewAPI 注册认证防护：调研及设计计划
 
-日期：2026-11-17，America/Los_Angeles。状态：API 编辑/变体分类修复、协议别名/raw 回归和本地媒体处理工具已实现并完成隔离验证；Bot 0.1.0 已实现并验证 UA/CIDR、可信地址、策略编译与作用域；Auth Guard 仍待实现。Bot 种子已接入编译工具，弱密码库仍待认证消费者。未部署本轮源码到生产。
+日期：2026-11-17，America/Los_Angeles。状态：API 编辑/变体分类修复、协议别名/raw 回归和本地媒体处理工具已实现并完成隔离验证；Bot 0.1.0 已实现并验证 UA/CIDR、可信地址、策略编译与作用域；Auth Guard 0.1.0 已有共享准入、Go 协作库与固定版本应用补丁。Bot 种子与弱库均已有消费者。未部署本轮源码到生产。
 
 ## 1. 建议与依据
 
@@ -546,10 +546,16 @@ CLI/受限 Unix Socket 提供只读状态、规则预检、观察模式切换、
 15. [Brave 的识别限制](https://search.brave.com/help/brave-search-crawler)、[Naver Yeti](https://searchadvisor.naver.com/guide/seo-basic-robots)、[搜狗](https://www.sogou.com/docs/help/webmasters.htm)、[Petal](https://webmaster.petalsearch.com/site/petalbot)。
 16. [NIST 密码要求](https://pages.nist.gov/800-63-4/sp800-63b/authenticators/)、[SecLists 固定提交](https://github.com/danielmiessler/SecLists/tree/fd15eaaa5ee6b1be059796a2e3058f3fa244243a)；[弱库 manifest](security-seeds/weak-passwords.manifest.json)与[许可](security-seeds/SECLISTS-LICENSE.txt)。
 
-本次交付包含 API 源码修复、协议别名和原始传输回归、本地媒体提取工具，以及后续安全模块的设计/种子。17 份来源的前缀/计数/摘要、29+4 条目录记录、10,001 条弱库摘要和许可可独立核验。Bot 运行实现见其手册；Auth Guard 尚无运行实现；没有本轮生产部署。API 新验证见[独立记录](validation-api-protocol-media-20261117.json)，不以已有线上图片修复或 CLI 报告替代新测试。
+本次交付包含 API 源码修复、协议别名和原始传输回归、本地媒体提取工具，以及后续安全模块的设计/种子。17 份来源的前缀/计数/摘要、29+4 条目录记录、10,001 条弱库摘要和许可可独立核验。Bot 运行实现见其手册；Auth Guard 的当前实现与边界见其手册；没有本轮生产部署。API 新验证见[独立记录](validation-api-protocol-media-20261117.json)，不以已有线上图片修复或 CLI 报告替代新测试。
 
 ## 11. Bot 首批实现与访问阶段修复
 
 Bot 0.1.0、来源编译/更新工具和八模块共存已经实现，见[运行手册](../native-bot/README.zh-CN.md)。请求路径无外部来源查询；站点规则、UA/IP OR、候选/陈旧来源、可信代理与观察/关闭决策有独立回归。尚未加入新的安全资源 Sync，也不调用旧 WAF/CC 的自动 L3 升级路径。
 
-新增测试确认原 Edge/API 在 PREACCESS 跳转会绕过原始 location 的 deny/auth_basic。现在只在 PREACCESS 准备，PRECONTENT 才分流，原 ACCESS 规则得以运行；保留 Lua 桥已有的 checked 标记防止重复。验证见[记录](validation-bot-20261117.json)。注册/登录及后端创建前保护仍是后续 Auth Guard 交付，不能由 Bot 已加载推断其已就绪。
+新增测试确认原 Edge/API 在 PREACCESS 跳转会绕过原始 location 的 deny/auth_basic。现在只在 PREACCESS 准备，PRECONTENT 才分流，原 ACCESS 规则得以运行；保留 Lua 桥已有的 checked 标记防止重复。验证见[记录](validation-bot-20261117.json)。Auth Guard 的独立运行和后端接入状态见下一节，不能由 Bot 已加载推断其已就绪。
+
+## 12. Auth Guard 首批实现
+
+[Auth Guard 0.1.0](../native-auth-guard/README.zh-CN.md)实现九模块共存、realm/IP/声明身份共享准入、公开弱库、最小邮箱策略快照、签名上下文/结果、实际应用预创建回查和本机认证 IP 固定短封。固定上游补丁先核验源码再生成 diff；不能替代实际定制版的整应用构建和部署。Sub2API 首版新 OAuth 创建需要额外的所有权 hook，否则由 repository fence 拒绝；已有账号不重新注册。
+
+跨节点认证状态、认证 IP 的 Ban Store 持久化/全局同步和更多提供者 proof 适配尚未交付，状态明确报告 false。没有发送真实邮件、创建真实账号、调用模型或更改生产。新验证见 [Auth 记录](validation-auth-guard-20261117.json)。

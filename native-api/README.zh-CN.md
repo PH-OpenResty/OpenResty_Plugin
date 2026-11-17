@@ -8,12 +8,13 @@
 
 ## 接入方式
 
-与同一源码版本的 Config、Edge 一起构建。动态加载顺序为 Config → Bot → Ban → API → Edge；静态编入时无需 `load_module`。统一构建还包含独立的 Tier、Purge 和 [Sync](../native-sync/README.zh-CN.md)，共八个模块，支持纯 Nginx 和完整 OpenResty。Sync 角色与其本机鉴权不参与 API/AI 分类。
+与同一源码版本的 Config、Edge 一起构建。动态加载顺序为 Config → Bot → Ban → Auth Guard → API → Edge；静态编入时无需 `load_module`。统一构建还包含独立的 Tier、Purge 和 [Sync](../native-sync/README.zh-CN.md)，共九个模块，支持纯 Nginx 和完整 OpenResty。Sync 角色与其本机鉴权不参与 API/AI 分类。
 
 ```nginx
 load_module modules/ngx_http_scdn_config_module.so;
 load_module modules/ngx_http_scdn_bot_module.so;
 load_module modules/ngx_http_scdn_ban_module.so;
+load_module modules/ngx_http_scdn_auth_guard_module.so;
 load_module modules/ngx_http_scdn_api_module.so;
 load_module modules/ngx_http_scdn_edge_module.so;
 ```

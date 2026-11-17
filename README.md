@@ -1,12 +1,13 @@
 # OpenResty Plugin
 
-八个纯 C 的 Nginx/OpenResty HTTP 插件：Bot 管理 UA/CIDR、搜索来源与扫描器拒绝；Sync 提供 Master/Node 身份、站点/证书加密发布与热应用、缓存刷新与预热任务；Config/Edge 读取站点数据热更新路由、证书和缓存策略；API 自动识别动态 API、AI 与流式请求；Purge 提供持久化失效、源站校验及过时复用。Nginx/BPF 为 C，Ban Agent 与专用 Ban Store 为 C++17。这些原生模块不依赖 Lua，不生成站点 Lua、字节码或 `nginx.conf`。
+九个纯 C 的 Nginx/OpenResty HTTP 插件：Bot 管理 UA/CIDR、搜索来源与扫描器拒绝；Auth Guard 提供有界登录/注册准入和应用创建前检查；Sync 提供 Master/Node 身份、站点/证书加密发布与热应用、缓存刷新与预热任务；Config/Edge 读取站点数据热更新路由、证书和缓存策略；API 自动识别动态 API、AI 与流式请求；Purge 提供持久化失效、源站校验及过时复用。Nginx/BPF 为 C，Ban Agent 与专用 Ban Store 为 C++17，Auth 后端协作库为 Go。这些原生模块不依赖 Lua，不生成站点 Lua、字节码或 `nginx.conf`。
 
 | 插件 | 职责 | 文档 |
 | --- | --- | --- |
 | `ngx_http_scdn_sync_module.so` | Master/Node 角色、mTLS 身份、加密站点/证书发布、Node 热应用/回退和缓存任务 | [Sync 完整手册](native-sync/README.zh-CN.md) |
 | `ngx_http_scdn_config_module.so` | 后台检测文件内容、校验并预加载候选版本、等待各 Worker 就绪、切换不可变配置版本 | [Config 完整手册](native-config/README.zh-CN.md) |
 | `ngx_http_scdn_bot_module.so` | 原生 UA 自动机、IPv4/IPv6 CIDR、可信代理、来源状态与 OR 拒绝 | [Bot 手册](native-bot/README.zh-CN.md) |
+| `ngx_http_scdn_auth_guard_module.so` | 弱密码/邮箱政策、登录与 MFA 预算、明确认证反馈、后端创建前回查和本机 IP 短封 | [Auth Guard 手册](native-auth-guard/README.zh-CN.md) |
 | `ngx_http_scdn_api_module.so` | 请求/响应自动识别、API/AI 代理策略、缓存绕过、流式响应与 TLS 连接复用身份检查 | [API 完整手册](native-api/README.zh-CN.md) |
 | `ngx_http_scdn_edge_module.so` | Host 与最长前缀路由、启停、静态目录、SNI 证书选择、缓存层/可选热度、规则回源头/响应诊断、Prometheus 指标 | [Edge 完整手册](native-edge/README.zh-CN.md) |
 | `ngx_http_scdn_ban_module.so` | 可信 WAF/CC 事件、固定期限 L7/L3、独立 Agent/eBPF、所有节点完整封禁快照 | [Ban 运行手册](native-ban/RUNTIME.zh-CN.md) |
@@ -14,9 +15,9 @@
 | `ngx_http_scdn_tier_module.so` | 原生热度选层、L1 → L2 → 源站、晋升/冷层保留、对象大小准入与原始到期 | [Tier 完整手册](native-tier/README.zh-CN.md) |
 | `ngx_http_scdn_purge_module.so` | 持久化精确/批量/通配符/正则/后缀/目录/整站/节点失效、源站条件校验、有界过时复用 | [Purge 完整手册](native-purge/README.zh-CN.md) |
 
-Edge 依赖 Config 的 C 接口；一起构建 API 时也调用其判定接口。业务模块必须使用同一源码版本编译，全量动态加载顺序建议 Config → Bot → Ban → Tier → API → Edge → Purge → Sync；Sync、Tier 与 Purge 可独立加载。代理、静态文件与缓存文件管理继续使用 Nginx 自带模块。WAF、业务限速仍由外部能力承担。
+Edge 依赖 Config 的 C 接口；一起构建 API 时也调用其判定接口。业务模块必须使用同一源码版本编译，全量动态加载顺序建议 Config → Bot → Ban → Auth Guard → Tier → API → Edge → Purge → Sync；Auth Guard、Bot、Sync、Tier 与 Purge 可独立加载。代理、静态文件与缓存文件管理继续使用 Nginx 自带模块。通用 WAF/CC 限速仍由外部能力承担，Auth Guard 仅处理指定认证路由。
 
-API 已补齐图片编辑/变体分类、按方法/路径/可选站点的协议别名，以及 Responses/Chat/Gemini/Messages 工具链原始传输回归。显式 [媒体工具](native-api/tools/media_artifact.py)可从已有 JSON/SSE/二进制结果完整解码并保存图片，使用独立 Pillow 依赖；它不在 Worker 解码、不调用模型，也不把文件保存冒充客户端已展示。Bot/注册防护的[规划与种子](docs/BOT-UA-AUTH-GUARD-RESEARCH-DESIGN.zh-CN.md)仍按各自能力状态推进。
+API 已补齐图片编辑/变体分类、按方法/路径/可选站点的协议别名，以及 Responses/Chat/Gemini/Messages 工具链原始传输回归。显式 [媒体工具](native-api/tools/media_artifact.py)可从已有 JSON/SSE/二进制结果完整解码并保存图片，使用独立 Pillow 依赖；它不在 Worker 解码、不调用模型，也不把文件保存冒充客户端已展示。Bot/注册防护的[设计与种子](docs/BOT-UA-AUTH-GUARD-RESEARCH-DESIGN.zh-CN.md)已有对应运行实现；Auth 必须安装真实应用 hook，当前本机认证短封不持久化、不升级 L3、不跨 Node 同步。
 
 **Sync 0.3.0 已补齐原生站点配置与证书发布/应用。** Master 自动检查完整源快照并按 Node 加密签名，Node 验证、持久准备、热应用并等待全 Worker 确认，失败回退，结果可重报；详见 [发布手册](docs/SYNC-PUBLICATION.zh-CN.md)。这是独立的 native.snapshot.v2 协议，不与旧 Lua JWE/JWS API 混用；迁移需明确交接唯一配置写入权。
 
@@ -88,7 +89,7 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-nginx --purge -
   --report /tmp/scdn-five-modules-results.json
 ```
 
-系统构建依赖与 OpenResty 构建方式见 [安装文档](docs/INSTALL.zh-CN.md)。脚本固定下载归档并验证 SHA-256，构建八个插件，拒绝覆盖已有安装。
+系统构建依赖与 OpenResty 构建方式见 [安装文档](docs/INSTALL.zh-CN.md)。脚本固定下载归档并验证 SHA-256，构建九个插件，拒绝覆盖已有安装。
 
 ## 配置如何生效
 

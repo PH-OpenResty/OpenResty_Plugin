@@ -4,7 +4,7 @@
 
 ## 安装和接入
 
-统一构建包含八个 HTTP 模块。完整动态加载顺序为 Config → Bot → Ban → Tier → API → Edge → Purge → Sync。同一次构建中的 API/Edge 会显式调用 Bot，在正文识别前执行廉价检查；这些动态模块需一起更新并先加载 Bot。Bot 本身可独立加载；使用站点 ID 作用域时需加载并启用 Edge。
+统一构建包含八个 HTTP 模块。完整动态加载顺序为 Config → Bot → Ban → Auth Guard → Tier → API → Edge → Purge → Sync。同一次构建中的 API/Edge 会显式调用 Bot，在正文识别前执行廉价检查；这些动态模块需一起更新并先加载 Bot。Bot 本身可独立加载；使用站点 ID 作用域时需加载并启用 Edge。
 
 Bot 共享的地址解析头文件位于 `native-security/src/`，需要与 `native-bot/` 一起保留，不产生额外动态模块。
 
