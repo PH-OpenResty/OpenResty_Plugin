@@ -1,0 +1,10 @@
+ngx_addon_name=ngx_http_scdn_auth_guard_module
+have=NGX_SCDN_AUTH_GUARD . auto/have
+ngx_module_type=HTTP_FILTER
+ngx_module_name=ngx_http_scdn_auth_guard_module
+ngx_module_order="ngx_http_scdn_auth_guard_module ngx_http_scdn_api_module ngx_http_copy_filter_module"
+ngx_module_srcs="$ngx_addon_dir/src/ngx_http_scdn_auth_guard_module.c $ngx_addon_dir/src/auth_policy.c $ngx_addon_dir/src/auth_state.c"
+ngx_module_incs="$ngx_addon_dir/src $ngx_addon_dir/../native-security/src"
+ngx_module_deps="$ngx_addon_dir/src/scdn_auth.h $ngx_addon_dir/src/auth_internal.h $ngx_addon_dir/../native-security/src/scdn_security.h"
+ngx_module_libs="-ljson-c -lcrypto"
+. auto/module

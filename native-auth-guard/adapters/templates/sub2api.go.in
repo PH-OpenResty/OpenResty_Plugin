@@ -1,0 +1,23 @@
+package routes
+
+import (
+    "context"
+    "os"
+    authguard "github.com/Wei-Shaw/sub2api/internal/scdnauth"
+    "github.com/Wei-Shaw/sub2api/internal/service"
+    "github.com/gin-gonic/gin"
+)
+
+func installSCDNAuth(v1 *gin.RouterGroup, settings *service.SettingService) gin.HandlerFunc {
+    g,err:=authguard.FromFile(os.Getenv("SCDN_AUTH_GUARD_CONFIG"),func(ctx context.Context)(authguard.Policy,error){
+        if settings==nil { return authguard.Policy{},authguard.ErrUnavailable }
+        current,err:=settings.GetPublicSettings(ctx)
+        if err!=nil { return authguard.Policy{},err }
+        return authguard.Policy{Adapter:"sub2api",RegistrationEnabled:current.RegistrationEnabled,
+            EmailVerifyEnabled:current.EmailVerifyEnabled,AllowedDomains:append([]string{},current.RegistrationEmailSuffixWhitelist...),
+            DeniedDomains:[]string{},StrictEmail:true,PrecreateRequired:true},nil
+    })
+    if err!=nil { panic("SCDN Auth Guard configuration is unavailable") }
+    v1.GET("/internal/scdn-auth/policy",func(c *gin.Context){g.ExportPolicy(c.Writer,c.Request)})
+    return scdnAuthMiddleware(g,"sub2api")
+}

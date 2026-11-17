@@ -1,0 +1,50 @@
+{
+  "sub2api": {
+    "repository": "Wei-Shaw/sub2api",
+    "commit": "15871f904056f548dd874a1d069ffc6cdf777b78",
+    "files": [
+      {
+        "path": "backend/internal/server/routes/auth.go",
+        "sha256": "df989b29580838f5e242dbd8f1b29f908bedb1b18d737a18a3ffef4ace2d6b19"
+      },
+      {
+        "path": "backend/internal/service/auth_service.go",
+        "sha256": "ed8cb0787bef30dbed35aba1fa86851e18c15d70ded7d529613e5313af8cf81f"
+      },
+      {
+        "path": "backend/internal/repository/user_repo.go",
+        "sha256": "03d854af9026bc4c8cdf10af687ff99142ee314d5e6a42ae250b4bd61f776886"
+      },
+      {
+        "path": "backend/internal/handler/auth_handler.go",
+        "sha256": "772ca95f629cfacfd1e8f9d8f193e40257f53a4a6848917b82445a280ebdf0f4"
+      }
+    ]
+  },
+  "newapi": {
+    "repository": "QuantumNous/new-api",
+    "commit": "669d774976369e986f03b6e24fff1042f6f94832",
+    "files": [
+      {
+        "path": "router/api-router.go",
+        "sha256": "a6ec29bf1844cb7d2100467937be3872ff1cc0437f354aeaaed017da3e6a96d7"
+      },
+      {
+        "path": "controller/user.go",
+        "sha256": "b02c6be9055ed0767e5667882eaaed84132388f9c436437459d80f54e76e4b08"
+      },
+      {
+        "path": "controller/login_verification.go",
+        "sha256": "e59a16b3805698182819e8d04b925a9a6fcd84d5123c1fda14871053499afe03"
+      },
+      {
+        "path": "controller/oauth.go",
+        "sha256": "5d8179526e2bc7184fa561bbae9c0a18088abe03cb8eeb1f366cf907aff7156d"
+      },
+      {
+        "path": "controller/wechat.go",
+        "sha256": "e8c78757719f044b2784238e9cd24b62d096f3f8fc842a3afbd6fe6af3078540"
+      }
+    ]
+  }
+}

@@ -1,4 +1,4 @@
-name: Native Sync Config Bot Ban API Edge Tier and Purge
+name: Native Sync Config Bot Ban Auth API Edge Tier and Purge
 
 on:
   push:
@@ -27,6 +27,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.24.x'
+          cache-dependency-path: native-auth-guard/adapters/go/go.mod
       - name: Install build and test dependencies
         run: |
           sudo apt-get update
@@ -48,7 +52,7 @@ jobs:
           if [ "$PLUGIN_RUNTIME" = nginx ]; then
             SCDN_NATIVE_SANITIZERS='-fsanitize=address,undefined -fno-omit-frame-pointer' sh native-sync/tests/check-core.sh
           fi
-      - name: Build isolated runtime and all eight plugins
+      - name: Build isolated runtime and all nine plugins
         env:
           PLUGIN_RUNTIME: ${{ matrix.runtime }}
           PLUGIN_LINKAGE: ${{ matrix.linkage }}
@@ -59,6 +63,20 @@ jobs:
             export SCDN_NATIVE_CC="sh $GITHUB_WORKSPACE/tools/sanitizer-cc.sh"
           fi
           sh tools/build-runtime.sh "$RUNNER_TEMP/scdn-plugin" "$PLUGIN_RUNTIME" "$PLUGIN_LINKAGE"
+      - name: Auth application adapter, policy snapshot and pinned upstream hooks
+        run: |
+          (cd native-auth-guard/adapters/go && go test -race -json ./...) > "$RUNNER_TEMP/auth-go-results.jsonl"
+          (cd native-auth-guard/tests/backend && go build -o "$RUNNER_TEMP/scdn-auth-backend" .)
+          python native-auth-guard/tests/tools.py --report "$RUNNER_TEMP/auth-tools-results.json"
+      - name: Auth registration gate, explicit outcomes, concurrency and worker faults
+        env:
+          ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+          PLUGIN_LINKAGE: ${{ matrix.linkage }}
+        run: |
+          extra=()
+          if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
+          python native-auth-guard/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" --backend "$RUNNER_TEMP/scdn-auth-backend" "${extra[@]}" --report "$RUNNER_TEMP/auth-runtime-results.json"
       - name: Build native Ban Agent and kernel programs
         env:
           PLUGIN_RUNTIME: ${{ matrix.runtime }}
@@ -251,6 +269,9 @@ jobs:
         with:
           name: all-plugins-${{ matrix.runtime }}-${{ matrix.linkage }}-results
           path: |
+            ${{ runner.temp }}/auth-go-results.jsonl
+            ${{ runner.temp }}/auth-tools-results.json
+            ${{ runner.temp }}/auth-runtime-results.json
             ${{ runner.temp }}/startup-results.json
             ${{ runner.temp }}/identity-reassignment-results.json
             ${{ runner.temp }}/receipt-capacity-results.json

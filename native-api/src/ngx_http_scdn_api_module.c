@@ -1,4 +1,7 @@
 #include "scdn_api.h"
+#if (NGX_SCDN_AUTH_GUARD)
+#include "scdn_auth.h"
+#endif
 #if (NGX_SCDN_BOT)
 #include "scdn_bot.h"
 #endif
@@ -541,6 +544,10 @@ ngx_http_scdn_api_prepare(ngx_http_request_t *r)
 #if (NGX_SCDN_BOT)
     ngx_int_t bot_rc = ngx_http_scdn_bot_check(r);
     if (bot_rc != NGX_DECLINED) return bot_rc;
+#endif
+#if (NGX_SCDN_AUTH_GUARD)
+    ngx_int_t auth_rc = ngx_http_scdn_auth_prepare(r);
+    if (auth_rc != NGX_DECLINED) return auth_rc;
 #endif
     ngx_int_t rc;
     api_location_t *conf = ngx_http_get_module_loc_conf(r, ngx_http_scdn_api_module);

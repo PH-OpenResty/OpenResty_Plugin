@@ -1,0 +1,24 @@
+package controller
+
+import (
+    "context"
+    "os"
+    authguard "github.com/QuantumNous/new-api/internal/scdnauth"
+    "github.com/QuantumNous/new-api/common"
+    "github.com/gin-gonic/gin"
+)
+
+func InstallSCDNAuth(api *gin.RouterGroup) {
+    g,err:=authguard.FromFile(os.Getenv("SCDN_AUTH_GUARD_CONFIG"),func(context.Context)(authguard.Policy,error){
+        common.OptionMapRWMutex.RLock()
+        defer common.OptionMapRWMutex.RUnlock()
+        allowed:=[]string{}
+        if common.EmailDomainRestrictionEnabled { allowed=append(allowed,common.EmailDomainWhitelist...) }
+        return authguard.Policy{Adapter:"newapi",RegistrationEnabled:common.RegisterEnabled,
+            EmailVerifyEnabled:common.EmailVerificationEnabled,AllowedDomains:allowed,DeniedDomains:[]string{},
+            AliasRestriction:common.EmailAliasRestrictionEnabled,StrictEmail:true,PrecreateRequired:true},nil
+    })
+    if err!=nil { panic("SCDN Auth Guard configuration is unavailable") }
+    api.GET("/internal/scdn-auth/policy",func(c *gin.Context){g.ExportPolicy(c.Writer,c.Request)})
+    api.Use(scdnAuthMiddleware(g,"newapi"))
+}

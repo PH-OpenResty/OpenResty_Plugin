@@ -1,0 +1,27 @@
+
+// Auth JSON and OAuth redirects only: model streaming handlers are excluded.
+type scdnAuthWriter struct {
+    gin.ResponseWriter
+    guard *authguard.Guard
+    context context.Context
+}
+func (w *scdnAuthWriter) prepare() {
+    w.Header().Del("X-SCDN-Auth-Result")
+    if value:=w.guard.ResponseHeader(w.context); value!="" { w.Header().Set("X-SCDN-Auth-Result",value) }
+    w.Header().Set("Cache-Control","no-store")
+}
+func (w *scdnAuthWriter) WriteHeader(code int) { w.prepare(); w.ResponseWriter.WriteHeader(code) }
+func (w *scdnAuthWriter) WriteHeaderNow() { w.prepare(); w.ResponseWriter.WriteHeaderNow() }
+func (w *scdnAuthWriter) Write(value []byte)(int,error) { w.prepare(); return w.ResponseWriter.Write(value) }
+func (w *scdnAuthWriter) WriteString(value string)(int,error) { w.prepare(); return w.ResponseWriter.WriteString(value) }
+func (w *scdnAuthWriter) Flush() { w.prepare(); w.ResponseWriter.Flush() }
+func scdnAuthMiddleware(g *authguard.Guard, adapter string) gin.HandlerFunc {
+    return func(c *gin.Context) {
+        if !authguard.Matches(adapter,c.Request) { c.Next();return }
+        attached,err:=g.Attach(c.Request)
+        if err!=nil { c.Header("Cache-Control","no-store"); c.AbortWithStatusJSON(403,gin.H{"success":false,"reason":"INVALID_AUTH_ADMISSION"});return }
+        c.Request=attached
+        c.Writer=&scdnAuthWriter{ResponseWriter:c.Writer,guard:g,context:attached.Context()}
+        c.Next()
+    }
+}

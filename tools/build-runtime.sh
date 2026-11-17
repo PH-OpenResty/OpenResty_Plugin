@@ -43,6 +43,7 @@ esac
   "$native_addon=$native_root/native-config" \
   "$native_addon=$native_root/native-bot" \
   "$native_addon=$native_root/native-ban" \
+  "$native_addon=$native_root/native-auth-guard" \
   "$native_addon=$native_root/native-api" \
   "$native_addon=$native_root/native-tier" \
   "$native_addon=$native_root/native-edge" \

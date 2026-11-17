@@ -124,7 +124,7 @@ site static {{ host static.example.com; root {self.root}/html; cache off; }}
         user='user root root;' if os.geteuid()==0 else ''
         modules='' if self.static else '\n'.join(
             f'load_module {self.prefix}/modules/ngx_http_scdn_{name}_module.so;'
-            for name in ('config','bot','ban','api','edge'))
+            for name in ('config','bot','ban','auth_guard','api','edge'))
         return f'''{modules}
 {user}
 worker_processes 2;

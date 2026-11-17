@@ -28,3 +28,5 @@ Ban 集群的真实 IP 集合、来源设备、签名私钥、快照和 outbox/�
 Ban 的实际 policy.json、Ban Store AOF/checkpoint、共享视图、pin/链接、客户端证书和签名密钥、事件/IP 日志均是私有运行材料，不提交仓库。公开运行示例使用保留 IP、合成身份和通用路径。CI 只上传检查名称/结果，不上传状态目录或签名快照。
 
 Ban Store 的 ban-store.aof、锁、临时 checkpoint、离线状态副本和测试性能运行目录均为私有材料，不提交。memory 模式的审计日志仍按相同隐私规则处理。CI 仅上传断言、非敏感计数和合成 IP 基准的性能摘要。
+
+Auth Guard 的 realm/admin 密钥、实际邮箱策略快照、应用配置、认证正文、私有上下文/MAC、令牌、账号声明及其用户密码摘要均为私有运行材料。公开弱值 SHA-256 仅派生自已署名的 SecLists 数据。CI 使用临时随机密钥与纯内存创建计数 fixture，只上传断言/数量；不上传邮箱证明、真实账号、认证响应或控制 socket。

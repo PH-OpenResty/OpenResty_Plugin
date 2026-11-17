@@ -1,0 +1,828 @@
+{
+  "date": "2026-11-17",
+  "base_commit": "ba515950460811156694a36c1247589a28843cd9",
+  "passed": true,
+  "environment": "isolated Linux x86_64, WSL2 Alpine; Nginx 1.31.8, OpenResty 1.31.8.1; native fixture built with Go 1.24.13",
+  "runtimes": [
+    {
+      "runtime": "nginx",
+      "linkage": "dynamic",
+      "check_count": 1237,
+      "suites": [
+        {
+          "suite": "api-protocols",
+          "checks": 66,
+          "report_sha256": "4189f49c8850e6773f414ab802e0a9e37ef50099eaf19ce4d94c36a23b71b9e9"
+        },
+        {
+          "suite": "api-access",
+          "checks": 8,
+          "report_sha256": "f166a3f31f79295d7b9ac6d510690043e17e4012f6a5ac0baa94440aa3b48e4b"
+        },
+        {
+          "suite": "bot",
+          "checks": 44,
+          "report_sha256": "d23858ab1aaf6c6553a3b14390aaec3c6b1aa3bcd20188fe327cfdd3ae85b20d"
+        },
+        {
+          "suite": "identity",
+          "checks": 8,
+          "report_sha256": "d8ca1c9119e881fab10fee0a93dde688849feb3b4baa986bc17671158a5fc3e0"
+        },
+        {
+          "suite": "capacity",
+          "checks": 6,
+          "report_sha256": "0d3c8e310a2e17d3f9d8ec68ca00133c8f01a2ad42571e609099b59eb6faba3a"
+        },
+        {
+          "suite": "edge-audit",
+          "checks": 13,
+          "report_sha256": "f418e132320c7293ae4452b94ecdf1976de4b78ac8cc5c854947ab62190bd4c1"
+        },
+        {
+          "suite": "edge",
+          "checks": 47,
+          "report_sha256": "9e92e8d31e0119ca852a150457154a47413df53298901e0feffacff48c4a0f99"
+        },
+        {
+          "suite": "api",
+          "checks": 47,
+          "report_sha256": "646d55bd71aa0112f37a5c57900d796268d39b2c3d8e2f93dcb6dc8d7f4d8792"
+        },
+        {
+          "suite": "roles",
+          "checks": 50,
+          "report_sha256": "7959c140d0592711a066d983547f2c22e6d23bb0829c9c04252f0b95a09248f5"
+        },
+        {
+          "suite": "distribution",
+          "checks": 40,
+          "report_sha256": "e9ae11eabaad5a90f8ab9ea56d4c7c268f1359b275f525c682ced39198425fcc"
+        },
+        {
+          "suite": "recovery",
+          "checks": 47,
+          "report_sha256": "f56a2f5a0f98f4aa4b2d63fc8db61aa784e7780243e0d7a1d852932a87048242"
+        },
+        {
+          "suite": "tasks",
+          "checks": 99,
+          "report_sha256": "f7820ffac2f6d271493785aee1d5a5b75d9488fd60d6a86923d856eb42979080"
+        },
+        {
+          "suite": "tier-tasks",
+          "checks": 102,
+          "report_sha256": "f6ab85fa31821e0d84d9ccd284929ae0210fe58a07e5290200099ffe8763f957"
+        },
+        {
+          "suite": "tier",
+          "checks": 48,
+          "report_sha256": "39f4e3b4fb54ddca71aea452ed1abd68b3c0467b6627ccbc65a3c485fd4d669b"
+        },
+        {
+          "suite": "tier-boundaries",
+          "checks": 73,
+          "report_sha256": "04a3e81895c7a87187ff2db291402e3b46e78bef7fc151f1b62d133878db4498"
+        },
+        {
+          "suite": "custom-cache",
+          "checks": 4,
+          "report_sha256": "e01991e31fdf74482c4e5aa496b89662ba8c8c9cf83613721d8322e91a35eddd"
+        },
+        {
+          "suite": "coexist",
+          "checks": 54,
+          "report_sha256": "74fff89b4365027dc6ed891464fb6a46cfaee6cf25ad18d3f8e9af897d1c93ad"
+        },
+        {
+          "suite": "purge",
+          "checks": 70,
+          "report_sha256": "60e09f507cd3b3c84ae26e2fe31e87ffa3fd3826b0f798234234ace60fe8d9ed"
+        },
+        {
+          "suite": "patterns",
+          "checks": 64,
+          "report_sha256": "5f407286b6a303cd2f890689f6dcdfab246d3acbf326ee81601def204ca7daaa"
+        },
+        {
+          "suite": "regex-cache",
+          "checks": 2,
+          "report_sha256": "5365dccab07bcfffd61f3dcef3eeb5d21356fc55443a7db90883adc5fe2ec870"
+        },
+        {
+          "suite": "revalidate",
+          "checks": 45,
+          "report_sha256": "bca0269462f00a7ab6abb449a1868a832c63d2e9656ebaf9673242212a228b1a"
+        },
+        {
+          "suite": "headers",
+          "checks": 32,
+          "report_sha256": "2a8394f919b27b14d6c45145743409771b26927f6bfe79e1b48268dd5694ae6d"
+        },
+        {
+          "suite": "startup",
+          "checks": 6,
+          "report_sha256": "e568069edb9e58357d31bbe31cb9904ea992467c60a750641100ed16defe411e"
+        },
+        {
+          "suite": "mixed",
+          "checks": 53,
+          "report_sha256": "5a2977ff0039f870d3fe0052ba3cb6363df5f40f6aa44df19f65dc0a8ae5a4e1"
+        },
+        {
+          "suite": "ban",
+          "checks": 64,
+          "report_sha256": "8eb6c52fc093b4079742dfab92f837ea86cf74975e120ec9edbfbc733605b223"
+        },
+        {
+          "suite": "ban-xdp",
+          "checks": 64,
+          "report_sha256": "8eb6c52fc093b4079742dfab92f837ea86cf74975e120ec9edbfbc733605b223"
+        },
+        {
+          "suite": "ban-memory",
+          "checks": 16,
+          "report_sha256": "43a735f3584709bea27d2be739f161a2e79172dbb5a5a7cda6503aea9e41a29b"
+        },
+        {
+          "suite": "auth-guard",
+          "checks": 65,
+          "report_sha256": "292d3089db2e7240a15e0720375ba78be95d676e699c645021d9743c9e7c898a"
+        }
+      ]
+    },
+    {
+      "runtime": "openresty",
+      "linkage": "dynamic",
+      "check_count": 1268,
+      "suites": [
+        {
+          "suite": "api-protocols",
+          "checks": 66,
+          "report_sha256": "4189f49c8850e6773f414ab802e0a9e37ef50099eaf19ce4d94c36a23b71b9e9"
+        },
+        {
+          "suite": "api-access",
+          "checks": 8,
+          "report_sha256": "f166a3f31f79295d7b9ac6d510690043e17e4012f6a5ac0baa94440aa3b48e4b"
+        },
+        {
+          "suite": "bot",
+          "checks": 44,
+          "report_sha256": "d23858ab1aaf6c6553a3b14390aaec3c6b1aa3bcd20188fe327cfdd3ae85b20d"
+        },
+        {
+          "suite": "identity",
+          "checks": 8,
+          "report_sha256": "2d4de73f3abad7f037b11d1ec43cd7e8180d5a89e0b19ba33fc4706139ec244d"
+        },
+        {
+          "suite": "capacity",
+          "checks": 6,
+          "report_sha256": "e22376b0a394f0cd7aa94fcc6ce0e6b73932227cbd5272632fffa0dfab7b1ddf"
+        },
+        {
+          "suite": "edge-audit",
+          "checks": 13,
+          "report_sha256": "f418e132320c7293ae4452b94ecdf1976de4b78ac8cc5c854947ab62190bd4c1"
+        },
+        {
+          "suite": "edge",
+          "checks": 47,
+          "report_sha256": "9e92e8d31e0119ca852a150457154a47413df53298901e0feffacff48c4a0f99"
+        },
+        {
+          "suite": "api",
+          "checks": 47,
+          "report_sha256": "4c3d4527756b68e057fb8c439f67bdffe8f0c317f130adab5331b7af0c134cac"
+        },
+        {
+          "suite": "roles",
+          "checks": 50,
+          "report_sha256": "7959c140d0592711a066d983547f2c22e6d23bb0829c9c04252f0b95a09248f5"
+        },
+        {
+          "suite": "distribution",
+          "checks": 40,
+          "report_sha256": "e9ae11eabaad5a90f8ab9ea56d4c7c268f1359b275f525c682ced39198425fcc"
+        },
+        {
+          "suite": "recovery",
+          "checks": 47,
+          "report_sha256": "f56a2f5a0f98f4aa4b2d63fc8db61aa784e7780243e0d7a1d852932a87048242"
+        },
+        {
+          "suite": "tasks",
+          "checks": 99,
+          "report_sha256": "f7820ffac2f6d271493785aee1d5a5b75d9488fd60d6a86923d856eb42979080"
+        },
+        {
+          "suite": "tier-tasks",
+          "checks": 102,
+          "report_sha256": "f6ab85fa31821e0d84d9ccd284929ae0210fe58a07e5290200099ffe8763f957"
+        },
+        {
+          "suite": "tier",
+          "checks": 48,
+          "report_sha256": "39f4e3b4fb54ddca71aea452ed1abd68b3c0467b6627ccbc65a3c485fd4d669b"
+        },
+        {
+          "suite": "tier-boundaries",
+          "checks": 73,
+          "report_sha256": "04a3e81895c7a87187ff2db291402e3b46e78bef7fc151f1b62d133878db4498"
+        },
+        {
+          "suite": "custom-cache",
+          "checks": 4,
+          "report_sha256": "e01991e31fdf74482c4e5aa496b89662ba8c8c9cf83613721d8322e91a35eddd"
+        },
+        {
+          "suite": "coexist",
+          "checks": 54,
+          "report_sha256": "74fff89b4365027dc6ed891464fb6a46cfaee6cf25ad18d3f8e9af897d1c93ad"
+        },
+        {
+          "suite": "purge",
+          "checks": 70,
+          "report_sha256": "60e09f507cd3b3c84ae26e2fe31e87ffa3fd3826b0f798234234ace60fe8d9ed"
+        },
+        {
+          "suite": "patterns",
+          "checks": 64,
+          "report_sha256": "5f407286b6a303cd2f890689f6dcdfab246d3acbf326ee81601def204ca7daaa"
+        },
+        {
+          "suite": "regex-cache",
+          "checks": 2,
+          "report_sha256": "5365dccab07bcfffd61f3dcef3eeb5d21356fc55443a7db90883adc5fe2ec870"
+        },
+        {
+          "suite": "revalidate",
+          "checks": 45,
+          "report_sha256": "bca0269462f00a7ab6abb449a1868a832c63d2e9656ebaf9673242212a228b1a"
+        },
+        {
+          "suite": "headers",
+          "checks": 32,
+          "report_sha256": "2a8394f919b27b14d6c45145743409771b26927f6bfe79e1b48268dd5694ae6d"
+        },
+        {
+          "suite": "startup",
+          "checks": 6,
+          "report_sha256": "e568069edb9e58357d31bbe31cb9904ea992467c60a750641100ed16defe411e"
+        },
+        {
+          "suite": "mixed",
+          "checks": 53,
+          "report_sha256": "ff3c599c92753eacfcfe71210a2433b7a5a966ea284dfc1d0df2efccf8d52307"
+        },
+        {
+          "suite": "ban",
+          "checks": 64,
+          "report_sha256": "8eb6c52fc093b4079742dfab92f837ea86cf74975e120ec9edbfbc733605b223"
+        },
+        {
+          "suite": "ban-xdp",
+          "checks": 64,
+          "report_sha256": "8eb6c52fc093b4079742dfab92f837ea86cf74975e120ec9edbfbc733605b223"
+        },
+        {
+          "suite": "ban-memory",
+          "checks": 16,
+          "report_sha256": "43a735f3584709bea27d2be739f161a2e79172dbb5a5a7cda6503aea9e41a29b"
+        },
+        {
+          "suite": "lua-handoff",
+          "checks": 27,
+          "report_sha256": "dd48a0982da600767de293e25489888f99bcd74bb974f219a864148618a08ea3"
+        },
+        {
+          "suite": "ban-lua",
+          "checks": 4,
+          "report_sha256": "7b6637a14336fabb4d74064e5fc16f6e363ac804ab4e59babd0831cc8a868ddc"
+        },
+        {
+          "suite": "auth-guard",
+          "checks": 65,
+          "report_sha256": "292d3089db2e7240a15e0720375ba78be95d676e699c645021d9743c9e7c898a"
+        }
+      ]
+    },
+    {
+      "runtime": "openresty",
+      "linkage": "static",
+      "check_count": 1268,
+      "suites": [
+        {
+          "suite": "api-protocols",
+          "checks": 66,
+          "report_sha256": "4189f49c8850e6773f414ab802e0a9e37ef50099eaf19ce4d94c36a23b71b9e9"
+        },
+        {
+          "suite": "api-access",
+          "checks": 8,
+          "report_sha256": "f166a3f31f79295d7b9ac6d510690043e17e4012f6a5ac0baa94440aa3b48e4b"
+        },
+        {
+          "suite": "bot",
+          "checks": 44,
+          "report_sha256": "d23858ab1aaf6c6553a3b14390aaec3c6b1aa3bcd20188fe327cfdd3ae85b20d"
+        },
+        {
+          "suite": "identity",
+          "checks": 8,
+          "report_sha256": "2d4de73f3abad7f037b11d1ec43cd7e8180d5a89e0b19ba33fc4706139ec244d"
+        },
+        {
+          "suite": "capacity",
+          "checks": 6,
+          "report_sha256": "e22376b0a394f0cd7aa94fcc6ce0e6b73932227cbd5272632fffa0dfab7b1ddf"
+        },
+        {
+          "suite": "edge-audit",
+          "checks": 13,
+          "report_sha256": "f418e132320c7293ae4452b94ecdf1976de4b78ac8cc5c854947ab62190bd4c1"
+        },
+        {
+          "suite": "edge",
+          "checks": 47,
+          "report_sha256": "9e92e8d31e0119ca852a150457154a47413df53298901e0feffacff48c4a0f99"
+        },
+        {
+          "suite": "api",
+          "checks": 47,
+          "report_sha256": "f69a347b2e06eec9feec7aeb286f4235007d64e7f4a236592577ebcb696bcc38"
+        },
+        {
+          "suite": "roles",
+          "checks": 50,
+          "report_sha256": "7959c140d0592711a066d983547f2c22e6d23bb0829c9c04252f0b95a09248f5"
+        },
+        {
+          "suite": "distribution",
+          "checks": 40,
+          "report_sha256": "e9ae11eabaad5a90f8ab9ea56d4c7c268f1359b275f525c682ced39198425fcc"
+        },
+        {
+          "suite": "recovery",
+          "checks": 47,
+          "report_sha256": "f56a2f5a0f98f4aa4b2d63fc8db61aa784e7780243e0d7a1d852932a87048242"
+        },
+        {
+          "suite": "tasks",
+          "checks": 99,
+          "report_sha256": "f7820ffac2f6d271493785aee1d5a5b75d9488fd60d6a86923d856eb42979080"
+        },
+        {
+          "suite": "tier-tasks",
+          "checks": 102,
+          "report_sha256": "f6ab85fa31821e0d84d9ccd284929ae0210fe58a07e5290200099ffe8763f957"
+        },
+        {
+          "suite": "tier",
+          "checks": 48,
+          "report_sha256": "39f4e3b4fb54ddca71aea452ed1abd68b3c0467b6627ccbc65a3c485fd4d669b"
+        },
+        {
+          "suite": "tier-boundaries",
+          "checks": 73,
+          "report_sha256": "04a3e81895c7a87187ff2db291402e3b46e78bef7fc151f1b62d133878db4498"
+        },
+        {
+          "suite": "custom-cache",
+          "checks": 4,
+          "report_sha256": "e01991e31fdf74482c4e5aa496b89662ba8c8c9cf83613721d8322e91a35eddd"
+        },
+        {
+          "suite": "coexist",
+          "checks": 54,
+          "report_sha256": "74fff89b4365027dc6ed891464fb6a46cfaee6cf25ad18d3f8e9af897d1c93ad"
+        },
+        {
+          "suite": "purge",
+          "checks": 70,
+          "report_sha256": "60e09f507cd3b3c84ae26e2fe31e87ffa3fd3826b0f798234234ace60fe8d9ed"
+        },
+        {
+          "suite": "patterns",
+          "checks": 64,
+          "report_sha256": "5f407286b6a303cd2f890689f6dcdfab246d3acbf326ee81601def204ca7daaa"
+        },
+        {
+          "suite": "regex-cache",
+          "checks": 2,
+          "report_sha256": "5365dccab07bcfffd61f3dcef3eeb5d21356fc55443a7db90883adc5fe2ec870"
+        },
+        {
+          "suite": "revalidate",
+          "checks": 45,
+          "report_sha256": "bca0269462f00a7ab6abb449a1868a832c63d2e9656ebaf9673242212a228b1a"
+        },
+        {
+          "suite": "headers",
+          "checks": 32,
+          "report_sha256": "2a8394f919b27b14d6c45145743409771b26927f6bfe79e1b48268dd5694ae6d"
+        },
+        {
+          "suite": "startup",
+          "checks": 6,
+          "report_sha256": "e568069edb9e58357d31bbe31cb9904ea992467c60a750641100ed16defe411e"
+        },
+        {
+          "suite": "mixed",
+          "checks": 53,
+          "report_sha256": "b8a5fe6607cacfe41f881e9b88ad0a6d7bfc4479b4d6344aa50038d56042461f"
+        },
+        {
+          "suite": "ban",
+          "checks": 64,
+          "report_sha256": "8eb6c52fc093b4079742dfab92f837ea86cf74975e120ec9edbfbc733605b223"
+        },
+        {
+          "suite": "ban-xdp",
+          "checks": 64,
+          "report_sha256": "8eb6c52fc093b4079742dfab92f837ea86cf74975e120ec9edbfbc733605b223"
+        },
+        {
+          "suite": "ban-memory",
+          "checks": 16,
+          "report_sha256": "43a735f3584709bea27d2be739f161a2e79172dbb5a5a7cda6503aea9e41a29b"
+        },
+        {
+          "suite": "lua-handoff",
+          "checks": 27,
+          "report_sha256": "dd48a0982da600767de293e25489888f99bcd74bb974f219a864148618a08ea3"
+        },
+        {
+          "suite": "ban-lua",
+          "checks": 4,
+          "report_sha256": "7b6637a14336fabb4d74064e5fc16f6e363ac804ab4e59babd0831cc8a868ddc"
+        },
+        {
+          "suite": "auth-guard",
+          "checks": 65,
+          "report_sha256": "292d3089db2e7240a15e0720375ba78be95d676e699c645021d9743c9e7c898a"
+        }
+      ]
+    }
+  ],
+  "standalone": [
+    {
+      "suite": "tools",
+      "checks": 31,
+      "report_sha256": "0bdb93c9fe2429d2e0f6790c158d6a68146c031d587475130ddf23327f22ac7e"
+    },
+    {
+      "suite": "bot-catalog",
+      "checks": 21,
+      "report_sha256": "4d6c730dfe50f11a406d45e710fcbb3e95df6dfd936ecdcbe172235f97d535cc"
+    },
+    {
+      "suite": "api-media",
+      "checks": 48,
+      "report_sha256": "2c1b7f8fc962774d24939c30bc4c22512a2fe325d3ac77f3c8692a958f20395c"
+    }
+  ],
+  "python_checks": 3873,
+  "go_adapter": {
+    "race_detector": true,
+    "test_cases_including_subtests": 12,
+    "tests": [
+      "TestCreateRequiresVerifiedOwnershipBeforeRPC",
+      "TestGateIsAuthenticatedAndOutcomesAreExplicit",
+      "TestRequestBodyAndAuthorityCannotBeReplayedOrChanged",
+      "TestFailedAndRedirectedGateCannotCreate/Forbidden",
+      "TestFailedAndRedirectedGateCannotCreate/Internal_Server_Error",
+      "TestFailedAndRedirectedGateCannotCreate/Found",
+      "TestFailedAndRedirectedGateCannotCreate",
+      "TestDomainWildcardsMatchUpstreamAndAliasesRemainExplicit",
+      "TestExporterRequiresDedicatedMACAndReturnsNoKeys",
+      "TestRepositoryFenceRequiresTheAdmittedMailbox",
+      "TestCreationSuccessNeedsGateAndStalePolicyStopsCreation",
+      "TestRouteSelectionLeavesModelAndOrdinaryRequestsAlone"
+    ],
+    "report_sha256": "00f657b05ed49e3e7ef3c7fbd19f4a5d80c1d995e2fba0bc607d68ddc284177e"
+  },
+  "source_hashes": [
+    {
+      "path": "compat/lua/export_sites.lua",
+      "sha256": "4e8c5688a412097e8476a8f837a810a64233e65c874ba8ce9934a208e53e63d5"
+    },
+    {
+      "path": "compat/lua/lib/security_guard.lua",
+      "sha256": "55626218b966e77587cdb3d4acda26730d0945f79ddeb452e3daf83777c4a9a1"
+    },
+    {
+      "path": "native-api/config",
+      "sha256": "20bf372a4851f33cdff758f138a3faab73d5f4cb8069dbc6bab3ac800ebfd58d"
+    },
+    {
+      "path": "native-api/src/ngx_http_scdn_api_module.c",
+      "sha256": "ad93c880569e4dd3eca74001d07b330a232bc9c1682c776a86438572d9482713"
+    },
+    {
+      "path": "native-api/src/scdn_api.h",
+      "sha256": "19308b8c44fba60416f68eaa20daca25750a5cc4d6ec798417dc3eca15c972d3"
+    },
+    {
+      "path": "native-api/src/scdn_api_json.c",
+      "sha256": "3d5577d353650d7440fbffd85649ebac070c43918c7a9e763f2fcf3fce150e11"
+    },
+    {
+      "path": "native-api/tools/media_artifact.py",
+      "sha256": "31e69ca9c3b277fd5bcb99a64e93ebde53b3312636cd317767256add5049aa40"
+    },
+    {
+      "path": "native-api/tools/requirements.txt",
+      "sha256": "ae3337e5ae362bf1fad83355272ff595b58aae13d7a7ac67617f6f3161fa0c07"
+    },
+    {
+      "path": "native-auth-guard/adapters/go/application.go",
+      "sha256": "7f553977330fe1f4a7d80a33d305f4d287ee7a3550e7bfbe019a93ca7fa3e058"
+    },
+    {
+      "path": "native-auth-guard/adapters/go/go.mod",
+      "sha256": "7c14e18d091050befa3ce4ff0c568f9e5da4c0bcee3eeb95d708bb31b31ce3f2"
+    },
+    {
+      "path": "native-auth-guard/adapters/go/guard.go",
+      "sha256": "35a62421840e1b16d3985102be81f279d2648d8ce097b49855462094dacb5a44"
+    },
+    {
+      "path": "native-auth-guard/adapters/prepare_upstream.py",
+      "sha256": "90ca11149cf8d012ca685ff45405156c772ed76a8a9566118bb20a9c85c21d20"
+    },
+    {
+      "path": "native-auth-guard/adapters/templates/gin.go.in",
+      "sha256": "f7501ddc248a96e106d4d6ac63cf4b654ea88377154554790e2c0422cd34fbb6"
+    },
+    {
+      "path": "native-auth-guard/adapters/templates/newapi.go.in",
+      "sha256": "8ab10f430662db720bc57135386132882f359b68e610df549c128c637bd33577"
+    },
+    {
+      "path": "native-auth-guard/adapters/templates/sub2api.go.in",
+      "sha256": "dc235467fe3b4ef0b829f6cf6214e80946cb8feaadb0ab82c8a2ba47c23856ae"
+    },
+    {
+      "path": "native-auth-guard/adapters/upstream-lock.json",
+      "sha256": "8e59b3991543b2a38d62f1dac73ce7ae58a308dda7ac8470402bbc522be0e057"
+    },
+    {
+      "path": "native-auth-guard/config",
+      "sha256": "7120f8484f4754fd18a401368b8d0c137c3b6a782ab042edaa0033a064d4c4b9"
+    },
+    {
+      "path": "native-auth-guard/src/auth_internal.h",
+      "sha256": "6d4c9eb370f30b2d8989fc9cb236d2a85c6683f2a11eecbb93a948b3e6003431"
+    },
+    {
+      "path": "native-auth-guard/src/auth_policy.c",
+      "sha256": "a6a991d6bce7350ff3da8955afc31d6a4adf70bda89147f5d98b64f9b6382317"
+    },
+    {
+      "path": "native-auth-guard/src/auth_state.c",
+      "sha256": "77bb63788545bae1c14a0327946ce0a0f0c18678f48540b211c3626a3d1ba49d"
+    },
+    {
+      "path": "native-auth-guard/src/ngx_http_scdn_auth_guard_module.c",
+      "sha256": "719a0132b670641853c6693a773becccf3c0ce12feda0077fc5a8999f6eb20a5"
+    },
+    {
+      "path": "native-auth-guard/src/scdn_auth.h",
+      "sha256": "2143610691ee90b811369e534146846851138b6315213ff0b25055e88a8eff58"
+    },
+    {
+      "path": "native-auth-guard/tools/snapshot_policy.py",
+      "sha256": "56378aab600db1b2118a059fa593753eed2b86c08a0b0eba1d05bf5bb75bc1ec"
+    },
+    {
+      "path": "native-ban-store/include/ban_store.hpp",
+      "sha256": "0ed06fb54a35074e776f730ea4e934584aa25b92626bb8387f697a3eb6c630f3"
+    },
+    {
+      "path": "native-ban-store/src/ban_store.cpp",
+      "sha256": "5e74ff67f4976f41f2cbb862eac7749eed4369c3222645167be5a60ea9696e8b"
+    },
+    {
+      "path": "native-ban-store/tools/build-store.sh",
+      "sha256": "7fadad08f6e03c14fdac723f7b79134c22be7796d916a16b5fc1acfa376ee50b"
+    },
+    {
+      "path": "native-ban/agent/ban.hpp",
+      "sha256": "69eccd77e4c9195368c7c06f9bd98cb211ce50f96b21cc74874e2f9c52f501aa"
+    },
+    {
+      "path": "native-ban/agent/cluster.cpp",
+      "sha256": "f249b164e642220caca539712cad85b567a11f016b54995a19aaf08ef3f327c8"
+    },
+    {
+      "path": "native-ban/agent/config.cpp",
+      "sha256": "c21cbca9b697c6945aabb4575399dee4bae1f24b163f9f1d3d10e8c06e9606fb"
+    },
+    {
+      "path": "native-ban/agent/engine.cpp",
+      "sha256": "69b6a10b2c7ec3af6db4301813acb8560a8091ac43597c91ad67476456d0e0a1"
+    },
+    {
+      "path": "native-ban/agent/kernel.cpp",
+      "sha256": "cc7c42969750be97f5265ffd544c06ed66fe50429b518111f9ddc0e39ced1057"
+    },
+    {
+      "path": "native-ban/agent/main.cpp",
+      "sha256": "c0d82c8fcd645fa6b19a42adf1c3b0d69231d4d21c0e4d6c13158b749eb059bc"
+    },
+    {
+      "path": "native-ban/agent/server.cpp",
+      "sha256": "724a1ab4d2c5ec44415d93c7a561147d9e13b86a95fb0c2b81d6c58a842a2d48"
+    },
+    {
+      "path": "native-ban/agent/util.cpp",
+      "sha256": "b66eaead4d1c73a7a43162a983100e121e3910ee0d6ea447a4fedf36e3c6cb18"
+    },
+    {
+      "path": "native-ban/bpf/ban.bpf.c",
+      "sha256": "e9a15eb84d9ee47ab4200e260a4d11467f0e12c47aae4953c773ec3c15c2dd1b"
+    },
+    {
+      "path": "native-ban/config",
+      "sha256": "e4e6dec62ee081b77bef946fb01ece646d21441379cffcf6e0a923f25426e93e"
+    },
+    {
+      "path": "native-ban/src/ban_common.c",
+      "sha256": "5dd6ca0ab659948673d294ab07d434b35310ded9bfa1a048b6b592f9926d3649"
+    },
+    {
+      "path": "native-ban/src/ban_common.h",
+      "sha256": "288cda857eaffa96663b77437f8e9c1e6b7acf50bc69d302e38e524ce71eaef1"
+    },
+    {
+      "path": "native-ban/src/ngx_http_scdn_ban_module.c",
+      "sha256": "cf167b1d62296926f3a22fba6113eecec3262aee42100df85fc36c90ddfb8adb"
+    },
+    {
+      "path": "native-ban/src/ngx_scdn_ban.h",
+      "sha256": "77f9341177f7ed8278775b6a2510682dc0bccdceb7952664ed2ecbfe2c7189c8"
+    },
+    {
+      "path": "native-bot/config",
+      "sha256": "4149c1b80e4cad3524fa5bc23e02f690278e41678608e67209cf74a00fabe34d"
+    },
+    {
+      "path": "native-bot/src/ngx_http_scdn_bot_module.c",
+      "sha256": "e365b483d65e0ad1d4e69f3b0112652d871d4040110a3ae7f86986fc7dd83305"
+    },
+    {
+      "path": "native-bot/src/scdn_bot.h",
+      "sha256": "0c47bcaea5701e108d0f6f8295b315154079d1637d38dd024338abee98e03ead"
+    },
+    {
+      "path": "native-bot/tools/build_catalog.py",
+      "sha256": "daf18a791b5a665c57b2e83c0b0aad7292d47b38fff3ce0b4ab160bebdc795cf"
+    },
+    {
+      "path": "native-config/config",
+      "sha256": "0884a6cb39efe2deba61accf245ad66d615722301747718e3296dec97a0b0a7e"
+    },
+    {
+      "path": "native-config/src/ngx_http_scdn_config_module.c",
+      "sha256": "32c83e126ac83d7ad7fdfcaf9a33d1fa6331ed5833ca6c3651259a8fc87b032c"
+    },
+    {
+      "path": "native-config/src/scdn_config.h",
+      "sha256": "8bef0eaa1db9580f303262e0532257ff740405a93a76960d316cfd090d171cac"
+    },
+    {
+      "path": "native-config/src/scdn_config_parse.c",
+      "sha256": "9932062835cab879f696988b03c04f272f0abf6327d3ff5e1e67cd89c5501a62"
+    },
+    {
+      "path": "native-config/src/scdn_config_transaction.c",
+      "sha256": "9f00294ca53d19ea5e0b48e3ad136b875548e1a66b542f7bde0337ea1a179137"
+    },
+    {
+      "path": "native-edge/config",
+      "sha256": "15288078c89cf0573a65f6e91136999c05eccddbe18d7c8b98a4bb91ca1ea2c3"
+    },
+    {
+      "path": "native-edge/src/ngx_http_scdn_edge_module.c",
+      "sha256": "10536486745aacf8e26fd82402633695856e68329dfe6336d592f5a581a213ef"
+    },
+    {
+      "path": "native-edge/src/scdn_edge.h",
+      "sha256": "88ee24a44c8e1afde6ecd05586c47e08cea3e881fb0097f99fa67acb12ff0442"
+    },
+    {
+      "path": "native-edge/src/scdn_edge_metrics.c",
+      "sha256": "4e289e99ee9dd7830a55e53d8533bae874fcce0021d57f34fd37a341ccc94a1c"
+    },
+    {
+      "path": "native-purge/config",
+      "sha256": "fa727667804415dd03337d57cef2ce87013f94522276abdd83e186c79575054f"
+    },
+    {
+      "path": "native-purge/src/ngx_http_scdn_purge_module.c",
+      "sha256": "abbf553c16903c531072323ebb7d334d28332a27908142222055db14e08a7a00"
+    },
+    {
+      "path": "native-purge/src/scdn_purge.h",
+      "sha256": "42f4670231f751f2d922d50df4aa0312428e64b26e3932a4a7e80cbd807e15e7"
+    },
+    {
+      "path": "native-purge/src/scdn_purge_match.c",
+      "sha256": "2f81f4a05306523575c86b2e4d3b56bff11edcd548dc400c9da7021c0639ab9a"
+    },
+    {
+      "path": "native-purge/src/scdn_purge_revalidate.c",
+      "sha256": "a25bdfa7f5444110f0fa0235bd7d0e8022e6e27eef7e594fc986acdfd02b41b0"
+    },
+    {
+      "path": "native-purge/src/scdn_purge_state.c",
+      "sha256": "d31816a753022e64b9b52ba2e9975370bd2111ecca5b93a7d08906c0a55c1039"
+    },
+    {
+      "path": "native-security/src/scdn_security.h",
+      "sha256": "0873dedac102bfd4713125c5c4f774764fb12ddac0418b44647dd0a4df725aa6"
+    },
+    {
+      "path": "native-sync/config",
+      "sha256": "f4f2c5c7213ec2539f7fa27a697e6cd3f6cc759b8252103dd40aece28e26523a"
+    },
+    {
+      "path": "native-sync/src/ngx_http_scdn_sync_module.c",
+      "sha256": "000f19fca6293d7735cc5f3ec8debc692bbad6d21f4af743d70d0a2016bbd1fe"
+    },
+    {
+      "path": "native-sync/src/scdn_sync_ban.c",
+      "sha256": "360508aed8c86dfae1d5c832cc6d5d32a1aeba7b92eb0bb26411acc0e85bf2e0"
+    },
+    {
+      "path": "native-sync/src/scdn_sync_bundle.c",
+      "sha256": "8a05d55d712aeaec4fed17bcf0caf8a3d1700806efdec8071b38b22223309b36"
+    },
+    {
+      "path": "native-sync/src/scdn_sync_bundle.h",
+      "sha256": "7b9cd6593393c7f97ea747560d7b6093a490797e701089fd094c8b91126f0890"
+    },
+    {
+      "path": "native-sync/src/scdn_sync_core.c",
+      "sha256": "f780eaf409ceecd480c494854909aa910a3f2008a631c58aeb276411228fa27a"
+    },
+    {
+      "path": "native-sync/src/scdn_sync_core.h",
+      "sha256": "b958c2bf3b6f59fd628414a71906df9b74c62458fda19f2ec85c7078347c2bf5"
+    },
+    {
+      "path": "native-sync/src/scdn_sync_distribution.c",
+      "sha256": "063f2ba386f53b6695388fa8e54f8a45636ebccb2ccab205e96a454a34677999"
+    },
+    {
+      "path": "native-sync/src/scdn_sync_module.h",
+      "sha256": "7949ecdf341a6abe21e50ee96198ad297ab729b6d666f53011a662de6ccced7a"
+    },
+    {
+      "path": "native-sync/src/scdn_sync_snapshot.c",
+      "sha256": "7454ef1a8ee69fff67ea96bacfb324b0b634e224659e2c0b8488da83f06eb8a7"
+    },
+    {
+      "path": "native-sync/src/scdn_sync_snapshot.h",
+      "sha256": "758d4187534c1f3889d7d17ea4a417106f93ba4ed4bc8b1ec2d0bb59d1c77dd1"
+    },
+    {
+      "path": "native-sync/src/scdn_sync_tasks.c",
+      "sha256": "b305d27cc388d895f185d9bfa5f6882bfa1a2468a6d7b4d511f0d883cfdcaa8f"
+    },
+    {
+      "path": "native-tier/config",
+      "sha256": "afb9e9842490f5880ef2bda30f3f3657add3f00223d09ee4ab6e96937e22019e"
+    },
+    {
+      "path": "native-tier/src/ngx_http_scdn_tier_module.c",
+      "sha256": "ff2d86d3207ccdb84c3608b0f89569a82f57594c7d512067bf1e38003242b13f"
+    },
+    {
+      "path": "tools/stage-lua-handoff.py",
+      "sha256": "98b5686ac47faaecb787fd37b845a69fbe1328a7e03c284688878200eb85a867"
+    }
+  ],
+  "implementation_file_count": 75,
+  "production_modified": false,
+  "real_accounts_created": 0,
+  "mail_delivered": false,
+  "real_model_requests": 0,
+  "capabilities": {
+    "local_shared_auth_state": true,
+    "verified_precreate_rpc": true,
+    "minimal_signed_policy_export": true,
+    "version_checked_upstream_patch_generator": true,
+    "durable_auth_ip_bans": false,
+    "global_auth_quota": false,
+    "auth_ip_ban_sync": false
+  },
+  "validation_limits": [
+    "Application hook patches are checked against pinned real upstream files with gofmt and git apply --check; complete upstream application builds and deployment are not claimed.",
+    "Sub2API initial OAuth creation without an installed verified-mailbox hook is denied at the shared user repository fence; existing OAuth account login is preserved.",
+    "Local nginx uses UBSan traps and the existing upstream HTTP/2 alignment compiler wrapper. Full ASan/UBSan remains a GitHub CI check.",
+    "Fixture assertions do not establish production throughput, ARM64, all identity-provider proofs, or distributed authentication quotas."
+  ]
+}
