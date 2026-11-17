@@ -4,6 +4,14 @@
 #endif
 
 enum { API_WEB, API_DYNAMIC, API_AI, API_STREAM, API_GRPC, API_WEBSOCKET, API_KINDS };
+enum { API_PROTOCOL_NONE, API_RESPONSES, API_CHAT, API_MESSAGES, API_GEMINI,
+    API_IMAGES, API_AUDIO, API_EMBEDDINGS, API_OLLAMA, API_GENERIC, API_PROTOCOLS };
+
+typedef struct {
+    ngx_str_t path, site;
+    ngx_uint_t protocol, methods;
+    ngx_flag_t prefix;
+} api_endpoint_t;
 
 typedef struct {
     ngx_flag_t enabled, dispatch;
@@ -11,11 +19,12 @@ typedef struct {
     ngx_msec_t stream_timeout;
     ngx_str_t dynamic_location, ai_location, stream_location;
     ngx_str_t grpc_location, websocket_location;
+    ngx_array_t *endpoints;
 } api_location_t;
 
 typedef struct {
     ngx_http_request_t *owner;
-    ngx_uint_t kind;
+    ngx_uint_t kind, protocol;
     ngx_str_t reason;
     ngx_flag_t headers_done, body_started, prepared, dispatched;
     ngx_flag_t stream, private_request, recorded;
@@ -57,6 +66,7 @@ static void *api_location(ngx_conf_t *cf);
 static char *api_merge(ngx_conf_t *cf, void *parent, void *child);
 static char *api_zone(ngx_conf_t *cf, ngx_command_t *cmd, void *data);
 static char *api_metrics_directive(ngx_conf_t *cf, ngx_command_t *cmd, void *data);
+static char *api_endpoint(ngx_conf_t *cf, ngx_command_t *cmd, void *data);
 static ngx_int_t api_metrics(ngx_http_request_t *r);
 static ngx_int_t api_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t api_access(ngx_http_request_t *r);
@@ -84,6 +94,8 @@ static ngx_command_t api_commands[] = {
     API_STRING("scdn_api_stream_location", stream_location),
     API_STRING("scdn_api_grpc_location", grpc_location),
     API_STRING("scdn_api_websocket_location", websocket_location),
+    { ngx_string("scdn_api_endpoint"), API_LOC|NGX_CONF_TAKE3|NGX_CONF_TAKE4,
+      api_endpoint, NGX_HTTP_LOC_CONF_OFFSET, 0, NULL },
     { ngx_string("scdn_api_zone"), NGX_HTTP_MAIN_CONF|NGX_CONF_TAKE2,
       api_zone, NGX_HTTP_MAIN_CONF_OFFSET, 0, NULL },
     { ngx_string("scdn_api_metrics"), NGX_HTTP_LOC_CONF|NGX_CONF_NOARGS,
@@ -105,6 +117,74 @@ static ngx_str_t api_names[] = {
     ngx_string("web"), ngx_string("api"), ngx_string("ai"),
     ngx_string("stream"), ngx_string("grpc"), ngx_string("websocket")
 };
+static ngx_str_t api_protocol_names[] = {
+    ngx_string("none"), ngx_string("responses"), ngx_string("chat"),
+    ngx_string("messages"), ngx_string("gemini"), ngx_string("images"),
+    ngx_string("audio"), ngx_string("embeddings"), ngx_string("ollama"),
+    ngx_string("generic")
+};
+
+static char *
+api_endpoint(ngx_conf_t *cf, ngx_command_t *cmd, void *data)
+{
+    api_location_t *conf = data;
+    ngx_str_t *v = cf->args->elts;
+    api_endpoint_t candidate, *entry;
+    ngx_uint_t i;
+    static const struct { const char *name; ngx_uint_t method; } methods[] = {
+        {"GET", NGX_HTTP_GET}, {"HEAD", NGX_HTTP_HEAD}, {"POST", NGX_HTTP_POST},
+        {"PUT", NGX_HTTP_PUT}, {"PATCH", NGX_HTTP_PATCH},
+        {"DELETE", NGX_HTTP_DELETE}, {"OPTIONS", NGX_HTTP_OPTIONS}
+    };
+    (void) cmd;
+    ngx_memzero(&candidate, sizeof(candidate));
+    for (i = 1; i < API_PROTOCOLS; i++) {
+        if (v[1].len == api_protocol_names[i].len
+            && ngx_memcmp(v[1].data, api_protocol_names[i].data, v[1].len) == 0) {
+            candidate.protocol = i; break;
+        }
+    }
+    if (!candidate.protocol) return "invalid scdn_api_endpoint protocol";
+    for (i = 0; i < sizeof(methods) / sizeof(methods[0]); i++) {
+        if (v[2].len == ngx_strlen(methods[i].name)
+            && ngx_memcmp(v[2].data, methods[i].name, v[2].len) == 0) {
+            candidate.methods = methods[i].method; break;
+        }
+    }
+    if (!candidate.methods) return "invalid scdn_api_endpoint HTTP method";
+    candidate.path = v[3];
+    if (!candidate.path.len || candidate.path.len > 4096 || candidate.path.data[0] != '/')
+        return "scdn_api_endpoint requires an absolute normalized path";
+    for (i = 0; i < candidate.path.len; i++) {
+        u_char c = candidate.path.data[i];
+        if (c == '*' && i == candidate.path.len - 1 && i > 1
+            && candidate.path.data[i - 1] == '/') {
+            candidate.prefix = 1; candidate.path.len--; break;
+        }
+        if (c <= 32 || c == 127 || c == '?' || c == '#' || c == '%' || c == '*')
+            return "scdn_api_endpoint path must be normalized; only a final /* is supported";
+    }
+    if (cf->args->nelts == 5) {
+        candidate.site = v[4];
+        if (!candidate.site.len || candidate.site.len > 96)
+            return "invalid scdn_api_endpoint site ID";
+        for (i = 0; i < candidate.site.len; i++) {
+            u_char c = candidate.site.data[i];
+            if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                  || (c >= '0' && c <= '9') || c == '-' || c == '_'))
+                return "invalid scdn_api_endpoint site ID";
+        }
+    }
+    if (!conf->endpoints) {
+        conf->endpoints = ngx_array_create(cf->pool, 4, sizeof(api_endpoint_t));
+        if (!conf->endpoints) return NGX_CONF_ERROR;
+    }
+    if (conf->endpoints->nelts >= 1024) return "too many scdn_api_endpoint entries";
+    entry = ngx_array_push(conf->endpoints);
+    if (!entry) return NGX_CONF_ERROR;
+    *entry = candidate;
+    return NGX_CONF_OK;
+}
 
 static void *
 api_main(ngx_conf_t *cf)
@@ -137,7 +217,9 @@ api_merge(ngx_conf_t *cf, void *parent, void *child)
     api_location_t *prev = parent, *conf = child;
     ngx_str_t *locations[5];
     ngx_uint_t i;
-    (void) cf;
+    ngx_uint_t j, count;
+    api_endpoint_t *entries, *a, *b;
+    ngx_array_t *merged;
     ngx_conf_merge_value(conf->enabled, prev->enabled, 0);
     ngx_conf_merge_value(conf->dispatch, prev->dispatch, 0);
     ngx_conf_merge_size_value(conf->inspect, prev->inspect, 16384);
@@ -147,6 +229,34 @@ api_merge(ngx_conf_t *cf, void *parent, void *child)
     ngx_conf_merge_str_value(conf->stream_location, prev->stream_location, "");
     ngx_conf_merge_str_value(conf->grpc_location, prev->grpc_location, "");
     ngx_conf_merge_str_value(conf->websocket_location, prev->websocket_location, "");
+    if (!conf->endpoints) conf->endpoints = prev->endpoints;
+    else if (prev->endpoints) {
+        count = prev->endpoints->nelts + conf->endpoints->nelts;
+        if (count > 1024) return "too many inherited scdn_api_endpoint entries";
+        merged = ngx_array_create(cf->pool, count, sizeof(api_endpoint_t));
+        if (!merged) return NGX_CONF_ERROR;
+        entries = ngx_array_push_n(merged, count);
+        if (!entries) return NGX_CONF_ERROR;
+        ngx_memcpy(entries, prev->endpoints->elts,
+            prev->endpoints->nelts * sizeof(api_endpoint_t));
+        ngx_memcpy(entries + prev->endpoints->nelts, conf->endpoints->elts,
+            conf->endpoints->nelts * sizeof(api_endpoint_t));
+        conf->endpoints = merged;
+    }
+    if (conf->endpoints) {
+        entries = conf->endpoints->elts;
+        for (i = 0; i < conf->endpoints->nelts; i++) {
+            a = &entries[i];
+            for (j = i + 1; j < conf->endpoints->nelts; j++) {
+                b = &entries[j];
+                if (a->methods == b->methods && a->prefix == b->prefix
+                    && a->path.len == b->path.len && a->site.len == b->site.len
+                    && ngx_memcmp(a->path.data, b->path.data, a->path.len) == 0
+                    && (!a->site.len || ngx_memcmp(a->site.data, b->site.data, a->site.len) == 0))
+                    return "duplicate scdn_api_endpoint method, path and site";
+            }
+        }
+    }
     if (conf->inspect > 65536) { return "scdn_api_inspect_body must be at most 64k"; }
     if (conf->stream_timeout < 1000 || conf->stream_timeout > 3600000) {
         return "scdn_api_stream_timeout must be between 1s and 1h";
@@ -251,19 +361,57 @@ api_suffix(const ngx_str_t *uri, const char *suffix)
         && ngx_memcmp(uri->data + uri->len - length, suffix, length) == 0;
 }
 
-static ngx_flag_t
+static ngx_uint_t
 api_ai_path(ngx_str_t *uri)
 {
-    static const char *paths[] = {
-        "/v1/chat/completions", "/v1/completions", "/v1/responses",
-        "/v1/messages", "/v1/embeddings", "/v1/images/generations",
-        "/v1/audio/transcriptions", "/v1/audio/speech", "/api/chat",
-        "/api/generate", "/api/embed", "/api/embeddings",
-        ":generateContent", ":streamGenerateContent", NULL
+    static const struct { const char *path; ngx_uint_t protocol; } paths[] = {
+        {"/v1/chat/completions", API_CHAT}, {"/v1/completions", API_CHAT},
+        {"/v1/responses", API_RESPONSES}, {"/v1/messages", API_MESSAGES},
+        {"/v1/embeddings", API_EMBEDDINGS},
+        {"/v1/images/generations", API_IMAGES}, {"/v1/images/edits", API_IMAGES},
+        {"/v1/images/variations", API_IMAGES},
+        {"/v1/audio/transcriptions", API_AUDIO}, {"/v1/audio/translations", API_AUDIO},
+        {"/v1/audio/speech", API_AUDIO}, {"/api/chat", API_OLLAMA},
+        {"/api/generate", API_OLLAMA}, {"/api/embed", API_OLLAMA},
+        {"/api/embeddings", API_OLLAMA}, {":generateContent", API_GEMINI},
+        {":streamGenerateContent", API_GEMINI}, {NULL, API_PROTOCOL_NONE}
     };
     ngx_uint_t i;
-    for (i = 0; paths[i] != NULL; i++) { if (api_suffix(uri, paths[i])) { return 1; } }
-    return 0;
+    for (i = 0; paths[i].path != NULL; i++) {
+        if (api_suffix(uri, paths[i].path)) return paths[i].protocol;
+    }
+    return API_PROTOCOL_NONE;
+}
+
+static ngx_uint_t
+api_configured_path(ngx_http_request_t *r)
+{
+    api_location_t *conf = ngx_http_get_module_loc_conf(r, ngx_http_scdn_api_module);
+    api_endpoint_t *entries, *entry, *best = NULL;
+    ngx_http_variable_value_t *site = NULL;
+    ngx_str_t name = ngx_string("scdn_edge_site");
+    ngx_uint_t i;
+    ngx_flag_t site_checked = 0;
+    if (!conf->endpoints) return API_PROTOCOL_NONE;
+    entries = conf->endpoints->elts;
+    for (i = 0; i < conf->endpoints->nelts; i++) {
+        entry = &entries[i];
+        if (!(r->method & entry->methods) || r->uri.len < entry->path.len
+            || (!entry->prefix && r->uri.len != entry->path.len)
+            || ngx_memcmp(r->uri.data, entry->path.data, entry->path.len) != 0) continue;
+        if (entry->site.len) {
+            if (!site_checked) {
+                site = ngx_http_get_variable(r, &name, ngx_hash_key(name.data, name.len));
+                site_checked = 1;
+            }
+            if (!site || site->not_found || site->len != entry->site.len
+                || ngx_memcmp(site->data, entry->site.data, entry->site.len) != 0) continue;
+        }
+        if (!best || entry->path.len > best->path.len
+            || (entry->path.len == best->path.len && entry->site.len > best->site.len))
+            best = entry;
+    }
+    return best ? best->protocol : API_PROTOCOL_NONE;
 }
 
 static void
@@ -322,8 +470,12 @@ api_classify_headers(ngx_http_request_t *r, api_request_t *ctx)
     if (sse) {
         api_set_kind(ctx, API_STREAM, "accept_sse"); ctx->stream = 1;
     }
-    if (api_ai_path(&r->uri) || anthropic) {
-        api_set_kind(ctx, API_AI, "ai_endpoint");
+    ctx->protocol = api_configured_path(r);
+    if (ctx->protocol) api_set_kind(ctx, API_AI, "configured_endpoint");
+    else {
+        ctx->protocol = api_ai_path(&r->uri);
+        if (!ctx->protocol && anthropic) ctx->protocol = API_MESSAGES;
+        if (ctx->protocol) api_set_kind(ctx, API_AI, "ai_endpoint");
     }
     if (content && (api_mime(&content->value, "application/grpc")
         || api_contains(&content->value, "application/grpc+"))) {
@@ -358,6 +510,7 @@ api_inspect_body(ngx_http_request_t *r, api_request_t *ctx, size_t maximum)
     }
     if (scdn_api_json(body, length, &signals) && signals.model && signals.input) {
         api_set_kind(ctx, API_AI, "json_schema");
+        ctx->protocol = API_GENERIC;
         if (signals.stream) { ctx->stream = 1; }
     }
 }
@@ -535,7 +688,8 @@ api_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data
         if (ctx->stream) { ngx_str_set(&value, "1"); } else { ngx_str_set(&value, "0"); }
     } else if (data == 4) {
         if (ctx->kind == API_WEBSOCKET) { ngx_str_set(&value, "upgrade"); }
-    } else { ngx_str_set(&value, "api-policy-v1"); }
+    } else if (data == 6) { value = api_protocol_names[ctx->protocol]; }
+    else { ngx_str_set(&value, "api-policy-v1"); }
     v->data = value.data; v->len = value.len; v->valid = 1;
     v->no_cacheable = 1; v->not_found = 0;
     return NGX_OK;
@@ -547,7 +701,8 @@ api_preconfiguration(ngx_conf_t *cf)
     static ngx_str_t names[] = {
         ngx_string("scdn_api_kind"), ngx_string("scdn_api_reason"),
         ngx_string("scdn_api_skip_cache"), ngx_string("scdn_api_stream"),
-        ngx_string("scdn_api_connection"), ngx_string("scdn_api_cache_namespace")
+        ngx_string("scdn_api_connection"), ngx_string("scdn_api_cache_namespace"),
+        ngx_string("scdn_api_protocol")
     };
     ngx_http_variable_t *variable;
     ngx_uint_t i;

@@ -15,6 +15,8 @@
 
 Edge 依赖 Config 的 C 接口；一起构建 API 时也调用其判定接口。业务模块必须使用同一源码版本编译，全量动态加载顺序建议 Config → Ban → Tier → API → Edge → Purge → Sync；Sync、Tier 与 Purge 可独立加载。代理、静态文件与缓存文件管理继续使用 Nginx 自带模块。WAF、业务限速仍由外部能力承担。
 
+API 已补齐图片编辑/变体分类、按方法/路径/可选站点的协议别名，以及 Responses/Chat/Gemini/Messages 工具链原始传输回归。显式 [媒体工具](native-api/tools/media_artifact.py)可从已有 JSON/SSE/二进制结果完整解码并保存图片，使用独立 Pillow 依赖；它不在 Worker 解码、不调用模型，也不把文件保存冒充客户端已展示。Bot/注册防护的[规划与种子](docs/BOT-UA-AUTH-GUARD-RESEARCH-DESIGN.zh-CN.md)仍按各自能力状态推进。
+
 **Sync 0.3.0 已补齐原生站点配置与证书发布/应用。** Master 自动检查完整源快照并按 Node 加密签名，Node 验证、持久准备、热应用并等待全 Worker 确认，失败回退，结果可重报；详见 [发布手册](docs/SYNC-PUBLICATION.zh-CN.md)。这是独立的 native.snapshot.v2 协议，不与旧 Lua JWE/JWS API 混用；迁移需明确交接唯一配置写入权。
 
 Purge 可独立加载，不依赖其他插件，也不修改 Nginx 核心或私有缓存索引。它保证新请求不命中已失效版本，**不表示立即删除磁盘文件**；旧空间仍由 Nginx 管理。接入时必须把实际 cache key 改为 `$scdn_purge_key`。

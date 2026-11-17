@@ -1,0 +1,705 @@
+{
+  "schema_version": 1,
+  "artifact_kind": "design_seed",
+  "as_of_date": "2026-11-17",
+  "runtime_integrated": false,
+  "search_fallback": "ua_only_classification_without_identity_privilege",
+  "manual_deny_match": "ua_or_ip",
+  "entries": [
+    {
+      "id": "googlebot",
+      "name": "Google",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "Googlebot",
+          "case_sensitive": false
+        },
+        {
+          "type": "product_token",
+          "value": "Googlebot-Image",
+          "case_sensitive": false
+        },
+        {
+          "type": "product_token",
+          "value": "Googlebot-Video",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "google-common",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://developers.google.com/crawling/docs/crawlers-fetchers/overview-google-crawlers"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "google-special",
+      "name": "Google special crawlers",
+      "category": "special",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "AdsBot-Google",
+          "case_sensitive": false
+        },
+        {
+          "type": "product_token",
+          "value": "AdsBot-Google-Mobile",
+          "case_sensitive": false
+        },
+        {
+          "type": "product_token",
+          "value": "Mediapartners-Google",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "google-special",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://developers.google.com/crawling/docs/crawlers-fetchers/overview-google-crawlers"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "bingbot",
+      "name": "Bing",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "bingbot",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "bing",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://www.bing.com/toolbox/bingbot.json"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "baiduspider",
+      "name": "Baidu",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "Baiduspider",
+          "case_sensitive": false
+        },
+        {
+          "type": "product_token",
+          "value": "Baiduspider-image",
+          "case_sensitive": false
+        },
+        {
+          "type": "product_token",
+          "value": "Baiduspider-video",
+          "case_sensitive": false
+        },
+        {
+          "type": "product_token",
+          "value": "Baiduspider-news",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_only",
+      "ip_feed_id": null,
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://help.baidu.com/question?prod_id=99&class=0&id=3001"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "sogou",
+      "name": "Sogou",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "bounded_phrase",
+          "value": "Sogou web spider",
+          "case_sensitive": false
+        },
+        {
+          "type": "bounded_phrase",
+          "value": "Sogou inst spider",
+          "case_sensitive": false
+        },
+        {
+          "type": "bounded_phrase",
+          "value": "Sogou News Spider",
+          "case_sensitive": false
+        },
+        {
+          "type": "bounded_phrase",
+          "value": "Sogou spider",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_only",
+      "ip_feed_id": null,
+      "ua_evidence": "compatibility_tokens_official_page_confirms_crawler",
+      "reference_urls": [
+        "https://www.sogou.com/docs/help/webmasters.htm"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "so360",
+      "name": "360 Search",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "360Spider",
+          "case_sensitive": false
+        },
+        {
+          "type": "product_token",
+          "value": "360Spider-Image",
+          "case_sensitive": false
+        },
+        {
+          "type": "product_token",
+          "value": "360Spider-Video",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "so360",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://www.so.com/help/help_3_2.html",
+        "https://www.so.com/help/spider_ip.html"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "shenma",
+      "name": "Shenma",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "YisouSpider",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_only",
+      "ip_feed_id": null,
+      "ua_evidence": "compatibility_token_needs_official_recheck",
+      "reference_urls": [
+        "https://zhanzhang.sm.cn/"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "toutiao",
+      "name": "Toutiao / ByteDance crawler",
+      "category": "crawler_purpose_unverified",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "Bytespider",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_only",
+      "ip_feed_id": null,
+      "ua_evidence": "compatibility_token_needs_official_recheck",
+      "reference_urls": [
+        "https://zhanzhang.toutiao.com/"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "petal",
+      "name": "Petal Search",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "PetalBot",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_only",
+      "ip_feed_id": null,
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://webmaster.petalsearch.com/site/petalbot"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "yandex",
+      "name": "Yandex",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "YandexBot",
+          "case_sensitive": false
+        },
+        {
+          "type": "product_token",
+          "value": "YandexImages",
+          "case_sensitive": false
+        },
+        {
+          "type": "product_token",
+          "value": "YandexVideo",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_only",
+      "ip_feed_id": null,
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://yandex.com/support/webmaster/en/robot-workings/check-yandex-robots"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "duckduckgo",
+      "name": "DuckDuckGo",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "DuckDuckBot",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "duckduckgo",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://duckduckgo.com/duckduckgo-help-pages/results/duckduckbot"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "apple",
+      "name": "Apple",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "Applebot",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "apple",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://support.apple.com/en-us/119829"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "yahoo",
+      "name": "Yahoo",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "Slurp",
+          "case_sensitive": false
+        },
+        {
+          "type": "bounded_phrase",
+          "value": "Yahoo! Slurp",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "yahoo",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://help.yahoo.com/kb/SLN22600.html"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "mojeek",
+      "name": "Mojeek",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "MojeekBot",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "mojeek",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://www.mojeek.com/bot.html"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "seznam",
+      "name": "Seznam",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "SeznamBot",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "seznam",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://o-seznam.cz/napoveda/vyhledavani/seznambot/"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "naver",
+      "name": "Naver",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "Yeti",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_only",
+      "ip_feed_id": null,
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://searchadvisor.naver.com/guide/seo-basic-robots"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "daum",
+      "name": "Daum",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "Daumoa",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_only",
+      "ip_feed_id": null,
+      "ua_evidence": "compatibility_token_needs_official_recheck",
+      "reference_urls": [
+        "https://cs.daum.net/faq/service/15/category/4118"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "qwant",
+      "name": "Qwant",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "Qwantify",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_only",
+      "ip_feed_id": null,
+      "ua_evidence": "compatibility_token_official_page_unavailable",
+      "reference_urls": [
+        "https://help.qwant.com/bot/"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "yep",
+      "name": "Yep",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "YepBot",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_only",
+      "ip_feed_id": null,
+      "ua_evidence": "compatibility_token_official_page_unavailable",
+      "reference_urls": [
+        "https://yep.com/yepbot"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "exalead",
+      "name": "Exalead",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "Exabot",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_only",
+      "ip_feed_id": null,
+      "ua_evidence": "compatibility_token_needs_official_recheck",
+      "reference_urls": [
+        "https://www.exabot.com/"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "openai-search",
+      "name": "OpenAI search",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "OAI-SearchBot",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "openai-search",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://developers.openai.com/api/docs/bots"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "openai-training",
+      "name": "OpenAI training",
+      "category": "training",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "GPTBot",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "openai-training",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://developers.openai.com/api/docs/bots"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "openai-user",
+      "name": "OpenAI user fetch",
+      "category": "user_triggered",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "ChatGPT-User",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "openai-user",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://developers.openai.com/api/docs/bots"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "openai-ads",
+      "name": "OpenAI advertising",
+      "category": "advertising",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "OAI-AdsBot",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "openai-ads",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://developers.openai.com/api/docs/bots"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "claude-search",
+      "name": "Anthropic search",
+      "category": "search",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "Claude-SearchBot",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "anthropic-shared",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://claude.com/crawling/bots.json"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "claude-training",
+      "name": "Anthropic training",
+      "category": "training",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "ClaudeBot",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "anthropic-shared",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://claude.com/crawling/bots.json"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "claude-user",
+      "name": "Anthropic user fetch",
+      "category": "user_triggered",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "Claude-User",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "anthropic-shared",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://claude.com/crawling/bots.json"
+      ],
+      "default_action": "continue",
+      "identity_privilege": "none"
+    },
+    {
+      "id": "censys",
+      "name": "Censys",
+      "category": "security_scanner",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "CensysInspect",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_and_published_ip",
+      "ip_feed_id": "censys",
+      "ua_evidence": "official_ua",
+      "reference_urls": [
+        "https://docs.censys.com/docs/opt-out-of-data-collection"
+      ],
+      "default_action": "deny",
+      "identity_privilege": "none",
+      "deny_match_mode": "ua_or_ip",
+      "coverage": "published_ranges_or_declared_ua"
+    },
+    {
+      "id": "fofa",
+      "name": "FOFA",
+      "category": "security_scanner",
+      "ua_patterns": [
+        {
+          "type": "product_token",
+          "value": "FofaBot",
+          "case_sensitive": false
+        }
+      ],
+      "source_mode": "ua_only",
+      "ip_feed_id": null,
+      "ua_evidence": "operator_candidate_no_complete_official_ua_or_ip_source",
+      "reference_urls": [
+        "https://fofa.info/"
+      ],
+      "default_action": "deny",
+      "identity_privilege": "none",
+      "deny_match_mode": "ua_or_ip",
+      "coverage": "candidate_declared_ua_only"
+    }
+  ],
+  "unidentifiable_engines": [
+    {
+      "id": "brave",
+      "name": "Brave Search",
+      "reason": "Official documentation says no differentiated crawler user agent.",
+      "reference_url": "https://search.brave.com/help/brave-search-crawler",
+      "ua_patterns": [],
+      "ip_feed_id": null
+    },
+    {
+      "id": "ecosia",
+      "name": "Ecosia",
+      "reason": "Partner or unknown crawler; no independent verified signature in this research.",
+      "ua_patterns": [],
+      "ip_feed_id": null
+    },
+    {
+      "id": "startpage",
+      "name": "Startpage",
+      "reason": "Partner or unknown crawler; no independent verified signature in this research.",
+      "ua_patterns": [],
+      "ip_feed_id": null
+    },
+    {
+      "id": "aol",
+      "name": "AOL Search",
+      "reason": "Partner or unknown crawler; no independent verified signature in this research.",
+      "ua_patterns": [],
+      "ip_feed_id": null
+    }
+  ],
+  "unassigned_feed_ids": [
+    "google-user",
+    "google-user-google"
+  ]
+}

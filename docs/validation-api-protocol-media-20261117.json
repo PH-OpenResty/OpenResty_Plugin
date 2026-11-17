@@ -1,0 +1,51 @@
+{
+  "date": "2026-11-17",
+  "base_commit": "d4d5609963d31404d4f0a507d234dfd4e89540f3",
+  "local_checks": 783,
+  "matrix": {
+    "nginx": {
+      "api": 47,
+      "mixed": 53,
+      "protocols": 66,
+      "headers": 32,
+      "edge": 47
+    },
+    "openresty": {
+      "api": 47,
+      "mixed": 53,
+      "protocols": 66,
+      "headers": 32,
+      "edge": 47
+    },
+    "static": {
+      "api": 47,
+      "mixed": 53,
+      "protocols": 66,
+      "headers": 32,
+      "edge": 47
+    }
+  },
+  "media_checks": 48,
+  "nginx_sanitizers": "UBSan traps; upstream HTTP/2 alignment follows tools/sanitizer-cc.sh",
+  "real_vendor_api_calls": 0,
+  "production_modified": false,
+  "media_attachment_emitted": false,
+  "media_client_display_verified": false,
+  "source_hashes": [
+    {
+      "path": "native-api/src/ngx_http_scdn_api_module.c",
+      "sha256": "8981b022d103e105768dca554dc221ac0ac382de5fa50a518439905688b26e8b"
+    },
+    {
+      "path": "native-api/tools/media_artifact.py",
+      "sha256": "31e69ca9c3b277fd5bcb99a64e93ebde53b3312636cd317767256add5049aa40"
+    }
+  ],
+  "limits": {
+    "input_mb": 128,
+    "single_image_mb": 32,
+    "all_images_mb": 64,
+    "images": 16,
+    "pixels_per_image": 40000000
+  }
+}

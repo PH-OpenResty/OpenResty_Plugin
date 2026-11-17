@@ -1,0 +1,19 @@
+{
+  "validation_kind": "research_documents_and_design_seed_data",
+  "as_of_date": "2026-11-17",
+  "passed": true,
+  "official_ip_sources": 17,
+  "published_prefix_entries": 3154,
+  "bot_catalog_entries": 29,
+  "unidentifiable_engines": 4,
+  "weak_password_entries": 10001,
+  "weak_passwords_match_pinned_source": true,
+  "license_matches_pinned_source": true,
+  "relative_document_links_checked": 56,
+  "json_examples_checked": 1,
+  "publication_content_findings": 0,
+  "existing_source_hashes_verified": 53,
+  "runtime_integrated": false,
+  "new_runtime_or_production_tests": false,
+  "production_modified": false
+}
