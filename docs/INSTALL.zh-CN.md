@@ -1,6 +1,6 @@
 # 安装、构建和首次运行
 
-统一构建生成 Sync、Config、Ban、API、Edge、Tier、Purge 七个插件。Config/API/Edge 需同版本编译，全量动态加载顺序建议 Config → Ban → Tier → API → Edge → Purge → Sync；Tier、Sync 和 Purge 可按功能独立使用。Purge 的私有日志/token 见 [手册](../native-purge/README.zh-CN.md)，Sync 的独立身份/token/mTLS 接入见 [迁移说明](SYNC-MIGRATION.zh-CN.md)。当前原生模块不依赖 Lua 或 Python；Sync 0.3.0 已提供原生站点/证书发布，旧 Lua 协议交接按独立迁移流程操作。
+统一构建生成 Sync、Config、Bot、Ban、API、Edge、Tier、Purge 八个插件。Config/API/Edge 需同版本编译，全量动态加载顺序建议 Config → Bot → Ban → Tier → API → Edge → Purge → Sync；Tier、Sync 和 Purge 可按功能独立使用。Purge 的私有日志/token 见 [手册](../native-purge/README.zh-CN.md)，Sync 的独立身份/token/mTLS 接入见 [迁移说明](SYNC-MIGRATION.zh-CN.md)。当前原生模块不依赖 Lua 或 Python；Sync 0.3.0 已提供原生站点/证书发布，旧 Lua 协议交接按独立迁移流程操作。
 
 ## 1. 构建要求
 
@@ -48,7 +48,7 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-openresty --pur
   --report /tmp/scdn-five-modules-results.json
 ```
 
-构建脚本从 OpenResty 官方地址下载固定归档并校验 SHA-256。`nginx` 模式仅解包其中的 Nginx 核心，不编入 Lua；`openresty` 模式构建完整 OpenResty。两种模式都启用 `--with-compat --with-http_ssl_module --with-http_v2_module --with-pcre-jit --with-threads`，默认将七个插件作为动态模块构建。Purge 正则匹配需要 PCRE2，不能使用旧 PCRE1 构建。
+构建脚本从 OpenResty 官方地址下载固定归档并校验 SHA-256。`nginx` 模式仅解包其中的 Nginx 核心，不编入 Lua；`openresty` 模式构建完整 OpenResty。两种模式都启用 `--with-compat --with-http_ssl_module --with-http_v2_module --with-pcre-jit --with-threads`，默认将八个插件作为动态模块构建。Purge 正则匹配需要 PCRE2，不能使用旧 PCRE1 构建。
 
 第三参数设置为 `static` 可静态编入，例如 `sh tools/build-runtime.sh /tmp/scdn-static openresty static`。测试相应增加 `--static`；配置中删除已静态编入模块对应的 load_module。该脚本生成隔离验证运行时，已有生产 Node 仍需保留其原有构建参数、模块及库。
 
@@ -74,7 +74,7 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-openresty --pur
 
 先保存现有二进制、模块、配置、站点源文件及证书，并确认可恢复的版本。通过目标二进制的 `-V` 核对 Nginx/OpenResty 版本、补丁、构建选项、TLS 库和架构。
 
-使用目标的匹配源码和原构建参数，按需指定 `native-sync`、`native-config`、`native-api`、`native-edge`、`native-ban`、`native-tier`、`native-purge`；统一构建包含全部七个目录。保留目标已有模块、路径和编译参数，并满足 HTTP SSL、线程池、PCRE2 条件。`--with-compat` 不等于跨任意版本或构建的通用 ABI；不能只复制不兼容的 `.so`。
+使用目标的匹配源码和原构建参数，按需指定 `native-sync`、`native-config`、`native-bot`、`native-api`、`native-edge`、`native-ban`、`native-tier`、`native-purge`；统一构建包含全部八个目录。保留目标已有模块、路径和编译参数，并满足 HTTP SSL、线程池、PCRE2 条件。`--with-compat` 不等于跨任意版本或构建的通用 ABI；不能只复制不兼容的 `.so`。
 
 确认兼容后将三个 `.so` 安装到目标模块目录，在主配置最前面依次加入：
 
@@ -150,7 +150,7 @@ Config/Edge 按相同源码版本一起重编译后，可在站点数据启用 [
 
 ## 原生配置发布与分层缓存
 
-站点/证书同步的额外线程池、私有目录、RSA/Ed25519/mTLS 和受管 bootstrap 见 [发布手册](SYNC-PUBLICATION.zh-CN.md)。L1/L2 缓存读取链和停用 Lua flush 的条件见 [Tier 手册](../native-tier/README.zh-CN.md)。七模块及 Agent/BPF 源摘要均在 SOURCE-SHA256SUMS，完整业务共存测试为 native-tier/tests/coexist.py。
+站点/证书同步的额外线程池、私有目录、RSA/Ed25519/mTLS 和受管 bootstrap 见 [发布手册](SYNC-PUBLICATION.zh-CN.md)。L1/L2 缓存读取链和停用 Lua flush 的条件见 [Tier 手册](../native-tier/README.zh-CN.md)。八模块及 Agent/BPF 源摘要均在 SOURCE-SHA256SUMS，完整业务共存测试为 native-tier/tests/coexist.py。
 
 Tier 0.1.1 同时更新 front/backend 模板、条件头变量、L2 限额协议和默认缓存键。升级先使用独立实例/Socket 与新 cache zone/path 验证，不能让旧、新 Worker 混用同一个后端协议。新增验收为 `native-tier/tests/boundaries.py` 与 `native-sync/tests/cache_tasks.py --tier`；参数同样支持 `--prefix`、`--static`、`--report`。
 
@@ -161,3 +161,7 @@ Ban Agent 0.2.0 的构建会同时生成并链接 libscdn-ban-store.a，依赖 l
 ## 显式 API 图片处理工具
 
 原生 API 模块不增加图片解码库依赖。需要把已有 API 返回保存为实际图片时，在调用方环境单独安装 `python -m pip install -r native-api/tools/requirements.txt`，再调用 [media_artifact.py](../native-api/tools/media_artifact.py)。工具不调用模型，不接收厂商 Key，不在 Worker 中运行；默认禁止远程 URL，完整解码后原子保存。当前处理 PNG/JPEG/WebP 单帧图片，预算、允许下载主机、输出及附件/展示边界见 [API 手册](../native-api/README.zh-CN.md#图片文件与处理结果)。
+
+## Bot 规则接入
+
+同次构建的 API/Edge 增加 Bot 依赖，动态加载先加入 Bot；只复制旧加载清单会出现缺少符号。Bot 本身仍可独立构建和加载。规则编译、来源更新、独立/组合配置、可信代理与限制见 [Bot 手册](../native-bot/README.zh-CN.md)。生产接入先用隔离实例验证，代码交付不自动改变防火墙或程序。

@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "artifact_kind": "design_seed",
+  "artifact_kind": "bot_range_seed",
   "as_of_date": "2026-11-17",
-  "runtime_integrated": false,
+  "runtime_integrated": true,
   "source_count": 17,
   "prefix_count": 3154,
   "sources": [

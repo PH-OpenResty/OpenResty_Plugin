@@ -6,7 +6,7 @@
 
 ## 1. 依赖与指令
 
-业务链由 Config、API、Edge 构成，动态加载顺序为 Config → Ban → API → Edge，三者使用同一源码与目标 ABI 构建。统一构建还提供 Sync、Tier、Purge，共七个模块。运行时需要 HTTP SSL，Config 还需要线程池支持。Edge 用到 Nginx 代理/静态文件/缓存功能时，这些原生模块也必须存在。API 默认关闭，启用方式见 [API 手册](../native-api/README.zh-CN.md)。
+业务链由 Config、API、Edge 构成，动态加载顺序为 Config → Bot → Ban → API → Edge，三者使用同一源码与目标 ABI 构建。统一构建还提供 Sync、Tier、Purge，共八个模块。运行时需要 HTTP SSL，Config 还需要线程池支持。Edge 用到 Nginx 代理/静态文件/缓存功能时，这些原生模块也必须存在。API 默认关闭，启用方式见 [API 手册](../native-api/README.zh-CN.md)。
 
 [Sync](../native-sync/README.zh-CN.md) 的角色/身份接口不改变 Edge 站点版本，0.3.0 的配置发布通过受管 active.conf 和 Config 热更新生效。五模块共存、独立控制 token 与流式代理的验证入口是 `native-api/tests/integration.py --purge --sync`，静态构建增加 `--static`。
 
@@ -154,11 +154,11 @@ python native-edge/tests/integration.py --prefix /tmp/scdn-plugin-nginx \
 
 Edge 按当前请求持有的配置版本生成 `X-Cache`、`X-Cache-Layer`、`X-Cache-Policy` 和 `X-Cache-Revision`，站点/prefix 的 `cache_headers off;` 可关闭。删除已有同名 add_header，避免重复。规则的静态回源头在 proxy_pass 前替换客户端全部同名值；站点/前缀继承、私有绕过、Nginx 固定 proxy_set_header 的优先级及 HTTP/gRPC 边界见 [缓存头手册](../docs/CACHE-HEADERS.zh-CN.md)。
 
-Edge 现在以 HTTP_FILTER 类型注册，确保静态和动态构建均在 Nginx 基础 header filter 之后接入原生缓存诊断；动态加载仍保持 Config → Ban → API → Edge，三个模块需同源码版本一起编译。
+Edge 现在以 HTTP_FILTER 类型注册，确保静态和动态构建均在 Nginx 基础 header filter 之后接入原生缓存诊断；动态加载仍保持 Config → Bot → Ban → API → Edge，三个模块需同源码版本一起编译。
 
 当前统一构建包含原生 [Ban](../native-ban/RUNTIME.zh-CN.md)。一起编译时 Ban 必须先于 API/Edge 动态加载；未配置 scdn_ban on 时不启用封禁。其 Agent/eBPF 和全节点快照是独立运行路径，Sync 桥接需显式 scdn_sync_ban_agent。
 
-Edge 现在以 HTTP_FILTER 类型注册，确保静态和动态构建均在 Nginx 基础 header filter 之后接入原生缓存诊断；动态加载仍保持 Config → API → Edge，三个模块需同源码版本一起编译。
+Edge 现在以 HTTP_FILTER 类型注册，确保静态和动态构建均在 Nginx 基础 header filter 之后接入原生缓存诊断；动态加载仍保持 Config → Bot → Ban → API → Edge，三个模块需同源码版本一起编译。
 
 ## 原生策略与保留 Lua 的衔接
 
@@ -173,3 +173,7 @@ counter 使用有界 Worker 本地查找缓存，Host 使用 Config 准备的排
 status/metrics 放在未启用 scdn_edge 的独立受限 server；业务 server 不按 URL 名称自动绕过 Host 或安全策略。metrics 成功响应附 no-store，本机反向代理若公开路径须另行鉴权。动态证书回调独占所属 SSL_CTX，不与另一 Lua/第三方证书回调同时启用。
 
 Edge-only 示例已补齐 HTTPS 的 SNI、验证、CA 和 Host，并关闭可变身份的 TLS session reuse。实际 CA 路径按部署配置，命名池复用也可使用 API 模块的身份检查。完整结论见[独立复审](../docs/AUDIT-REVIEW-2026-11-16.zh-CN.md)。
+
+## 原始访问阶段与 Bot
+
+PREACCESS 固定站点、执行 Ban/Bot 与有界 API 准备；代理跳转延后到 PRECONTENT，保留原始 location 的 deny/auth_basic/Lua ACCESS 检查。WAF/限流桥应配置在 server 或原始入口，已有 security_guard 使用原生 checked 标记避免命名跳转后重复计数。不要只在代理 profile 配置必需的桥，否则安全 gate 会在入口拒绝。Bot 需先于同次构建的 API/Edge 加载，见 [Bot 手册](../native-bot/README.zh-CN.md)。

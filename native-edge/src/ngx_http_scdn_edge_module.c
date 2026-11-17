@@ -1,4 +1,7 @@
 #include "scdn_edge.h"
+#if (NGX_SCDN_BOT)
+#include "scdn_bot.h"
+#endif
 #if (NGX_SCDN_BAN)
 #include "ngx_scdn_ban.h"
 #endif
@@ -18,6 +21,7 @@ static ngx_int_t edge_preconfiguration(ngx_conf_t *cf);
 static ngx_int_t edge_postconfiguration(ngx_conf_t *cf);
 static ngx_int_t edge_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t edge_access(ngx_http_request_t *r);
+static ngx_int_t edge_prepare(ngx_http_request_t *r);
 static ngx_int_t edge_header_filter(ngx_http_request_t *r);
 static ngx_int_t edge_security_gate(ngx_http_request_t *r);
 static void edge_security_checked(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
@@ -299,11 +303,10 @@ edge_header_filter(ngx_http_request_t *r)
 }
 
 static ngx_int_t
-edge_access(ngx_http_request_t *r)
+edge_prepare(ngx_http_request_t *r)
 {
     scdn_edge_server_t *server;
     scdn_edge_request_t *request;
-    ngx_str_t *location;
 #if (NGX_SCDN_API)
     ngx_int_t rc;
 #endif
@@ -316,11 +319,34 @@ edge_access(ngx_http_request_t *r)
     { ngx_int_t ban_rc = ngx_http_scdn_ban_precheck(r);
       if (ban_rc != NGX_DECLINED) return ban_rc; }
 #endif
+#if (NGX_SCDN_BOT)
+    { ngx_int_t bot_rc = ngx_http_scdn_bot_check(r);
+      if (bot_rc != NGX_DECLINED) return bot_rc; }
+#endif
+#if (NGX_SCDN_API)
+    rc = ngx_http_scdn_api_prepare(r);
+    if (rc != NGX_DECLINED) { return rc; }
+#endif
+    return NGX_DECLINED;
+}
+
+static ngx_int_t
+edge_access(ngx_http_request_t *r)
+{
+    scdn_edge_server_t *server = ngx_http_get_module_srv_conf(r, ngx_http_scdn_edge_module);
+    scdn_edge_request_t *request;
+    ngx_str_t *location;
+    ngx_int_t rc;
+    if (!server->enabled) return NGX_DECLINED;
+    rc = edge_prepare(r);
+    if (rc != NGX_DECLINED) return rc;
+    rc = edge_security_gate(r);
+    if (rc != NGX_DECLINED) return rc;
+    request = scdn_edge_request(r);
+    if (!request) return NGX_HTTP_SERVICE_UNAVAILABLE;
     if (!request->routed && request->upstream.len != 0) {
         location = &server->proxy_location;
 #if (NGX_SCDN_API)
-        rc = ngx_http_scdn_api_prepare(r);
-        if (rc != NGX_DECLINED) { return rc; }
         location = ngx_http_scdn_api_location(r, location);
 #endif
         if (edge_request_headers(r, request) != NGX_OK) return NGX_HTTP_INTERNAL_SERVER_ERROR;
@@ -523,6 +549,8 @@ edge_postconfiguration(ngx_conf_t *cf)
         }
     }
     handler = ngx_array_push(&core->phases[NGX_HTTP_PREACCESS_PHASE].handlers);
+    if (handler == NULL) { return NGX_ERROR; } *handler = edge_prepare;
+    handler = ngx_array_push(&core->phases[NGX_HTTP_PRECONTENT_PHASE].handlers);
     if (handler == NULL) { return NGX_ERROR; } *handler = edge_access;
     handler = ngx_array_push(&core->phases[NGX_HTTP_PRECONTENT_PHASE].handlers);
     if (handler == NULL) { return NGX_ERROR; } *handler = edge_security_gate;

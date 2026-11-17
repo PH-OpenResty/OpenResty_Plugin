@@ -1,14 +1,15 @@
 # 当前文档与能力核对
 
-当前运行模块为七个：Sync 0.3.0、Config、Ban、API、Edge、Tier 0.1.1、Purge 0.3.0。下面各入口描述当前实现；历史验证 JSON、带版本/日期的基线和研究报告保留其当时的结果，不将历史数字改成新版本证据。
+当前运行模块为八个：Sync 0.3.0、Config、Bot 0.1.0、Ban、API、Edge、Tier 0.1.1、Purge 0.3.0。下面各入口描述当前实现；历史验证 JSON、带版本/日期的基线和研究报告保留其当时的结果，不将历史数字改成新版本证据。
 
 | 范围 | 当前入口 | 核对结论 |
 | --- | --- | --- |
-| 总览/构建 | [README](../README.md)、[安装](INSTALL.zh-CN.md) | 七模块、目标 ABI/依赖、动态/静态、独立与组合运行 |
+| 总览/构建 | [README](../README.md)、[安装](INSTALL.zh-CN.md) | 八模块、目标 ABI/依赖、动态/静态、独立与组合运行 |
 | Sync | [模块手册](../native-sync/README.zh-CN.md)、[配置/证书发布](SYNC-PUBLICATION.zh-CN.md) | 已实现原生 v2 发布/拉取/热应用/回退，按启用状态报告 |
 | Sync 迁移/路线 | [迁移](SYNC-MIGRATION.zh-CN.md)、[路线](SYNC-ROADMAP.zh-CN.md) | 不与旧 Lua JWE/JWS 直接互通，写入权交接和剩余能力明确 |
 | 缓存任务 | [任务手册](CACHE-TASKS.zh-CN.md) | 独立刷新/预热，与配置发布分开，支持 Tier 业务入口 |
 | Config/Edge | [Config](../native-config/README.zh-CN.md)、[Edge](../native-edge/README.zh-CN.md) | 普通只读 watcher、Sync managed 恢复、路由/TLS/请求版本 |
+| Bot | [手册](../native-bot/README.zh-CN.md) | 原生 UA/CIDR、Censys/FOFA 规则、可信代理、观察与拒绝；来源更新为独立工具，尚无安全资源 Sync |
 | API | [API](../native-api/README.zh-CN.md)、[协议与媒体](API-PROTOCOL-MEDIA-DESIGN.zh-CN.md) | 图片编辑/变体、按站点协议别名、四协议 raw/工具链和显式本地图片解码；附件发出与实际展示独立报告 |
 | Bot/注册防护研究 | [总设计](BOT-UA-AUTH-GUARD-RESEARCH-DESIGN.zh-CN.md)、[种子数据](security-seeds/README.zh-CN.md) | 国内外 UA/IP 目录、扫描器严格拒绝、弱库/邮箱/建号前跟踪；安全模块仍为设计与数据，尚未接入运行模块 |
 | 分层缓存 | [Tier](../native-tier/README.zh-CN.md) | 0.1.1；Lua 选层/flush 对应、晋升/降温、304 续期、两层限额/隔离、预热恢复和升级 |

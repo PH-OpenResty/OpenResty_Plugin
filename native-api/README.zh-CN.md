@@ -8,10 +8,12 @@
 
 ## 接入方式
 
-与同一源码版本的 Config、Edge 一起构建。动态加载顺序为 Config → Ban → API → Edge；静态编入时无需 `load_module`。统一构建还包含独立的 Tier、Purge 和 [Sync](../native-sync/README.zh-CN.md)，共七个模块，支持纯 Nginx 和完整 OpenResty。Sync 角色与其本机鉴权不参与 API/AI 分类。
+与同一源码版本的 Config、Edge 一起构建。动态加载顺序为 Config → Bot → Ban → API → Edge；静态编入时无需 `load_module`。统一构建还包含独立的 Tier、Purge 和 [Sync](../native-sync/README.zh-CN.md)，共八个模块，支持纯 Nginx 和完整 OpenResty。Sync 角色与其本机鉴权不参与 API/AI 分类。
 
 ```nginx
 load_module modules/ngx_http_scdn_config_module.so;
+load_module modules/ngx_http_scdn_bot_module.so;
+load_module modules/ngx_http_scdn_ban_module.so;
 load_module modules/ngx_http_scdn_api_module.so;
 load_module modules/ngx_http_scdn_edge_module.so;
 ```
@@ -223,3 +225,5 @@ Config/Edge 已支持 [缓存响应头与规则回源头](../docs/CACHE-HEADERS.
 Accept SSE 是自动识别提示，不是授权或总资源预算。应在允许的 server/location 启用自动识别，按业务配置读空闲超时、连接/并发限制和既有安全执行策略；模块不提供模型配额或总时长限制。命名池在站点中用完整 http://pool_name / https://pool_name 表达。
 
 metrics 成功响应带 no-store；本机代理如公开该路径须另行鉴权，或使用受限 Unix Socket 目录。完整结论见[独立复审](../docs/AUDIT-REVIEW-2026-11-16.zh-CN.md)。
+
+代理 profile 跳转在 PRECONTENT 执行，保留原始 location 的 ACCESS 检查；PREACCESS 只执行有界准备。独立 `scdn_api_dispatch` 也遵循该顺序，避免跳过 deny/auth_basic。与 Bot 一起构建时，正文识别前显式调用其检查；[Bot 手册](../native-bot/README.zh-CN.md)说明作用域、可信地址和加载顺序。

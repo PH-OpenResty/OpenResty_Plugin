@@ -1,11 +1,12 @@
 # OpenResty Plugin
 
-七个纯 C 的 Nginx/OpenResty HTTP 插件：Sync 提供 Master/Node 身份、站点/证书加密发布与热应用、缓存刷新与预热任务；Config/Edge 读取站点数据热更新路由、证书和缓存策略；API 自动识别动态 API、AI 与流式请求；Purge 提供持久化失效、源站校验及过时复用。Nginx/BPF 为 C，Ban Agent 与专用 Ban Store 为 C++17。这些原生模块不依赖 Lua，不生成站点 Lua、字节码或 `nginx.conf`。
+八个纯 C 的 Nginx/OpenResty HTTP 插件：Bot 管理 UA/CIDR、搜索来源与扫描器拒绝；Sync 提供 Master/Node 身份、站点/证书加密发布与热应用、缓存刷新与预热任务；Config/Edge 读取站点数据热更新路由、证书和缓存策略；API 自动识别动态 API、AI 与流式请求；Purge 提供持久化失效、源站校验及过时复用。Nginx/BPF 为 C，Ban Agent 与专用 Ban Store 为 C++17。这些原生模块不依赖 Lua，不生成站点 Lua、字节码或 `nginx.conf`。
 
 | 插件 | 职责 | 文档 |
 | --- | --- | --- |
 | `ngx_http_scdn_sync_module.so` | Master/Node 角色、mTLS 身份、加密站点/证书发布、Node 热应用/回退和缓存任务 | [Sync 完整手册](native-sync/README.zh-CN.md) |
 | `ngx_http_scdn_config_module.so` | 后台检测文件内容、校验并预加载候选版本、等待各 Worker 就绪、切换不可变配置版本 | [Config 完整手册](native-config/README.zh-CN.md) |
+| `ngx_http_scdn_bot_module.so` | 原生 UA 自动机、IPv4/IPv6 CIDR、可信代理、来源状态与 OR 拒绝 | [Bot 手册](native-bot/README.zh-CN.md) |
 | `ngx_http_scdn_api_module.so` | 请求/响应自动识别、API/AI 代理策略、缓存绕过、流式响应与 TLS 连接复用身份检查 | [API 完整手册](native-api/README.zh-CN.md) |
 | `ngx_http_scdn_edge_module.so` | Host 与最长前缀路由、启停、静态目录、SNI 证书选择、缓存层/可选热度、规则回源头/响应诊断、Prometheus 指标 | [Edge 完整手册](native-edge/README.zh-CN.md) |
 | `ngx_http_scdn_ban_module.so` | 可信 WAF/CC 事件、固定期限 L7/L3、独立 Agent/eBPF、所有节点完整封禁快照 | [Ban 运行手册](native-ban/RUNTIME.zh-CN.md) |
@@ -13,7 +14,7 @@
 | `ngx_http_scdn_tier_module.so` | 原生热度选层、L1 → L2 → 源站、晋升/冷层保留、对象大小准入与原始到期 | [Tier 完整手册](native-tier/README.zh-CN.md) |
 | `ngx_http_scdn_purge_module.so` | 持久化精确/批量/通配符/正则/后缀/目录/整站/节点失效、源站条件校验、有界过时复用 | [Purge 完整手册](native-purge/README.zh-CN.md) |
 
-Edge 依赖 Config 的 C 接口；一起构建 API 时也调用其判定接口。业务模块必须使用同一源码版本编译，全量动态加载顺序建议 Config → Ban → Tier → API → Edge → Purge → Sync；Sync、Tier 与 Purge 可独立加载。代理、静态文件与缓存文件管理继续使用 Nginx 自带模块。WAF、业务限速仍由外部能力承担。
+Edge 依赖 Config 的 C 接口；一起构建 API 时也调用其判定接口。业务模块必须使用同一源码版本编译，全量动态加载顺序建议 Config → Bot → Ban → Tier → API → Edge → Purge → Sync；Sync、Tier 与 Purge 可独立加载。代理、静态文件与缓存文件管理继续使用 Nginx 自带模块。WAF、业务限速仍由外部能力承担。
 
 API 已补齐图片编辑/变体分类、按方法/路径/可选站点的协议别名，以及 Responses/Chat/Gemini/Messages 工具链原始传输回归。显式 [媒体工具](native-api/tools/media_artifact.py)可从已有 JSON/SSE/二进制结果完整解码并保存图片，使用独立 Pillow 依赖；它不在 Worker 解码、不调用模型，也不把文件保存冒充客户端已展示。Bot/注册防护的[规划与种子](docs/BOT-UA-AUTH-GUARD-RESEARCH-DESIGN.zh-CN.md)仍按各自能力状态推进。
 
@@ -87,7 +88,7 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-nginx --purge -
   --report /tmp/scdn-five-modules-results.json
 ```
 
-系统构建依赖与 OpenResty 构建方式见 [安装文档](docs/INSTALL.zh-CN.md)。脚本固定下载归档并验证 SHA-256，构建七个插件，拒绝覆盖已有安装。
+系统构建依赖与 OpenResty 构建方式见 [安装文档](docs/INSTALL.zh-CN.md)。脚本固定下载归档并验证 SHA-256，构建八个插件，拒绝覆盖已有安装。
 
 ## 配置如何生效
 
@@ -107,10 +108,10 @@ flowchart LR
 
 ## 仓库边界
 
-本仓库独立提供 Sync、Config、Ban、API、Edge、Tier、Purge 源码、模板、测试与构建工具。Config 的普通 watcher 保持只读；启用 scdn_config_managed 后与 Sync 的持久事务及启动回退配合。Sync 0.3.0 已负责原生 v2 站点/证书分发，Tier 负责原生层级缓存；Ban 已提供独立 Agent、XDP/TCX 和全节点 L3 同步；部署权限与明确支持范围见运行手册。自动证书签发和程序自动升级不属于本次实现。
+本仓库独立提供 Sync、Config、Bot、Ban、API、Edge、Tier、Purge 源码、模板、测试与构建工具。Config 的普通 watcher 保持只读；启用 scdn_config_managed 后与 Sync 的持久事务及启动回退配合。Sync 0.3.0 已负责原生 v2 站点/证书分发，Tier 负责原生层级缓存；Ban 已提供独立 Agent、XDP/TCX 和全节点 L3 同步；部署权限与明确支持范围见运行手册。自动证书签发和程序自动升级不属于本次实现。
 
 仓库示例只使用保留域名、本机地址和通用路径。运行配置、站点数据、证书、私钥、token、日志及构建二进制应保存在受限的部署目录或忽略目录中。
 
 当前修复把配置与应用记录纳入同一恢复事务，补充真实 I/O 故障和进程中断回归；原生模块与剩余 Lua 按功能交接，保留 WAF/限流执行，见 [Lua 交接](docs/LUA-HANDOFF.zh-CN.md)。
 
-Ban 0.2.0 已去除 SQLite，新增直接集成到 Agent 的 [Ban Store](native-ban-store/README.zh-CN.md)。七个 HTTP 模块之外的该存储组件不增加 Nginx 加载顺序或外部存储服务。Node 可选 memory，权威 Master 保留持久化；执行容量与存储容量独立。
+Ban 0.2.0 已去除 SQLite，新增直接集成到 Agent 的 [Ban Store](native-ban-store/README.zh-CN.md)。八个 HTTP 模块之外的该存储组件不增加 Nginx 加载顺序或外部存储服务。Node 可选 memory，权威 Master 保留持久化；执行容量与存储容量独立。
