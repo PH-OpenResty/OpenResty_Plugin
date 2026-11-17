@@ -23,13 +23,11 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'tests'))
-from nginx_process import assert_clean_startup,runtime_log_offsets,wait_for_workers
+from nginx_process import assert_clean_startup,runtime_log_offsets,wait_for_workers,unused_listen_port
 
 
 def free_port():
-    with socket.socket() as sock:
-        sock.bind(('127.0.0.1', 0))
-        return sock.getsockname()[1]
+    return unused_listen_port()
 
 
 def write(path, value, mode=0o600):

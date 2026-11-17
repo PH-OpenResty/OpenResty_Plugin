@@ -63,7 +63,7 @@ control 同时要求真实传输连接来自 Unix Socket 或 loopback，并验�
 
 ## 构建与验证
 
-模块源码通过 Nginx `auto/module` 接入，支持动态或静态构建；需匹配目标 Nginx/OpenResty 的版本、ABI 和构建条件。统一构建包含 Sync、Config、Ban、API、Edge、Tier、Purge 七个模块。Sync 可独立加载；另外三个业务模块仍按 Config → Ban → API → Edge 加载，Purge 也独立使用。
+模块源码通过 Nginx `auto/module` 接入，支持动态或静态构建；需匹配目标 Nginx/OpenResty 的版本、ABI 和构建条件。统一构建包含 Sync、Config、Bot、Ban、API、Edge、Tier、Purge 八个模块。Sync 可独立加载；另外三个业务模块仍按 Config → Bot → Ban → API → Edge 加载，Purge 也独立使用。
 
 ```sh
 # Native helpers, with warnings treated as errors.

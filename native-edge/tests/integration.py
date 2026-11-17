@@ -27,13 +27,11 @@ from cryptography.x509.oid import NameOID
 
 sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'tests'))
 from nginx_process import (assert_clean_startup,dump_runtime_logs,
-                           runtime_log_offsets,wait_for_workers,worker_pids)
+                           runtime_log_offsets,wait_for_workers,worker_pids,unused_listen_port)
 
 
 def port():
-    with socket.socket() as sock:
-        sock.bind(('127.0.0.1', 0))
-        return sock.getsockname()[1]
+    return unused_listen_port()
 
 
 def certificate(directory, label, hosts):
@@ -126,7 +124,7 @@ site static {{ host static.example.com; root {self.root}/html; cache off; }}
         user='user root root;' if os.geteuid()==0 else ''
         modules='' if self.static else '\n'.join(
             f'load_module {self.prefix}/modules/ngx_http_scdn_{name}_module.so;'
-            for name in ('config','ban','api','edge'))
+            for name in ('config','bot','ban','api','edge'))
         return f'''{modules}
 {user}
 worker_processes 2;

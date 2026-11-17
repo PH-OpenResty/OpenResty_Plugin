@@ -1,4 +1,7 @@
 #include "scdn_api.h"
+#if (NGX_SCDN_BOT)
+#include "scdn_bot.h"
+#endif
 #if (NGX_SCDN_BAN)
 #include "ngx_scdn_ban.h"
 #endif
@@ -70,6 +73,7 @@ static char *api_endpoint(ngx_conf_t *cf, ngx_command_t *cmd, void *data);
 static ngx_int_t api_metrics(ngx_http_request_t *r);
 static ngx_int_t api_variable(ngx_http_request_t *r, ngx_http_variable_value_t *v, uintptr_t data);
 static ngx_int_t api_access(ngx_http_request_t *r);
+static ngx_int_t api_prepare_access(ngx_http_request_t *r);
 static ngx_int_t api_header_filter(ngx_http_request_t *r);
 static ngx_int_t api_body_filter(ngx_http_request_t *r, ngx_chain_t *in);
 static ngx_int_t api_log(ngx_http_request_t *r);
@@ -534,6 +538,10 @@ ngx_http_scdn_api_prepare(ngx_http_request_t *r)
     ngx_int_t ban_rc = ngx_http_scdn_ban_precheck(r);
     if (ban_rc != NGX_DECLINED) return ban_rc;
 #endif
+#if (NGX_SCDN_BOT)
+    ngx_int_t bot_rc = ngx_http_scdn_bot_check(r);
+    if (bot_rc != NGX_DECLINED) return bot_rc;
+#endif
     ngx_int_t rc;
     api_location_t *conf = ngx_http_get_module_loc_conf(r, ngx_http_scdn_api_module);
     api_request_t *ctx;
@@ -580,6 +588,12 @@ ngx_http_scdn_api_location(ngx_http_request_t *r, ngx_str_t *fallback)
     default: break;
     }
     return selected != NULL && selected->len != 0 ? selected : fallback;
+}
+
+static ngx_int_t
+api_prepare_access(ngx_http_request_t *r)
+{
+    return ngx_http_scdn_api_prepare(r);
 }
 
 static ngx_int_t
@@ -983,6 +997,8 @@ api_postconfiguration(ngx_conf_t *cf)
         servers[i]->peer.init = api_init_peer;
     }
     handler = ngx_array_push(&core->phases[NGX_HTTP_PREACCESS_PHASE].handlers);
+    if (handler == NULL) { return NGX_ERROR; } *handler = api_prepare_access;
+    handler = ngx_array_push(&core->phases[NGX_HTTP_PRECONTENT_PHASE].handlers);
     if (handler == NULL) { return NGX_ERROR; } *handler = api_access;
     handler = ngx_array_push(&core->phases[NGX_HTTP_LOG_PHASE].handlers);
     if (handler == NULL) { return NGX_ERROR; } *handler = api_log;

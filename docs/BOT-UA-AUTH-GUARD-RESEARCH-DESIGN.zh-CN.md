@@ -1,10 +1,10 @@
 # API 工具链/图片结果、Bot UA 管理与 Sub2API/NewAPI 注册认证防护：调研及设计计划
 
-日期：2026-11-17，America/Los_Angeles。状态：API 编辑/变体分类修复、协议别名/raw 回归和本地媒体处理工具已实现并完成隔离验证；Bot/Auth Guard 仍为待实现设计，种子数据尚未接入运行模块。未部署本轮源码到生产。
+日期：2026-11-17，America/Los_Angeles。状态：API 编辑/变体分类修复、协议别名/raw 回归和本地媒体处理工具已实现并完成隔离验证；Bot 0.1.0 已实现并验证 UA/CIDR、可信地址、策略编译与作用域；Auth Guard 仍待实现。Bot 种子已接入编译工具，弱密码库仍待认证消费者。未部署本轮源码到生产。
 
 ## 1. 建议与依据
 
-建议先正式合入 `native-api` 的图片编辑/变体识别修复，按[API 工具链与媒体设计](API-PROTOCOL-MEDIA-DESIGN.zh-CN.md)覆盖四种协议的原始传输和显式处理结果，再新增两个可分别启用的原生 C HTTP 模块：`native-bot` 与 `native-auth-guard`。Bot 覆盖国内外可扩展目录、UA/IP 拒绝与严格扫描器策略；Auth Guard 用共同内核与 Sub2API/NewAPI 适配器，增加弱密码、邮箱策略、第一方行为跟踪和建号前拦截。现有七个 HTTP 模块在这两项实现后成为九个；Ban Store 仍是 Agent 内部组件。
+建议先正式合入 `native-api` 的图片编辑/变体识别修复，按[API 工具链与媒体设计](API-PROTOCOL-MEDIA-DESIGN.zh-CN.md)覆盖四种协议的原始传输和显式处理结果，再新增两个可分别启用的原生 C HTTP 模块：`native-bot` 与 `native-auth-guard`。Bot 覆盖国内外可扩展目录、UA/IP 拒绝与严格扫描器策略；Auth Guard 用共同内核与 Sub2API/NewAPI 适配器，增加弱密码、邮箱策略、第一方行为跟踪和建号前拦截。当前八个 HTTP 模块在 Auth Guard 实现后成为九个；Ban Store 仍是 Agent 内部组件。
 
 用户要求的恶意名单具有明确的 OR 语义：**在适用站点/路由内，命中禁用 UA 或禁用 IP/CIDR 中任意一项即可屏蔽**。已确认官方 IP 的搜索服务填写精确来源表，未确认 IP 的保留 UA 分类和站点策略。UA 单独命中不产生可信身份或认证豁免；Censys/FOFA 作为明确要求拒绝的扫描来源单独管理。
 
@@ -12,7 +12,7 @@
 
 Ban Store 继续只保存 IP 封禁及其必要的回执、期限、解封水位和同步元数据。账号 HMAC、认证计数、跟踪 ID、弱密码字典、邮箱策略、UA 规则和 Bot 地址源不写入 Ban Store。异常注册达到明确规则时，在创建账号之前拒绝并立即加入限定范围的 IP 黑名单；普通字段错误、首次弱密码选择或一次认证失败不自动升级为全局内核封禁。
 
-本轮已准备[可审查的种子数据](security-seeds/README.zh-CN.md)：29 个 Bot 条目与 4 个不可独立识别的搜索服务、17 份官方来源的 3,154 条精确前缀、10,001 条已知常见弱密码的本地匹配摘要及许可。所有种子标记 `runtime_integrated=false`，不是已运行的插件。
+本轮已准备[可审查的种子数据](security-seeds/README.zh-CN.md)：29 个 Bot 条目与 4 个不可独立识别的搜索服务、17 份官方来源的 3,154 条精确前缀、10,001 条已知常见弱密码的本地匹配摘要及许可。Bot 目录/地址种子已由运行模块的编译工具消费；弱密码种子仍标记 runtime_integrated=false。
 
 ### 1.1 本次核对的源码基线
 
@@ -546,4 +546,10 @@ CLI/受限 Unix Socket 提供只读状态、规则预检、观察模式切换、
 15. [Brave 的识别限制](https://search.brave.com/help/brave-search-crawler)、[Naver Yeti](https://searchadvisor.naver.com/guide/seo-basic-robots)、[搜狗](https://www.sogou.com/docs/help/webmasters.htm)、[Petal](https://webmaster.petalsearch.com/site/petalbot)。
 16. [NIST 密码要求](https://pages.nist.gov/800-63-4/sp800-63b/authenticators/)、[SecLists 固定提交](https://github.com/danielmiessler/SecLists/tree/fd15eaaa5ee6b1be059796a2e3058f3fa244243a)；[弱库 manifest](security-seeds/weak-passwords.manifest.json)与[许可](security-seeds/SECLISTS-LICENSE.txt)。
 
-本次交付包含 API 源码修复、协议别名和原始传输回归、本地媒体提取工具，以及后续安全模块的设计/种子。17 份来源的前缀/计数/摘要、29+4 条目录记录、10,001 条弱库摘要和许可可独立核验。Bot/Auth Guard 尚无运行实现；没有本轮生产部署。API 新验证见[独立记录](validation-api-protocol-media-20261117.json)，不以已有线上图片修复或 CLI 报告替代新测试。
+本次交付包含 API 源码修复、协议别名和原始传输回归、本地媒体提取工具，以及后续安全模块的设计/种子。17 份来源的前缀/计数/摘要、29+4 条目录记录、10,001 条弱库摘要和许可可独立核验。Bot 运行实现见其手册；Auth Guard 尚无运行实现；没有本轮生产部署。API 新验证见[独立记录](validation-api-protocol-media-20261117.json)，不以已有线上图片修复或 CLI 报告替代新测试。
+
+## 11. Bot 首批实现与访问阶段修复
+
+Bot 0.1.0、来源编译/更新工具和八模块共存已经实现，见[运行手册](../native-bot/README.zh-CN.md)。请求路径无外部来源查询；站点规则、UA/IP OR、候选/陈旧来源、可信代理与观察/关闭决策有独立回归。尚未加入新的安全资源 Sync，也不调用旧 WAF/CC 的自动 L3 升级路径。
+
+新增测试确认原 Edge/API 在 PREACCESS 跳转会绕过原始 location 的 deny/auth_basic。现在只在 PREACCESS 准备，PRECONTENT 才分流，原 ACCESS 规则得以运行；保留 Lua 桥已有的 checked 标记防止重复。验证见[记录](validation-bot-20261117.json)。注册/登录及后端创建前保护仍是后续 Auth Guard 交付，不能由 Bot 已加载推断其已就绪。

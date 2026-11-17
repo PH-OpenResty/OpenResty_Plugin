@@ -1,0 +1,52 @@
+{
+  "date": "2026-11-17",
+  "base_commit": "fb67cddaf64f90d3dbbc8f1f65999be666514330",
+  "local_checks": 1293,
+  "matrix": {
+    "nginx": {
+      "bot": 44,
+      "access": 8,
+      "api": 47,
+      "mixed": 53,
+      "protocols": 66,
+      "edge": 47,
+      "coexist": 54,
+      "distribution": 40,
+      "receipt_recovery": 47
+    },
+    "openresty": {
+      "bot": 44,
+      "access": 8,
+      "api": 47,
+      "mixed": 53,
+      "protocols": 66,
+      "edge": 47,
+      "coexist": 54,
+      "distribution": 40,
+      "lua-handoff": 27,
+      "receipt_recovery": 47
+    },
+    "static": {
+      "bot": 44,
+      "access": 8,
+      "api": 47,
+      "mixed": 53,
+      "protocols": 66,
+      "edge": 47,
+      "coexist": 54,
+      "distribution": 40,
+      "lua-handoff": 27,
+      "receipt_recovery": 47
+    }
+  },
+  "catalog_checks": 21,
+  "production_modified": false,
+  "real_vendor_api_calls": 0,
+  "runtime_modules": 8,
+  "source_update_in_worker": false,
+  "automatic_ip_ban": false,
+  "auth_guard_implemented": false,
+  "security_regression": "Original deny/auth_basic rules execute before Edge/standalone API profile dispatch.",
+  "nginx_sanitizers": "UBSan traps; stock HTTP/2 alignment uses the existing compiler wrapper",
+  "fixture_listeners": "Unique planned listeners exclude the operating system ephemeral client-port range."
+}

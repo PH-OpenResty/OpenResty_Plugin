@@ -20,6 +20,7 @@ import socket
 import socketserver
 import ssl
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -33,11 +34,12 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import NameOID
 
+sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'tests'))
+from nginx_process import unused_listen_port
+
 
 def unused_port():
-    with socket.socket() as sock:
-        sock.bind(('127.0.0.1', 0))
-        return sock.getsockname()[1]
+    return unused_listen_port()
 
 
 def certificate(root):
@@ -264,7 +266,7 @@ site prefix {{ host prefix.example.test; upstream http://pooled-origin; cache of
 }}'''
 
     def config(self):
-        names=('config','ban','api','edge')+ (('purge',) if self.purge else ()) + (('sync',) if self.sync else ())
+        names=('config','bot','ban','api','edge')+ (('purge',) if self.purge else ()) + (('sync',) if self.sync else ())
         modules = '' if self.static else '\n'.join(
             f'load_module {self.prefix}/modules/ngx_http_scdn_{name}_module.so;'
             for name in names)

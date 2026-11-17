@@ -14,7 +14,7 @@ class Review(Test):
         if not self.static:
             configuration=f'load_module {self.prefix}/modules/ngx_http_scdn_config_module.so;\n'+configuration
             configuration=configuration.replace(f'load_module {self.prefix}/modules/ngx_http_scdn_sync_module.so;',
-                '\n'.join(f'load_module {self.prefix}/modules/ngx_http_scdn_{name}_module.so;' for name in ('api','edge','sync')))
+                '\n'.join(f'load_module {self.prefix}/modules/ngx_http_scdn_{name}_module.so;' for name in ('bot','api','edge','sync')))
         configuration=configuration.replace('thread_pool scdn_sync_ban', 'thread_pool scdn_config_reader threads=1 max_queue=2;\nthread_pool scdn_sync_ban')
         config=root/'sites.conf'
         write(config,f'sites {{ site lua-site {{ host www.example.test; root {root}/html; cache off; waf on; waf_group sqli; rate_limit off; }} }}',0o644)

@@ -1,0 +1,8 @@
+ngx_addon_name=ngx_http_scdn_bot_module
+have=NGX_SCDN_BOT . auto/have
+ngx_module_type=HTTP
+ngx_module_name=ngx_http_scdn_bot_module
+ngx_module_srcs="$ngx_addon_dir/src/ngx_http_scdn_bot_module.c"
+ngx_module_incs="$ngx_addon_dir/src $ngx_addon_dir/../native-security/src"
+ngx_module_deps="$ngx_addon_dir/src/scdn_bot.h $ngx_addon_dir/../native-security/src/scdn_security.h"
+. auto/module

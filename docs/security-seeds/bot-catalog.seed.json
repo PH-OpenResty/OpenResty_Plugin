@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "artifact_kind": "design_seed",
+  "artifact_kind": "bot_catalog_seed",
   "as_of_date": "2026-11-17",
-  "runtime_integrated": false,
+  "runtime_integrated": true,
   "search_fallback": "ua_only_classification_without_identity_privilege",
   "manual_deny_match": "ua_or_ip",
   "entries": [
