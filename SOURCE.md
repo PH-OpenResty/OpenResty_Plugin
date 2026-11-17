@@ -6,6 +6,8 @@
 
 [SOURCE-SHA256SUMS](SOURCE-SHA256SUMS) 现记录本次交付实现文件的摘要，用于校验当前源码。最初来源仍可通过上述历史提交复核，不能把新的清单当作原提交未变的证明。
 
+API 协议别名与媒体处理的后续实现包含本仓库的原生端点分类、原始代理回归和独立 Python 媒体工具。媒体工具及固定 Pillow 依赖也纳入实现摘要；Pillow 不链接进 Nginx，按其上游许可单独安装。
+
 在仓库根目录可核对：
 
 ```sh
@@ -29,3 +31,5 @@ Ban 0.1.0 的 IPC/共享视图、Agent、内核解析/Map 和 Sync 桥为本仓�
 `compat/lua/lib/security_guard.lua` 是原生快照到保留 Lua 安全引擎的桥接代码；转换器与暂存工具仅用于退出旧写入路径。测试 fixtures 保留既有 Lua WAF/限流和规则接口，以验证没有因迁移删除或绕过安全执行。它们不构成新原生 WAF/Ban 实现，真实部署目录和策略仍不进入仓库。
 
 `native-ban-store/` 是本仓库新增的 Ban 专用 C++17 存储组件，包含内存索引、变更事务、校验追加日志、原子快照和容量限制；未复制 Redis 或其他数据库源码。仅 Agent 使用该组件，Nginx Worker 保持只读共享视图。
+
+`docs/security-seeds/` 是尚未接入运行模块的设计数据。Bot 前缀按各提供者官方来源保留精确值、来源 URL 和快照摘要；分类与范围不得合并为通用可信表。弱密码摘要集合派生自 SecLists 固定提交 `fd15eaaa5ee6b1be059796a2e3058f3fa244243a` 的公开常见值数据，单独保留 [MIT 许可](docs/security-seeds/SECLISTS-LICENSE.txt)、[来源与摘要 manifest](docs/security-seeds/weak-passwords.manifest.json)及[使用边界](docs/security-seeds/README.zh-CN.md)，不以仓库的 Apache 许可替代上游署名和许可。它不包含用户口令，不是认证密码存储，也不代表 Bot/Auth Guard 已实现。

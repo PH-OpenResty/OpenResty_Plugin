@@ -157,3 +157,7 @@ Tier 0.1.1 同时更新 front/backend 模板、条件头变量、L2 限额协议
 Ban 额外构建依赖和私有目录、capabilities、bpffs/时间同步要求见 [运行手册](../native-ban/RUNTIME.zh-CN.md)。Agent 可执行文件与 BPF 对象独立于 Nginx .so 构建；默认不自动挂载到生产接口。
 
 Ban Agent 0.2.0 的构建会同时生成并链接 libscdn-ban-store.a，依赖 libbpf/json-c/libcurl/OpenSSL，不安装或链接 SQLite。独立存储构建、两种模式与升级要求见 [Ban Store](../native-ban-store/README.zh-CN.md)。
+
+## 显式 API 图片处理工具
+
+原生 API 模块不增加图片解码库依赖。需要把已有 API 返回保存为实际图片时，在调用方环境单独安装 `python -m pip install -r native-api/tools/requirements.txt`，再调用 [media_artifact.py](../native-api/tools/media_artifact.py)。工具不调用模型，不接收厂商 Key，不在 Worker 中运行；默认禁止远程 URL，完整解码后原子保存。当前处理 PNG/JPEG/WebP 单帧图片，预算、允许下载主机、输出及附件/展示边界见 [API 手册](../native-api/README.zh-CN.md#图片文件与处理结果)。

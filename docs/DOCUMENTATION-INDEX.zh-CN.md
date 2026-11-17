@@ -9,7 +9,8 @@
 | Sync 迁移/路线 | [迁移](SYNC-MIGRATION.zh-CN.md)、[路线](SYNC-ROADMAP.zh-CN.md) | 不与旧 Lua JWE/JWS 直接互通，写入权交接和剩余能力明确 |
 | 缓存任务 | [任务手册](CACHE-TASKS.zh-CN.md) | 独立刷新/预热，与配置发布分开，支持 Tier 业务入口 |
 | Config/Edge | [Config](../native-config/README.zh-CN.md)、[Edge](../native-edge/README.zh-CN.md) | 普通只读 watcher、Sync managed 恢复、路由/TLS/请求版本 |
-| API | [API](../native-api/README.zh-CN.md) | 私有/API/流式绕过和代理行为，七模块真实共存测试 |
+| API | [API](../native-api/README.zh-CN.md)、[协议与媒体](API-PROTOCOL-MEDIA-DESIGN.zh-CN.md) | 图片编辑/变体、按站点协议别名、四协议 raw/工具链和显式本地图片解码；附件发出与实际展示独立报告 |
+| Bot/注册防护研究 | [总设计](BOT-UA-AUTH-GUARD-RESEARCH-DESIGN.zh-CN.md)、[种子数据](security-seeds/README.zh-CN.md) | 国内外 UA/IP 目录、扫描器严格拒绝、弱库/邮箱/建号前跟踪；安全模块仍为设计与数据，尚未接入运行模块 |
 | 分层缓存 | [Tier](../native-tier/README.zh-CN.md) | 0.1.1；Lua 选层/flush 对应、晋升/降温、304 续期、两层限额/隔离、预热恢复和升级 |
 | 缓存清理 | [Purge](../native-purge/README.zh-CN.md)、[机制](CACHE-MECHANISM.zh-CN.md)、[再验证研究](CACHE-REVALIDATION-RESEARCH.zh-CN.md) | 两层共同失效、原生回收、穿透 L2 的条件校验与边界 |
 | HTTP 头 | [约定](HTTP-HEADERS.zh-CN.md)、[缓存头](CACHE-HEADERS.zh-CN.md) | X-Clinet-IP、缓存诊断/回源头、私有 X-Tier 和 X-Config 控制元数据 |

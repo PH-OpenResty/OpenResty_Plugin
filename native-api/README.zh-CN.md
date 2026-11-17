@@ -4,6 +4,8 @@
 
 本模块实现自动识别、缓存绕过、响应流转发、超时配置接入、客户端取消处理及 HTTPS 连接复用身份检查。网络选路、厂商密钥托管、模型协议转换、回答缓存和推理算力不在本版本范围内。
 
+现已包含图片生成/编辑/变体、音频翻译等分类，以及按方法/路径/可选站点登记的协议别名。Responses、Chat、Gemini、Messages 的工具调用、结果、签名及未知事件保持原始传输；另提供显式离线媒体工具保存和完整解码图片，不在 Nginx Worker 中解码图片，也不将数据返回冒充客户端展示。
+
 ## 接入方式
 
 与同一源码版本的 Config、Edge 一起构建。动态加载顺序为 Config → Ban → API → Edge；静态编入时无需 `load_module`。统一构建还包含独立的 Tier、Purge 和 [Sync](../native-sync/README.zh-CN.md)，共七个模块，支持纯 Nginx 和完整 OpenResty。Sync 角色与其本机鉴权不参与 API/AI 分类。
@@ -85,6 +87,7 @@ JSON 扫描验证完整结构、UTF-8、转义、数值与嵌套边界，仅保�
 | `scdn_api on\|off` | http/server/location | off | 启用本模块 |
 | `scdn_api_inspect_body SIZE` | http/server/location | 16k | 正文检查上限，0～64k |
 | `scdn_api_stream_timeout TIME` | http/server/location | 600s | 响应补判为流式后使用的回源读空闲超时，1s～1h |
+| `scdn_api_endpoint PROTOCOL METHOD PATH [SITE_ID]` | http/server/location | 无 | 登记上游协议别名；精确路径或结尾 `/*`，最多继承 1024 条 |
 | `scdn_api_dynamic_location @name` | http/server/location | 空 | 普通 API profile |
 | `scdn_api_ai_location @name` | http/server/location | 空 | AI profile |
 | `scdn_api_stream_location @name` | http/server/location | 空 | 普通流式 profile |
@@ -99,13 +102,50 @@ profile 未配置时使用 Edge 原有的代理 location。不要把不存在的
 | 变量 | 内容 |
 | --- | --- |
 | `$scdn_api_kind` | `web/api/ai/stream/grpc/websocket` |
-| `$scdn_api_reason` | `default/request_api/accept_sse/ai_endpoint/json_schema/grpc_content_type/websocket_upgrade/response_stream/response_json` |
+| `$scdn_api_reason` | `default/request_api/accept_sse/ai_endpoint/configured_endpoint/json_schema/grpc_content_type/websocket_upgrade/response_stream/response_json` |
+| `$scdn_api_protocol` | `none/responses/chat/messages/gemini/images/audio/embeddings/ollama/generic`；分类元数据，不是身份或授权 |
 | `$scdn_api_skip_cache` | 非公共 web 请求或携带身份/禁止缓存信号时为 1，否则 0 |
 | `$scdn_api_stream` | 已有明确流式信号时为 1，否则 0；AI 非流式调用也可为 0 |
 | `$scdn_api_connection` | WebSocket 时为 `upgrade`，其他请求为空 |
 | `$scdn_api_cache_namespace` | `api-policy-v1`，用于隔离启用新规则之前的旧缓存 |
 
 `Authorization`、`Proxy-Authorization`、`Cookie`、`X-API-Key`、`Api-Key`、`Cache-Control: no-cache/no-store`、`Pragma: no-cache` 或携带请求正文，都会禁止共享缓存命中与写入。上游自己的 `Set-Cookie`、`Vary` 和 Cache-Control 仍由 Nginx 原生规则处理，不应在其他配置中强制忽略这些头。
+
+## 协议别名与原始工具链
+
+内置端点采用原有规范化 URI 后缀约定。上游的根路径、compact、异步任务或自定义入口需要管理员明确登记，例如：
+
+```nginx
+scdn_api_endpoint responses POST /responses api-site;
+scdn_api_endpoint responses POST /responses/compact api-site;
+scdn_api_endpoint responses GET /v1/responses/* api-site;
+scdn_api_endpoint images POST /images/edits api-site;
+scdn_api_endpoint images POST /v1/images/edits/async api-site;
+scdn_api_endpoint images GET /v1/images/tasks/* api-site;
+```
+
+`SITE_ID` 来自 Config/Edge 的稳定站点 ID，不能由客户端头选择。省略时作用于该 Nginx 配置作用域，适合独立 server/location。未加载 Edge 时带站点的规则不匹配。子配置追加父配置规则；重复的方法、路径、站点组合拒绝启动；最长路径优先，同长度优先站点规则。显式配置先于内置端点识别，尾部 `/*` 只匹配带该目录边界的路径，不是正则。
+
+四种协议的非流式 JSON、SSE、工具参数分片、并行调用、工具结果、签名和未知字段由原生代理保持完整。模块不执行工具、不转换协议，不以“模型生成成功”替代上游的 error/failed/incomplete。HTTP 分块可以改变，应用正文和事件顺序保持。已识别入口不因工具参数或图片超过分类预算而退回普通 profile。
+
+## 图片文件与处理结果
+
+安装独立工具依赖并处理已经取得的 JSON/SSE/图片文件：
+
+```sh
+python -m pip install -r native-api/tools/requirements.txt
+python native-api/tools/media_artifact.py --input /tmp/image-response.json --out-dir /tmp/api-images
+```
+
+工具不调用模型，默认不下载外部 URL；输入原文不改写、不自动留存。支持 Images `b64_json`/URL、Responses 最终图片结果及 SSE、Chat 图片 data URL、Gemini inlineData、Messages 图片/工具结果、PNG/JPEG/WebP 二进制。每次运行建立私有目录，严格 Base64 解码、完整图片校验、原子保存原始字节，记录实际格式/尺寸/摘要和绝对本地路径。重现于完成 item 和 completed 响应中的同一张图去重；partial 不算最终成功。
+
+默认预算为输入 128 MiB、单图 32 MiB、总图片 64 MiB、16 张、每图 4000 万像素；当前拒绝动画。可显式调整字节/像素预算。`--include-partial` 可保存预览，但只有 partial 的输入仍报告 partial；流式错误、图片损坏或不完整结果不会被改成 complete。
+
+外部资源需逐个登记 `--allow-url-host media.example.test`；仅接受 HTTPS/443，禁止 URL 用户凭据，每跳重新核验允许主机和全部 DNS 地址，连接固定到通过检查的公共地址并验证 TLS。不会把模型服务的 Authorization/Cookie 转发给图片站点，错误报告不包含签名 URL。私网、回环和 metadata 等目标不允许。
+
+输出包含 `manifest_path`、图片文件和 `preview_markdown`，其中 `attachment_emitted=false`、`client_display_verified=false`。调用方仍须通过自己支持的附件接口返回图片，或展示真实绝对本地路径。文件落在服务器上时不能把该路径当作用户电脑的路径；只有路径不等于附件，Base64、HTTP 200 或文字“已生成”也不等于已展示。
+
+测试均使用本地确定性图片与隔离 origin，不需要厂商凭据。运行 `native-api/tests/protocols.py --prefix /tmp/isolated/runtime --report /tmp/protocols.json` 和 `native-api/tests/media_artifact.py --report /tmp/media.json`；前者支持 `--static`，覆盖四协议 raw、签名/工具结果、未知事件、大图片、定长/分块提前上传、站点别名和错误配置；后者验证提取、解码、部分失败、预算和 URL/输出边界。
 
 ## 流式、超时与取消
 

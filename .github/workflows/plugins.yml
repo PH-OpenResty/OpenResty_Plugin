@@ -31,7 +31,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential perl libpcre2-dev libssl-dev zlib1g-dev libcurl4-openssl-dev curl clang libbpf-dev libelf-dev libjson-c-dev iproute2
-          python -m pip install -r tests/requirements.txt
+          python -m pip install -r tests/requirements.txt -r native-api/tools/requirements.txt
       - name: Verify implementation checksums
         run: sha256sum -c SOURCE-SHA256SUMS
       - name: Ban cluster design schema, example and ABI contracts
@@ -176,6 +176,8 @@ jobs:
           extra=()
           if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
           python native-api/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/api-results.json"
+          python native-api/tests/protocols.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/api-protocol-results.json"
+          python native-api/tests/media_artifact.py --report "$RUNNER_TEMP/api-media-results.json"
       - name: Five-module coexistence with Sync roles, API streaming and Purge
         env:
           ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
@@ -270,6 +272,8 @@ jobs:
             ${{ runner.temp }}/plugin-results.json
             ${{ runner.temp }}/cache-header-results.json
             ${{ runner.temp }}/api-results.json
+            ${{ runner.temp }}/api-protocol-results.json
+            ${{ runner.temp }}/api-media-results.json
             ${{ runner.temp }}/api-purge-sync-results.json
             ${{ runner.temp }}/purge-results.json
             ${{ runner.temp }}/pattern-results.json
