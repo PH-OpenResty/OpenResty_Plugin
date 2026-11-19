@@ -1,0 +1,11 @@
+{
+  "node": "edge_1",
+  "interfaces": ["eth0"],
+  "ports": [80, 443],
+  "interval_ms": 1000,
+  "nginx_pid_file": "/run/nginx.pid",
+  "ban_socket": "/run/scdn-ban/admin.sock",
+  "ban_counter_map": "/sys/fs/bpf/scdn-ban-edge_1/counters",
+  "bpf_object": "/usr/lib/scdn-log-sync/packet.bpf.o",
+  "output": "/run/scdn-log-netmon/packets.json"
+}

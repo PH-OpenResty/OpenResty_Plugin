@@ -1,0 +1,24 @@
+[Unit]
+Description=SCDN passive TCP and UDP packet counters
+After=network.target
+
+[Service]
+Type=simple
+User=root
+Group=nginx
+UMask=0027
+RuntimeDirectory=scdn-log-netmon
+RuntimeDirectoryMode=0750
+ExecStart=/usr/bin/scdn-log-netmon --config /etc/scdn-log-sync/netmon.json
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+CapabilityBoundingSet=CAP_BPF CAP_NET_RAW CAP_SYS_ADMIN CAP_SYS_PTRACE
+RestrictAddressFamilies=AF_PACKET AF_UNIX
+ReadWritePaths=/run/scdn-log-netmon
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,773 @@
+{
+  "uid": "scdn-native-network",
+  "title": "SCDN 原生 TCP / UDP 实时观测",
+  "schemaVersion": 40,
+  "version": 1,
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Nginx TCP 套接字",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(connections, 'nginx_tcp_sockets', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Nginx TCP 已建立",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(connections, 'nginx_tcp_established', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Nginx TCP 监听",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(connections, 'nginx_tcp_listen', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Nginx TCP SYN_SENT",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 8,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(connections, 'nginx_tcp_syn_sent', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Nginx TCP SYN_RECV · 已归属套接字",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(connections, 'nginx_tcp_syn_recv', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Nginx UDP 套接字",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(connections, 'nginx_udp_sockets', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Nginx connected UDP 套接字",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(connections, 'nginx_udp_connected_sockets', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "主机 TCP 套接字",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 24,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(connections, 'host_tcp_sockets', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "主机 UDP 套接字",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(connections, 'host_udp_sockets', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "入站 TCP SYN 包累计",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 32,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(packets, 'ingress', 'tcp_syn', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "出站 TCP SYN-ACK 包累计",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(packets, 'egress', 'tcp_syn_ack', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "入站 TCP ACK 包累计",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 40,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(packets, 'ingress', 'tcp_ack', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "入站 UDP 数据报累计",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(packets, 'ingress', 'udp_packets', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "入站 TCP SYN 包速率",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 48,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(packet_pps, 'ingress', 'tcp_syn', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "pps",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "入站 TCP ACK 包速率",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(packet_pps, 'ingress', 'tcp_ack', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "pps",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "入站 UDP 数据报速率",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 56,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(packet_pps, 'ingress', 'udp_packets', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "pps",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "主机 TCP 重传累计",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 64,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(host_protocols, 'Tcp_RetransSegs', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "主机监听队列丢弃累计",
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 64,
+        "w": 12,
+        "h": 8
+      },
+      "description": "连接按 Nginx PID 树归属；报文按指定网卡/监听端口归属。UDP 套接字不等同 QUIC 会话；采集缺失或初次速率显示无数据。",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "format": 0,
+          "rawSql": "SELECT time, node AS metric, JSONExtract(host_protocols, 'TcpExt_ListenDrops', 'Nullable(Float64)') AS value FROM scdn.network_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) ORDER BY time"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "采集不可用"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    }
+  ],
+  "templating": {
+    "list": []
+  }
+}

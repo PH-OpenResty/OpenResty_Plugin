@@ -1,4 +1,4 @@
-name: Native Sync Config Bot Ban Auth API Edge Tier and Purge
+name: Native Sync Config Bot Ban Auth API Edge Tier Purge and Log Sync
 
 on:
   push:
@@ -52,7 +52,7 @@ jobs:
           if [ "$PLUGIN_RUNTIME" = nginx ]; then
             SCDN_NATIVE_SANITIZERS='-fsanitize=address,undefined -fno-omit-frame-pointer' sh native-sync/tests/check-core.sh
           fi
-      - name: Build isolated runtime and all nine plugins
+      - name: Build isolated runtime and all ten plugins
         env:
           PLUGIN_RUNTIME: ${{ matrix.runtime }}
           PLUGIN_LINKAGE: ${{ matrix.linkage }}
@@ -63,6 +63,20 @@ jobs:
             export SCDN_NATIVE_CC="sh $GITHUB_WORKSPACE/tools/sanitizer-cc.sh"
           fi
           sh tools/build-runtime.sh "$RUNNER_TEMP/scdn-plugin" "$PLUGIN_RUNTIME" "$PLUGIN_LINKAGE"
+      - name: Native log sender recovery, node sampling and real kernel packet counters
+        env:
+          ASAN_OPTIONS: detect_leaks=0:suppressions=${{ github.workspace }}/tests/asan.supp
+          UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+          PLUGIN_LINKAGE: ${{ matrix.linkage }}
+        run: |
+          sh native-log-sync/tools/build-core.sh "$RUNNER_TEMP/scdn-log-core"
+          sh native-log-sync/tools/build-netmon.sh "$RUNNER_TEMP/scdn-log-core"
+          python native-log-sync/tests/core.py --build "$RUNNER_TEMP/scdn-log-core" --report "$RUNNER_TEMP/log-core-results.json"
+          python native-log-sync/tests/telemetry.py --build "$RUNNER_TEMP/scdn-log-core" --report "$RUNNER_TEMP/log-telemetry-results.json"
+          sudo "$(command -v python)" native-log-sync/tests/netmon.py --build "$RUNNER_TEMP/scdn-log-core" --report "$RUNNER_TEMP/log-netmon-results.json"
+          extra=()
+          if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
+          python native-log-sync/tests/runtime.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/log-runtime-results.json"
       - name: Auth application adapter, policy snapshot and pinned upstream hooks
         run: |
           (cd native-auth-guard/adapters/go && go test -race -json ./...) > "$RUNNER_TEMP/auth-go-results.jsonl"
@@ -270,6 +284,10 @@ jobs:
         with:
           name: all-plugins-${{ matrix.runtime }}-${{ matrix.linkage }}-results
           path: |
+            ${{ runner.temp }}/log-core-results.json
+            ${{ runner.temp }}/log-telemetry-results.json
+            ${{ runner.temp }}/log-netmon-results.json
+            ${{ runner.temp }}/log-runtime-results.json
             ${{ runner.temp }}/api-provider-results.json
             ${{ runner.temp }}/auth-go-results.jsonl
             ${{ runner.temp }}/auth-tools-results.json
@@ -307,3 +325,25 @@ jobs:
             ${{ runner.temp }}/purge-results.json
             ${{ runner.temp }}/pattern-results.json
             ${{ runner.temp }}/revalidate-results.json
+
+  log-backends:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install direct sender build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libjson-c-dev libcurl4-openssl-dev libssl-dev libbpf-dev zlib1g-dev
+      - name: Build direct sender core
+        run: sh native-log-sync/tools/build-core.sh "$RUNNER_TEMP/scdn-log-core"
+      - name: Actual Elasticsearch and ClickHouse with every Grafana data query
+        run: python native-log-sync/tools/test-backends.py --build "$RUNNER_TEMP/scdn-log-core" --report "$RUNNER_TEMP/log-backend-results.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-log-backend-results
+          path: ${{ runner.temp }}/log-backend-results.json

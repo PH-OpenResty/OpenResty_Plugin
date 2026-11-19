@@ -1,10 +1,11 @@
 # 当前文档与能力核对
 
-当前运行模块为九个：Sync 0.3.0、Config、Bot 0.1.0、Ban、Auth Guard 0.1.0、API、Edge、Tier 0.1.1、Purge 0.3.0。下面各入口描述当前实现；历史验证 JSON、带版本/日期的基线和研究报告保留其当时的结果，不将历史数字改成新版本证据。
+当前运行模块为十个：Sync 0.3.0、Config、Bot 0.1.0、Ban、Auth Guard 0.1.0、API、Edge、Tier 0.1.1、Purge 0.3.0、Log Sync 0.1.0。下面各入口描述当前实现；历史验证 JSON、带版本/日期的基线和研究报告保留其当时的结果，不将历史数字改成新版本证据。
 
 | 范围 | 当前入口 | 核对结论 |
 | --- | --- | --- |
-| 总览/构建 | [README](../README.md)、[安装](INSTALL.zh-CN.md) | 九模块、目标 ABI/依赖、动态/静态、独立与组合运行 |
+| 总览/构建 | [README](../README.md)、[安装](INSTALL.zh-CN.md) | 十模块、目标 ABI/依赖、动态/静态、独立与组合运行 |
+| 日志与网络指标 | [Log Sync](../native-log-sync/README.zh-CN.md)、[指标清单](../native-log-sync/schema/metrics-catalog.json) | ES/CH 直连、完整/增量、WAL/游标、81 个既有面板和 TCP/UDP 只读采集 |
 | Sync | [模块手册](../native-sync/README.zh-CN.md)、[配置/证书发布](SYNC-PUBLICATION.zh-CN.md) | 已实现原生 v2 发布/拉取/热应用/回退，按启用状态报告 |
 | Sync 迁移/路线 | [迁移](SYNC-MIGRATION.zh-CN.md)、[路线](SYNC-ROADMAP.zh-CN.md) | 不与旧 Lua JWE/JWS 直接互通，写入权交接和剩余能力明确 |
 | 缓存任务 | [任务手册](CACHE-TASKS.zh-CN.md) | 独立刷新/预热，与配置发布分开，支持 Tier 业务入口 |

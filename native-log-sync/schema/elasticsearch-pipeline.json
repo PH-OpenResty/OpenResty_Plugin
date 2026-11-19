@@ -1,0 +1,52 @@
+{
+  "description": "Use original event time, with a safe ingestion-time fallback.",
+  "processors": [
+    {
+      "date": {
+        "if": "ctx.kind == 'access' && ctx.normalized != null && ctx.normalized.time != null",
+        "field": "normalized.time",
+        "target_field": "@timestamp",
+        "formats": [
+          "ISO8601",
+          "yyyy-MM-dd HH:mm:ss.SSS",
+          "UNIX_MS",
+          "UNIX"
+        ],
+        "ignore_failure": true
+      }
+    },
+    {
+      "date": {
+        "if": "ctx.kind == 'ban' && ctx.normalized != null && ctx.normalized.time_ms != null",
+        "field": "normalized.time_ms",
+        "target_field": "@timestamp",
+        "formats": [
+          "UNIX_MS"
+        ],
+        "ignore_failure": true
+      }
+    },
+    {
+      "date": {
+        "if": "ctx.kind == 'metrics' && ctx.metrics != null && ctx.metrics.time != null",
+        "field": "metrics.time",
+        "target_field": "@timestamp",
+        "formats": [
+          "UNIX_MS"
+        ],
+        "ignore_failure": true
+      }
+    },
+    {
+      "date": {
+        "if": "ctx['@timestamp'] == null",
+        "field": "timestamp",
+        "target_field": "@timestamp",
+        "formats": [
+          "ISO8601",
+          "yyyy-MM-dd HH:mm:ss.SSS"
+        ]
+      }
+    }
+  ]
+}

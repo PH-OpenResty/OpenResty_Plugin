@@ -1,0 +1,426 @@
+{
+  "index_patterns": [
+    "scdn-logs*"
+  ],
+  "template": {
+    "mappings": {
+      "dynamic": "strict",
+      "properties": {
+        "event_id": {
+          "type": "keyword"
+        },
+        "timestamp": {
+          "type": "date",
+          "format": "strict_date_optional_time||yyyy-MM-dd HH:mm:ss.SSS"
+        },
+        "node": {
+          "type": "keyword"
+        },
+        "source": {
+          "type": "keyword"
+        },
+        "kind": {
+          "type": "keyword"
+        },
+        "path": {
+          "type": "keyword"
+        },
+        "generation": {
+          "type": "keyword"
+        },
+        "format": {
+          "type": "keyword"
+        },
+        "offset": {
+          "type": "long"
+        },
+        "end_offset": {
+          "type": "long"
+        },
+        "terminated": {
+          "type": "long"
+        },
+        "fragment": {
+          "type": "long"
+        },
+        "archive": {
+          "type": "long"
+        },
+        "message": {
+          "type": "text"
+        },
+        "raw_base64": {
+          "type": "keyword",
+          "index": false,
+          "doc_values": false
+        },
+        "fields_json": {
+          "type": "keyword",
+          "index": false,
+          "doc_values": false
+        },
+        "normalized_json": {
+          "type": "keyword",
+          "index": false,
+          "doc_values": false
+        },
+        "fields": {
+          "type": "flattened",
+          "ignore_above": 1024
+        },
+        "normalized": {
+          "dynamic": false,
+          "properties": {
+            "site": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "host": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "ip": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "ip_family": {
+              "type": "long"
+            },
+            "internal": {
+              "type": "long"
+            },
+            "uri": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "method": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "status": {
+              "type": "long"
+            },
+            "bytes": {
+              "type": "long"
+            },
+            "duration_ms": {
+              "type": "double"
+            },
+            "origin_ms": {
+              "type": "double"
+            },
+            "origin_seen": {
+              "type": "long"
+            },
+            "cache": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "cache_layer": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "country": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "asn": {
+              "type": "long"
+            },
+            "asn_org": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "operator": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "protocol": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "blocked": {
+              "type": "long"
+            },
+            "block_reason": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "request_id": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "ban_id": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "scope": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "layer": {
+              "type": "long"
+            },
+            "action": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "source": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "reason": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "origin": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "applied": {
+              "type": "long"
+            },
+            "event_id": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "node": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "time": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "time_ms": {
+              "type": "keyword",
+              "ignore_above": 2048
+            }
+          }
+        },
+        "metrics": {
+          "type": "object",
+          "dynamic": false,
+          "properties": {
+            "sync_ok": {
+              "type": "long"
+            },
+            "sync_sequence": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "ban_ready": {
+              "type": "long"
+            },
+            "active_bans": {
+              "type": "long"
+            },
+            "sites": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "site_hosts": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "ban_records": {
+              "type": "keyword",
+              "ignore_above": 2048
+            },
+            "cpu_pct": {
+              "type": "double"
+            },
+            "load1": {
+              "type": "double"
+            },
+            "cpu_count": {
+              "type": "long"
+            },
+            "mem_total": {
+              "type": "long"
+            },
+            "mem_available": {
+              "type": "long"
+            },
+            "mem_pct": {
+              "type": "double"
+            },
+            "net_rx": {
+              "type": "long"
+            },
+            "net_tx": {
+              "type": "long"
+            },
+            "rx_bps": {
+              "type": "double"
+            },
+            "tx_bps": {
+              "type": "double"
+            },
+            "cache_disk_total": {
+              "type": "long"
+            },
+            "cache_disk_free": {
+              "type": "long"
+            },
+            "cache_disk_pct": {
+              "type": "double"
+            },
+            "api_web": {
+              "type": "long"
+            },
+            "api_api": {
+              "type": "long"
+            },
+            "api_ai": {
+              "type": "long"
+            },
+            "api_stream": {
+              "type": "long"
+            },
+            "api_grpc": {
+              "type": "long"
+            },
+            "api_websocket": {
+              "type": "long"
+            },
+            "native_requests": {
+              "type": "long"
+            },
+            "native_bytes": {
+              "type": "long"
+            },
+            "source_clock_skew_ms": {
+              "type": "long"
+            },
+            "kernel_drop_counter": {
+              "type": "long"
+            },
+            "kernel_drop_delta": {
+              "type": "long"
+            },
+            "kernel_drop_pps": {
+              "type": "double"
+            },
+            "time": {
+              "type": "date",
+              "format": "epoch_millis"
+            },
+            "connections": {
+              "type": "object",
+              "dynamic": true
+            },
+            "network_protocols": {
+              "type": "object",
+              "dynamic": true
+            },
+            "health": {
+              "type": "object",
+              "dynamic": true
+            },
+            "packets": {
+              "type": "object",
+              "dynamic": false,
+              "properties": {
+                "session": {
+                  "type": "keyword"
+                },
+                "scope": {
+                  "type": "keyword"
+                },
+                "time_ms": {
+                  "type": "date",
+                  "format": "epoch_millis"
+                },
+                "ingress": {
+                  "type": "object",
+                  "properties": {
+                    "tcp_packets": {
+                      "type": "long"
+                    },
+                    "tcp_bytes": {
+                      "type": "long"
+                    },
+                    "tcp_ack": {
+                      "type": "long"
+                    },
+                    "tcp_syn": {
+                      "type": "long"
+                    },
+                    "tcp_syn_ack": {
+                      "type": "long"
+                    },
+                    "tcp_syn_only": {
+                      "type": "long"
+                    },
+                    "tcp_fin": {
+                      "type": "long"
+                    },
+                    "tcp_rst": {
+                      "type": "long"
+                    },
+                    "udp_packets": {
+                      "type": "long"
+                    },
+                    "udp_bytes": {
+                      "type": "long"
+                    }
+                  }
+                },
+                "egress": {
+                  "type": "object",
+                  "properties": {
+                    "tcp_packets": {
+                      "type": "long"
+                    },
+                    "tcp_bytes": {
+                      "type": "long"
+                    },
+                    "tcp_ack": {
+                      "type": "long"
+                    },
+                    "tcp_syn": {
+                      "type": "long"
+                    },
+                    "tcp_syn_ack": {
+                      "type": "long"
+                    },
+                    "tcp_syn_only": {
+                      "type": "long"
+                    },
+                    "tcp_fin": {
+                      "type": "long"
+                    },
+                    "tcp_rst": {
+                      "type": "long"
+                    },
+                    "udp_packets": {
+                      "type": "long"
+                    },
+                    "udp_bytes": {
+                      "type": "long"
+                    }
+                  }
+                }
+              }
+            },
+            "packet_pps": {
+              "type": "object",
+              "dynamic": true
+            },
+            "collection": {
+              "type": "object",
+              "dynamic": true
+            }
+          }
+        },
+        "@timestamp": {
+          "type": "date"
+        }
+      }
+    },
+    "settings": {
+      "index.default_pipeline": "scdn-log-sync"
+    }
+  }
+}

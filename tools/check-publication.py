@@ -27,6 +27,7 @@ PRIVATE_NAMES = {
     '.admin_token', 'id_rsa', 'id_ed25519', 'runtime.json', 'applied.json',
     'desired.json', 'journal.json', 'highest.json',
 }
+PUBLIC_DDL = {'native-log-sync/schema/clickhouse.sql'}
 CONTENT_RULES = {
     'private-key-material': re.compile(r'-----BEGIN (?:RSA |EC |OPENSSH |ENCRYPTED )?PRIVATE KEY-----'),
     'certificate-material': re.compile(r'-----BEGIN ' r'CERTIFICATE-----'),
@@ -49,7 +50,7 @@ def blocked_path(name):
         return True
     if any(part.lower() in PRIVATE_DIRS for part in path.parts):
         return True
-    if path.suffix.lower() in PRIVATE_SUFFIXES or basename in PRIVATE_NAMES:
+    if (path.suffix.lower() in PRIVATE_SUFFIXES and name not in PUBLIC_DDL) or basename in PRIVATE_NAMES:
         return True
     if basename == '.env' or (basename.startswith('.env.') and basename != '.env.example'):
         return True

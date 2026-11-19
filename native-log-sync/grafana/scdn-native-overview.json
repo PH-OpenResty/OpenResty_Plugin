@@ -1,0 +1,4804 @@
+{
+  "uid": "scdn-native-overview",
+  "title": "PH_OpenResty CDN 集群 总览",
+  "schemaVersion": 41,
+  "version": 0,
+  "editable": true,
+  "tags": [
+    "PH_OpenResty",
+    "CDN",
+    "中文"
+  ],
+  "timezone": "Asia/Shanghai",
+  "refresh": "5s",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "5s",
+      "10s",
+      "30s",
+      "1m",
+      "5m"
+    ]
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "node",
+        "label": "节点",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "scdn-native-clickhouse"
+        },
+        "query": {
+          "editorType": "sql",
+          "rawSql": "SELECT node FROM scdn.node_inventory FINAL WHERE enabled=1 ORDER BY node"
+        },
+        "definition": "SELECT node FROM scdn.node_inventory FINAL WHERE enabled=1 ORDER BY node",
+        "multi": true,
+        "includeAll": true,
+        "refresh": 1,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      },
+      {
+        "name": "site",
+        "label": "站点",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "scdn-native-clickhouse"
+        },
+        "query": {
+          "editorType": "sql",
+          "rawSql": "SELECT DISTINCT arrayJoin(arrayConcat(sites,['__unregistered__'])) AS site FROM scdn.node_samples ORDER BY site"
+        },
+        "definition": "SELECT DISTINCT arrayJoin(arrayConcat(sites,['__unregistered__'])) AS site FROM scdn.node_samples ORDER BY site",
+        "multi": true,
+        "includeAll": true,
+        "refresh": 1,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      },
+      {
+        "name": "country",
+        "label": "国家/地区",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "scdn-native-clickhouse"
+        },
+        "query": {
+          "editorType": "sql",
+          "rawSql": "SELECT DISTINCT country FROM (SELECT country FROM scdn.access UNION ALL SELECT 'ZZ' AS country) ORDER BY country"
+        },
+        "definition": "SELECT DISTINCT country FROM (SELECT country FROM scdn.access UNION ALL SELECT 'ZZ' AS country) ORDER BY country",
+        "multi": true,
+        "includeAll": true,
+        "refresh": 1,
+        "sort": 1,
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "options": []
+      },
+      {
+        "name": "scope",
+        "label": "请求范围",
+        "type": "custom",
+        "query": "公网请求 : public,全部请求（含内网/测试） : all",
+        "current": {
+          "text": "公网请求",
+          "value": "public"
+        },
+        "options": [
+          {
+            "text": "公网请求",
+            "value": "public",
+            "selected": true
+          },
+          {
+            "text": "全部请求（含内网/测试）",
+            "value": "all",
+            "selected": false
+          }
+        ]
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "row",
+      "title": "集群资产与当前健康",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 2,
+      "type": "stat",
+      "title": "总节点数",
+      "description": "已登记的 CDN 节点；Master 不计入边缘节点。",
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT count() AS value FROM scdn.node_inventory FINAL WHERE enabled=1 AND node IN (${node:singlequote})",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "总节点数"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 3,
+      "type": "stat",
+      "title": "在线健康节点",
+      "description": "最近 60 秒采集成功且原生 Sync applied / business_health passed。",
+      "gridPos": {
+        "x": 8,
+        "y": 1,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT countIf(seen>now()-INTERVAL 60 SECOND AND sync_ok=1) AS value FROM (SELECT node,max(time) seen,argMax(sync_ok,time) sync_ok,argMax(sites,time) sites,argMax(ban_records,time) records,argMax(cpu_pct,time) cpu,argMax(mem_pct,time) memory,argMax(cache_disk_pct,time) disk FROM scdn.node_samples WHERE node IN (${node:singlequote}) GROUP BY node)",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "在线健康节点"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "总站点数",
+      "description": "按启用的站点 ID 在节点间去重，含 demo.local；未登记 Host 不算站点。",
+      "gridPos": {
+        "x": 16,
+        "y": 1,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT uniqExact(site) AS value FROM (SELECT arrayJoin(sites) site FROM (SELECT node,max(time) seen,argMax(sync_ok,time) sync_ok,argMax(sites,time) sites,argMax(ban_records,time) records,argMax(cpu_pct,time) cpu,argMax(mem_pct,time) memory,argMax(cache_disk_pct,time) disk FROM scdn.node_samples WHERE node IN (${node:singlequote}) GROUP BY node)) WHERE site IN (${site:singlequote})",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "总站点数"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "总请求数",
+      "description": "所选时间内已完成并写入访问日志的请求；默认排除私网/测试地址。长连接在结束后计入。",
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT count() AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "总请求数"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 6,
+      "type": "stat",
+      "title": "总拦截数",
+      "description": "边缘直接返回 403/429 且未记录上游地址；含域名访问控制。源站 403/429 分开统计，L3 丢包不冒充 HTTP 请求。",
+      "gridPos": {
+        "x": 8,
+        "y": 6,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT countIf(blocked=1) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "总拦截数"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 7,
+      "type": "stat",
+      "title": "总拉黑 IP 数",
+      "description": "所选时间内实际生效的拉黑 IP 去重；集群多节点执行同一 IP 不重复累计。",
+      "gridPos": {
+        "x": 16,
+        "y": 6,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT uniqExactIf(ip,action='APPLIED' AND applied=1) AS value FROM scdn.bans WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (scope='*' OR scope IN (${site:singlequote}))",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "总拉黑 IP 数"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 8,
+      "type": "row",
+      "title": "所选时间范围 · 流量与缓存",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 11,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "缓存命中率",
+      "description": "可缓存请求中命中/STALE/UPDATING/REVALIDATED 的比例；BYPASS/NONE 不进入分母，无样本显示 —。",
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT 100.0*countIf(cache IN ('HIT','STALE','UPDATING','REVALIDATED'))/nullIf(countIf(cache IN ('HIT','MISS','EXPIRED','STALE','UPDATING','REVALIDATED')),0) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "noValue": "无可缓存样本",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "缓存命中率",
+          "min": 0,
+          "max": 100,
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 10,
+      "type": "stat",
+      "title": "总流量 · 下行正文",
+      "description": "真实发送的响应正文流量，包含压缩后字节；不含响应头、TLS/QUIC/IP 封装。",
+      "gridPos": {
+        "x": 8,
+        "y": 12,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT sum(bytes) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "总流量 · 下行正文"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 11,
+      "type": "stat",
+      "title": "缓存流量",
+      "description": "边缘缓存返回的响应正文字节，按每次请求实际发送量累计。",
+      "gridPos": {
+        "x": 16,
+        "y": 12,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT sumIf(bytes,cache IN ('HIT','STALE','UPDATING','REVALIDATED')) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "缓存流量"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 12,
+      "type": "stat",
+      "title": "独立请求 IP",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 17,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT uniqExact(ip) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "独立请求 IP"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 13,
+      "type": "stat",
+      "title": "5xx 错误率",
+      "description": "",
+      "gridPos": {
+        "x": 8,
+        "y": 17,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT 100.0*countIf(status>=500 AND status<600)/nullIf(count(),0) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "5xx 错误率",
+          "min": 0,
+          "max": 100,
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 14,
+      "type": "stat",
+      "title": "P95 请求耗时",
+      "description": "请求从接收至完成的耗时；流式/长连接包含整个持续时间。",
+      "gridPos": {
+        "x": 16,
+        "y": 17,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT quantileTDigest(0.95)(duration_ms) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "P95 请求耗时"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 15,
+      "type": "stat",
+      "title": "缓存流量占比",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT 100.0*sumIf(bytes,cache IN ('HIT','STALE','UPDATING','REVALIDATED'))/nullIf(sum(bytes),0) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "缓存流量占比",
+          "min": 0,
+          "max": 100,
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 16,
+      "type": "stat",
+      "title": "回源代理请求",
+      "description": "访问日志记录上游地址的请求；含内部缓存代理层，不能视为精确外部源站连接数。",
+      "gridPos": {
+        "x": 8,
+        "y": 22,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT countIf(origin_seen=1) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "回源代理请求"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 17,
+      "type": "stat",
+      "title": "HTTP/3 请求占比",
+      "description": "",
+      "gridPos": {
+        "x": 16,
+        "y": 22,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT 100.0*countIf(protocol='HTTP/3.0')/nullIf(count(),0) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "HTTP/3 请求占比",
+          "min": 0,
+          "max": 100,
+          "decimals": 2
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 18,
+      "type": "stat",
+      "title": "源站/上游 403",
+      "description": "有上游地址的 403，未作为已确认边缘拦截。",
+      "gridPos": {
+        "x": 0,
+        "y": 27,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT countIf(status=403 AND origin_seen=1) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "源站/上游 403"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 19,
+      "type": "stat",
+      "title": "独立请求 URI",
+      "description": "按 URI 路径去重，不采集查询参数。",
+      "gridPos": {
+        "x": 8,
+        "y": 27,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT uniqExact(uri) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "独立请求 URI"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 20,
+      "type": "stat",
+      "title": "P99 请求耗时",
+      "description": "",
+      "gridPos": {
+        "x": 16,
+        "y": 27,
+        "w": 8,
+        "h": 5
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT quantileTDigest(0.99)(duration_ms) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "noValue": "—",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "displayName": "P99 请求耗时"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "auto",
+        "textMode": "value",
+        "colorMode": "value",
+        "graphMode": "none",
+        "justifyMode": "auto"
+      }
+    },
+    {
+      "id": 21,
+      "type": "row",
+      "title": "请求、带宽与耗时趋势",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "请求速率 · QPS",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 33,
+        "w": 12,
+        "h": 11
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,count()/greatest(10,intDiv(${__interval_ms},1000)) AS QPS FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY time ORDER BY time",
+          "format": 0
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "pointSize": 3,
+            "axisLabel": "",
+            "axisBorderShow": true
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "下行正文带宽 · 总量 / 缓存",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 33,
+        "w": 12,
+        "h": 11
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,8*sum(bytes)/greatest(10,intDiv(${__interval_ms},1000)) AS `总带宽`,8*sumIf(bytes,cache IN ('HIT','STALE','UPDATING','REVALIDATED'))/greatest(10,intDiv(${__interval_ms},1000)) AS `缓存带宽` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY time ORDER BY time",
+          "format": 0
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "pointSize": 3,
+            "axisLabel": "",
+            "axisBorderShow": true
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "请求状态码分类趋势",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 44,
+        "w": 12,
+        "h": 11
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,concat(toString(intDiv(status,100)),'xx') AS metric,count() AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY time,metric ORDER BY time",
+          "format": 0
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "pointSize": 3,
+            "axisLabel": "",
+            "axisBorderShow": true
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "${__field.labels.metric}"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 25,
+      "type": "timeseries",
+      "title": "请求耗时 · P50 / P95 / P99",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 44,
+        "w": 12,
+        "h": 11
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,quantileTDigest(0.50)(duration_ms) AS P50,quantileTDigest(0.95)(duration_ms) AS P95,quantileTDigest(0.99)(duration_ms) AS P99 FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY time ORDER BY time",
+          "format": 0
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "pointSize": 3,
+            "axisLabel": "",
+            "axisBorderShow": true
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 26,
+      "type": "timeseries",
+      "title": "缓存状态趋势",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 55,
+        "w": 12,
+        "h": 11
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,cache AS metric,count() AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY time,metric ORDER BY time",
+          "format": 0
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "pointSize": 3,
+            "axisLabel": "",
+            "axisBorderShow": true
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "${__field.labels.metric}"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 27,
+      "type": "timeseries",
+      "title": "边缘拦截趋势",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 55,
+        "w": 12,
+        "h": 11
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,block_reason AS metric,count() AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND blocked=1 GROUP BY time,metric ORDER BY time",
+          "format": 0
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "pointSize": 3,
+            "axisLabel": "",
+            "axisBorderShow": true
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "${__field.labels.metric}"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 28,
+      "type": "row",
+      "title": "状态码、协议与缓存分层",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 66,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 29,
+      "type": "table",
+      "title": "总请求状态码",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 67,
+        "w": 12,
+        "h": 13
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT toString(status) AS `状态码`,count() AS `请求数`,sum(bytes) AS `正文流量_字节`,round(avg(duration_ms),2) AS `平均耗时_ms` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY status ORDER BY `请求数` DESC",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "align": "auto",
+            "minWidth": 80,
+            "wrapText": true,
+            "wrapHeaderText": true,
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "拦截数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状态码"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "层级"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "执行节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "时间"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "域名"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI路径"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md",
+        "footer": {
+          "show": false
+        },
+        "enablePagination": true
+      }
+    },
+    {
+      "id": 30,
+      "type": "barchart",
+      "title": "HTTP 协议分布",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 67,
+        "w": 12,
+        "h": 13
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT protocol AS `协议`,count() AS `请求数` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY protocol ORDER BY `请求数` DESC",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "multi"
+        },
+        "barWidth": 0.75,
+        "groupWidth": 0.8,
+        "xTickLabelRotation": 0
+      }
+    },
+    {
+      "id": 31,
+      "type": "table",
+      "title": "L1 / L2 / 回源 / 绕过分布",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 80,
+        "w": 12,
+        "h": 13
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT cache_layer AS `缓存层`,cache AS `缓存状态`,count() AS `请求数`,sum(bytes) AS `正文流量_字节` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY cache_layer,cache ORDER BY `请求数` DESC",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "align": "auto",
+            "minWidth": 80,
+            "wrapText": true,
+            "wrapHeaderText": true,
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "拦截数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状态码"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "层级"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "执行节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "时间"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "域名"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI路径"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md",
+        "footer": {
+          "show": false
+        },
+        "enablePagination": true
+      }
+    },
+    {
+      "id": 32,
+      "type": "barchart",
+      "title": "HTTP 方法分布",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 80,
+        "w": 12,
+        "h": 13
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT method AS `方法`,count() AS `请求数` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY method ORDER BY `请求数` DESC",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "multi"
+        },
+        "barWidth": 0.75,
+        "groupWidth": 0.8,
+        "xTickLabelRotation": 0
+      }
+    },
+    {
+      "id": 33,
+      "type": "row",
+      "title": "请求与拦截 Top 10",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 93,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 34,
+      "type": "table",
+      "title": "Top 10 请求 IP",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 94,
+        "w": 12,
+        "h": 13
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT ip AS `请求IP`,count() AS `请求数`,countIf(blocked=1) AS `拦截数`,sum(bytes) AS `正文流量_字节`,any(country) AS `国家`,any(operator) AS `运营商_ASN机构` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY ip ORDER BY `请求数` DESC LIMIT 10",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "align": "auto",
+            "minWidth": 80,
+            "wrapText": true,
+            "wrapHeaderText": true,
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "拦截数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状态码"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "层级"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "执行节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "时间"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "域名"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI路径"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md",
+        "footer": {
+          "show": false
+        },
+        "enablePagination": true
+      }
+    },
+    {
+      "id": 35,
+      "type": "table",
+      "title": "Top 10 请求站点",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 94,
+        "w": 12,
+        "h": 13
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT site AS `站点ID`,any(host) AS `域名`,count() AS `请求数`,uniqExact(ip) AS `独立IP`,sum(bytes) AS `正文流量_字节` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND site!='__unregistered__' GROUP BY site ORDER BY `请求数` DESC LIMIT 10",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "align": "auto",
+            "minWidth": 80,
+            "wrapText": true,
+            "wrapHeaderText": true,
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "拦截数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状态码"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "层级"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "执行节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "时间"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "域名"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI路径"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md",
+        "footer": {
+          "show": false
+        },
+        "enablePagination": true
+      }
+    },
+    {
+      "id": 36,
+      "type": "table",
+      "title": "Top 10 请求 URI",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 107,
+        "w": 12,
+        "h": 13
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT uri AS `URI路径`,count() AS `请求数`,sum(bytes) AS `正文流量_字节`,round(quantileTDigest(0.95)(duration_ms),2) AS P95_ms FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY uri ORDER BY `请求数` DESC LIMIT 10",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "align": "auto",
+            "minWidth": 80,
+            "wrapText": true,
+            "wrapHeaderText": true,
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "拦截数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状态码"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "层级"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "执行节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "时间"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "域名"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI路径"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md",
+        "footer": {
+          "show": false
+        },
+        "enablePagination": true
+      }
+    },
+    {
+      "id": 37,
+      "type": "table",
+      "title": "Top 10 拦截 IP",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 107,
+        "w": 12,
+        "h": 13
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT ip AS `请求IP`,count() AS `拦截数`,any(country) AS `国家`,any(operator) AS `运营商_ASN机构` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND blocked=1 GROUP BY ip ORDER BY `拦截数` DESC LIMIT 10",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "align": "auto",
+            "minWidth": 80,
+            "wrapText": true,
+            "wrapHeaderText": true,
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "拦截数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状态码"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "层级"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "执行节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "时间"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "域名"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI路径"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md",
+        "footer": {
+          "show": false
+        },
+        "enablePagination": true
+      }
+    },
+    {
+      "id": 38,
+      "type": "row",
+      "title": "请求 IP 地理、ASN 与运营商",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 120,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 39,
+      "type": "table",
+      "title": "请求 IP 地理位置数量统计",
+      "description": "基于现有 Loyalsoldier 国家库；不包含省市、经纬度，PRIVATE/ZZ 单独保留。",
+      "gridPos": {
+        "x": 0,
+        "y": 121,
+        "w": 12,
+        "h": 13
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT country AS `国家_地区代码`,uniqExact(ip) AS `独立IP数`,count() AS `请求数`,countIf(blocked=1) AS `拦截数`,sum(bytes) AS `正文流量_字节` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY country ORDER BY `请求数` DESC",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "align": "auto",
+            "minWidth": 80,
+            "wrapText": true,
+            "wrapHeaderText": true,
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "拦截数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状态码"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "层级"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "执行节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "时间"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "域名"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI路径"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md",
+        "footer": {
+          "show": false
+        },
+        "enablePagination": true
+      }
+    },
+    {
+      "id": 40,
+      "type": "table",
+      "title": "请求 IP ASN 统计",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 121,
+        "w": 12,
+        "h": 13
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT concat('AS',toString(asn)) AS ASN,any(asn_org) AS `ASN机构`,uniqExact(ip) AS `独立IP数`,count() AS `请求数`,countIf(blocked=1) AS `拦截数` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY asn ORDER BY `请求数` DESC LIMIT 30",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "align": "auto",
+            "minWidth": 80,
+            "wrapText": true,
+            "wrapHeaderText": true,
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "拦截数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状态码"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "层级"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "执行节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "时间"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "域名"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI路径"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md",
+        "footer": {
+          "show": false
+        },
+        "enablePagination": true
+      }
+    },
+    {
+      "id": 41,
+      "type": "table",
+      "title": "请求 IP 运营商统计",
+      "description": "按 ASN 组织名称归类中国电信/联通/移动等；无法确认时使用原始 ASN 机构名，不冒充独立 ISP 数据库。",
+      "gridPos": {
+        "x": 0,
+        "y": 134,
+        "w": 12,
+        "h": 13
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT operator AS `运营商_ASN机构`,uniqExact(ip) AS `独立IP数`,count() AS `请求数`,sum(bytes) AS `正文流量_字节` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY operator ORDER BY `请求数` DESC LIMIT 30",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "align": "auto",
+            "minWidth": 80,
+            "wrapText": true,
+            "wrapHeaderText": true,
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "拦截数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状态码"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "层级"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "执行节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "时间"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "域名"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI路径"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md",
+        "footer": {
+          "show": false
+        },
+        "enablePagination": true
+      }
+    },
+    {
+      "id": 42,
+      "type": "barchart",
+      "title": "IPv4 / IPv6 请求分布",
+      "description": "",
+      "gridPos": {
+        "x": 12,
+        "y": 134,
+        "w": 12,
+        "h": 13
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT concat('IPv',toString(ip_family)) AS `地址族`,uniqExact(ip) AS `独立IP数`,count() AS `请求数` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY ip_family",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "orientation": "horizontal",
+        "showValue": "auto",
+        "legend": {
+          "showLegend": false
+        },
+        "tooltip": {
+          "mode": "multi"
+        },
+        "barWidth": 0.75,
+        "groupWidth": 0.8,
+        "xTickLabelRotation": 0
+      }
+    },
+    {
+      "id": 43,
+      "type": "row",
+      "title": "节点资源与数据质量",
+      "collapsed": false,
+      "panels": [],
+      "gridPos": {
+        "x": 0,
+        "y": 147,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "id": 44,
+      "type": "timeseries",
+      "title": "节点 CPU 使用率",
+      "description": "来自 /proc 或文件系统；网卡带宽包含主机其他流量，不等同 CDN 正文带宽。",
+      "gridPos": {
+        "x": 0,
+        "y": 148,
+        "w": 12,
+        "h": 11
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,node AS metric,avg(cpu_pct) AS value FROM scdn.node_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) GROUP BY time,node ORDER BY time",
+          "format": 0
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "pointSize": 3,
+            "axisLabel": "",
+            "axisBorderShow": true
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "${__field.labels.metric}"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 45,
+      "type": "timeseries",
+      "title": "节点内存使用率",
+      "description": "来自 /proc 或文件系统；网卡带宽包含主机其他流量，不等同 CDN 正文带宽。",
+      "gridPos": {
+        "x": 12,
+        "y": 148,
+        "w": 12,
+        "h": 11
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,node AS metric,avg(mem_pct) AS value FROM scdn.node_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) GROUP BY time,node ORDER BY time",
+          "format": 0
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "pointSize": 3,
+            "axisLabel": "",
+            "axisBorderShow": true
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "${__field.labels.metric}"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 46,
+      "type": "timeseries",
+      "title": "节点缓存磁盘使用率",
+      "description": "来自 /proc 或文件系统；网卡带宽包含主机其他流量，不等同 CDN 正文带宽。",
+      "gridPos": {
+        "x": 0,
+        "y": 159,
+        "w": 12,
+        "h": 11
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,node AS metric,avg(cache_disk_pct) AS value FROM scdn.node_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) GROUP BY time,node ORDER BY time",
+          "format": 0
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "pointSize": 3,
+            "axisLabel": "",
+            "axisBorderShow": true
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "${__field.labels.metric}"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 47,
+      "type": "timeseries",
+      "title": "节点网卡发送带宽",
+      "description": "来自 /proc 或文件系统；网卡带宽包含主机其他流量，不等同 CDN 正文带宽。",
+      "gridPos": {
+        "x": 12,
+        "y": 159,
+        "w": 12,
+        "h": 11
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,node AS metric,avg(tx_bps) AS value FROM scdn.node_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) GROUP BY time,node ORDER BY time",
+          "format": 0
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bps",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "fillOpacity": 8,
+            "showPoints": "auto",
+            "spanNulls": false,
+            "pointSize": 3,
+            "axisLabel": "",
+            "axisBorderShow": true
+          },
+          "min": 0
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "value"
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "${__field.labels.metric}"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "calcs": [],
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      }
+    },
+    {
+      "id": 48,
+      "type": "table",
+      "title": "节点当前状态",
+      "description": "",
+      "gridPos": {
+        "x": 0,
+        "y": 170,
+        "w": 24,
+        "h": 15
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT node AS `节点`,seen AS `最后采集`,if(seen>now()-INTERVAL 60 SECOND AND sync_ok=1,'在线','离线或异常') AS `同步健康`,sites AS `启用站点`,round(cpu,2) AS `CPU_百分比`,round(memory,2) AS `内存_百分比`,round(disk,2) AS `缓存盘_百分比` FROM (SELECT node,max(time) seen,argMax(sync_ok,time) sync_ok,argMax(sites,time) sites,argMax(ban_records,time) records,argMax(cpu_pct,time) cpu,argMax(mem_pct,time) memory,argMax(cache_disk_pct,time) disk FROM scdn.node_samples WHERE node IN (${node:singlequote}) GROUP BY node) ORDER BY node",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "align": "auto",
+            "minWidth": 80,
+            "wrapText": true,
+            "wrapHeaderText": true,
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "拦截数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状态码"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "层级"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "执行节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "时间"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "域名"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI路径"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md",
+        "footer": {
+          "show": false
+        },
+        "enablePagination": true
+      }
+    },
+    {
+      "id": 49,
+      "type": "table",
+      "title": "采集进度与历史覆盖",
+      "description": "访问日志保留 14 天，封禁记录保留 90 天；实时日志优先，历史归档逐步补入。",
+      "gridPos": {
+        "x": 0,
+        "y": 185,
+        "w": 24,
+        "h": 15
+      },
+      "datasource": {
+        "type": "grafana-clickhouse-datasource",
+        "uid": "scdn-native-clickhouse"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "scdn-native-clickhouse"
+          },
+          "editorType": "sql",
+          "pluginVersion": "4.23.5",
+          "rawSql": "SELECT node AS `节点`,max(time) AS `最后采集`,argMax(success,time) AS `采集成功`,argMax(completed_files,time) AS `已补齐归档数`,argMax(source_files,time) AS `发现日志文件数`,sum(inserted) AS `本时间段写入行数_含重试`,sum(invalid) AS `无效行数`,argMax(error,time) AS `最近错误` FROM scdn.collection_health WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) GROUP BY node ORDER BY node",
+          "format": 1
+        }
+      ],
+      "interval": "10s",
+      "maxDataPoints": 300,
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "—",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "custom": {
+            "align": "auto",
+            "minWidth": 80,
+            "wrapText": true,
+            "wrapHeaderText": true,
+            "cellOptions": {
+              "type": "auto",
+              "wrapText": true
+            }
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "请求数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "拦截数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "独立IP数"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "状态码"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 90
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "层级"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 80
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 100
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "执行节点"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 110
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "时间"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 180
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "域名"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 220
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "URI路径"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 360
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "md",
+        "footer": {
+          "show": false
+        },
+        "enablePagination": true
+      }
+    }
+  ],
+  "links": [
+    {
+      "type": "link",
+      "title": "集群总览",
+      "url": "/d/scdn-native-overview",
+      "targetBlank": false,
+      "includeVars": true,
+      "keepTime": true
+    },
+    {
+      "type": "link",
+      "title": "访问与缓存明细",
+      "url": "/d/scdn-native-access",
+      "targetBlank": false,
+      "includeVars": true,
+      "keepTime": true
+    },
+    {
+      "type": "link",
+      "title": "安全与封禁明细",
+      "url": "/d/scdn-native-security",
+      "targetBlank": false,
+      "includeVars": true,
+      "keepTime": true
+    }
+  ]
+}

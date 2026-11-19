@@ -1,0 +1,174 @@
+{
+  "date": "2026-11-19",
+  "version": "0.1.0",
+  "base_commit": "ee273f33fde65738d01d782d440afb0778465533",
+  "passed": true,
+  "environment": "isolated WSL2 Linux x86_64 Alpine, Nginx/OpenResty 1.31.8.1; two real loopback-only backend containers",
+  "runtimes": [
+    {
+      "runtime": "nginx",
+      "linkage": "dynamic",
+      "checks": 813,
+      "suites": [
+        {
+          "suite": "log-runtime",
+          "checks": 32,
+          "report_digest": "6ab291a34d00ae30951354f02d9ef2f212f2241c280899d0497d9103440a4c49"
+        },
+        {
+          "suite": "api-providers",
+          "checks": 615,
+          "report_digest": "a8a34f0ed3778e5fbf263c1366e5dea9e001b0e04d7ae071e308815f5164f5a5"
+        },
+        {
+          "suite": "api-protocols",
+          "checks": 66,
+          "report_digest": "49c94e7700d7934363218e3b345bb073e36a02a0f36ed47c54b58b91f13d183b"
+        },
+        {
+          "suite": "api",
+          "checks": 47,
+          "report_digest": "4c3d4527756b68e057fb8c439f67bdffe8f0c317f130adab5331b7af0c134cac"
+        },
+        {
+          "suite": "api-coexist",
+          "checks": 53,
+          "report_digest": "dc10a61f71a0add5d44f74e0fba60ba872f9fb1aea98b330b95d9cc84ce64cc3"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact": "nginx",
+          "digest": "62bb2b206a397445e8c5dd73b34480162d584eb60c6e536da114238d73bfb4d4"
+        },
+        {
+          "artifact": "ngx_http_scdn_log_sync_module.so",
+          "digest": "6f1c7fcc93ea19216d4c8d6eaf99a50ce592e5f89372a8ccfa3060505c84e4e8"
+        }
+      ]
+    },
+    {
+      "runtime": "openresty",
+      "linkage": "dynamic",
+      "checks": 813,
+      "suites": [
+        {
+          "suite": "log-runtime",
+          "checks": 32,
+          "report_digest": "6ab291a34d00ae30951354f02d9ef2f212f2241c280899d0497d9103440a4c49"
+        },
+        {
+          "suite": "api-providers",
+          "checks": 615,
+          "report_digest": "a8a34f0ed3778e5fbf263c1366e5dea9e001b0e04d7ae071e308815f5164f5a5"
+        },
+        {
+          "suite": "api-protocols",
+          "checks": 66,
+          "report_digest": "49c94e7700d7934363218e3b345bb073e36a02a0f36ed47c54b58b91f13d183b"
+        },
+        {
+          "suite": "api",
+          "checks": 47,
+          "report_digest": "3a8ee359b3838dddf9670c20dce42499353b4091ef4e1152db391615f2ec7e05"
+        },
+        {
+          "suite": "api-coexist",
+          "checks": 53,
+          "report_digest": "4b530583a4042856baa09a0abd361c8c63fc3436b992c1ea91e26f65afe4dc56"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact": "nginx",
+          "digest": "660ecb7e49e27cfa651ffdc756593654005de9d2673416a65a0f9a90bdff6364"
+        },
+        {
+          "artifact": "ngx_http_scdn_log_sync_module.so",
+          "digest": "2adc5da10f91db8567477721d817b0970fd4962f320043fcc96c5ac2caaf1573"
+        }
+      ]
+    },
+    {
+      "runtime": "openresty",
+      "linkage": "static",
+      "checks": 813,
+      "suites": [
+        {
+          "suite": "log-runtime",
+          "checks": 32,
+          "report_digest": "6e4d8df63a4fe5025f7fd76e66597203dadd69b2c4ce3f1e9cecf2abe46d8399"
+        },
+        {
+          "suite": "api-providers",
+          "checks": 615,
+          "report_digest": "a8a34f0ed3778e5fbf263c1366e5dea9e001b0e04d7ae071e308815f5164f5a5"
+        },
+        {
+          "suite": "api-protocols",
+          "checks": 66,
+          "report_digest": "49c94e7700d7934363218e3b345bb073e36a02a0f36ed47c54b58b91f13d183b"
+        },
+        {
+          "suite": "api",
+          "checks": 47,
+          "report_digest": "1e81948f748c7d227e667497019745f0f4d48e336652203c35a88e4ba4e61858"
+        },
+        {
+          "suite": "api-coexist",
+          "checks": 53,
+          "report_digest": "8ed042ac288c5c5116c69477dc9359f7b8f3f50bb9b6a58ed8f404b410267429"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact": "nginx",
+          "digest": "0002ddf846361efd1325a56ad7d6120a12f38da74d9f5f9e7943290377e985ff"
+        }
+      ]
+    }
+  ],
+  "standalone": [
+    {
+      "suite": "core",
+      "checks": 44,
+      "report_digest": "dd3f80835072147c47fa6821cea8f39049e5ffccbdd20a515e2837583df4b2b7"
+    },
+    {
+      "suite": "telemetry",
+      "checks": 14,
+      "report_digest": "9ae725522f303d8345515e94d87ea9b09e66c886c70c446cece478cd88448284"
+    },
+    {
+      "suite": "netmon",
+      "checks": 18,
+      "report_digest": "c630cc93ea453bd44196abd6cd2509fe009427ef2a6ef130afd56539b9ef3516"
+    },
+    {
+      "suite": "backends",
+      "checks": 16,
+      "report_digest": "f4602a6f7248fec42add7d965864598a6c511edb09abfa097063857798066497"
+    }
+  ],
+  "total_checks": 2531,
+  "source_manifest_digest": "74f468ec041dd088faacb67496c27f6614dbdecaaab8e5825418811ab9c91fa0",
+  "backend_versions": {
+    "elasticsearch": "8.17.4",
+    "clickhouse": "25.8.33.6"
+  },
+  "existing_grafana_panels": 81,
+  "existing_grafana_data_queries": 79,
+  "additional_network_panels": 18,
+  "real_data_queries_validated": 97,
+  "production_modified": false,
+  "real_customer_logs_used": false,
+  "delivery_semantics": "at least once transport; deterministic ES document IDs and ClickHouse FINAL deduplication views",
+  "packet_scope": "passive AF_PACKET eBPF, selected interfaces/listener ports; no TC/XDP enforcement changes",
+  "build_validation": "Three clean ten-module builds, followed by final module/core relinking using dedicated equivalent preserved build trees.",
+  "limitations": [
+    "No production activation, sustained throughput benchmark, ARM64 runtime acceptance, or destructive host restore was performed.",
+    "Actual backend checks use Elasticsearch 8.17.4 and ClickHouse 25.8.33.6; they do not certify every backend version or production authentication setup.",
+    "UDP socket and datagram counts do not imply QUIC sessions; TCP ACK/SYN are overlapping flag counters.",
+    "Only retained source logs can be replayed; spool/record/file bounds report backpressure rather than silently discarding unconfirmed data."
+  ]
+}

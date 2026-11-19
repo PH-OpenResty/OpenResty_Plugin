@@ -1,0 +1,667 @@
+{
+  "source": "CDN observability schema and all current dashboards, 2026-11-19",
+  "fields": {
+    "raw_access": [
+      "event_id",
+      "time",
+      "node",
+      "site",
+      "host",
+      "ip",
+      "ip_family",
+      "internal",
+      "uri",
+      "method",
+      "status",
+      "bytes",
+      "duration_ms",
+      "origin_ms",
+      "origin_seen",
+      "cache",
+      "cache_layer",
+      "country",
+      "asn",
+      "asn_org",
+      "operator",
+      "protocol",
+      "blocked",
+      "block_reason",
+      "request_id"
+    ],
+    "raw_bans": [
+      "event_id",
+      "time",
+      "node",
+      "ip",
+      "internal",
+      "ban_id",
+      "scope",
+      "layer",
+      "action",
+      "source",
+      "reason",
+      "origin",
+      "applied"
+    ],
+    "node_samples": [
+      "time",
+      "node",
+      "sync_ok",
+      "sync_sequence",
+      "ban_ready",
+      "active_bans",
+      "sites",
+      "site_hosts",
+      "ban_records",
+      "cpu_pct",
+      "load1",
+      "cpu_count",
+      "mem_total",
+      "mem_available",
+      "mem_pct",
+      "net_rx",
+      "net_tx",
+      "rx_bps",
+      "tx_bps",
+      "cache_disk_total",
+      "cache_disk_free",
+      "cache_disk_pct",
+      "api_web",
+      "api_api",
+      "api_ai",
+      "api_stream",
+      "api_grpc",
+      "api_websocket",
+      "native_requests",
+      "native_bytes",
+      "nginx_stats",
+      "source_clock_skew_ms",
+      "kernel_drop_counter",
+      "kernel_drop_delta",
+      "kernel_drop_pps"
+    ],
+    "node_inventory": [
+      "node",
+      "address",
+      "role",
+      "enabled"
+    ],
+    "collection_health": [
+      "time",
+      "node",
+      "mode",
+      "success",
+      "inserted",
+      "invalid",
+      "source_files",
+      "completed_files",
+      "error"
+    ]
+  },
+  "panels": [
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "总节点数",
+      "queries": [
+        "SELECT count() AS value FROM scdn.node_inventory FINAL WHERE enabled=1 AND node IN (${node:singlequote})"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "在线健康节点",
+      "queries": [
+        "SELECT countIf(seen>now()-INTERVAL 60 SECOND AND sync_ok=1) AS value FROM (SELECT node,max(time) seen,argMax(sync_ok,time) sync_ok,argMax(sites,time) sites,argMax(ban_records,time) records,argMax(cpu_pct,time) cpu,argMax(mem_pct,time) memory,argMax(cache_disk_pct,time) disk FROM scdn.node_samples WHERE node IN (${node:singlequote}) GROUP BY node)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "总站点数",
+      "queries": [
+        "SELECT uniqExact(site) AS value FROM (SELECT arrayJoin(sites) site FROM (SELECT node,max(time) seen,argMax(sync_ok,time) sync_ok,argMax(sites,time) sites,argMax(ban_records,time) records,argMax(cpu_pct,time) cpu,argMax(mem_pct,time) memory,argMax(cache_disk_pct,time) disk FROM scdn.node_samples WHERE node IN (${node:singlequote}) GROUP BY node)) WHERE site IN (${site:singlequote})"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "总请求数",
+      "queries": [
+        "SELECT count() AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "总拦截数",
+      "queries": [
+        "SELECT countIf(blocked=1) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "总拉黑 IP 数",
+      "queries": [
+        "SELECT uniqExactIf(ip,action='APPLIED' AND applied=1) AS value FROM scdn.bans WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (scope='*' OR scope IN (${site:singlequote}))"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "缓存命中率",
+      "queries": [
+        "SELECT 100.0*countIf(cache IN ('HIT','STALE','UPDATING','REVALIDATED'))/nullIf(countIf(cache IN ('HIT','MISS','EXPIRED','STALE','UPDATING','REVALIDATED')),0) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "总流量 · 下行正文",
+      "queries": [
+        "SELECT sum(bytes) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "缓存流量",
+      "queries": [
+        "SELECT sumIf(bytes,cache IN ('HIT','STALE','UPDATING','REVALIDATED')) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "独立请求 IP",
+      "queries": [
+        "SELECT uniqExact(ip) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "5xx 错误率",
+      "queries": [
+        "SELECT 100.0*countIf(status>=500 AND status<600)/nullIf(count(),0) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "P95 请求耗时",
+      "queries": [
+        "SELECT quantileTDigest(0.95)(duration_ms) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "缓存流量占比",
+      "queries": [
+        "SELECT 100.0*sumIf(bytes,cache IN ('HIT','STALE','UPDATING','REVALIDATED'))/nullIf(sum(bytes),0) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "回源代理请求",
+      "queries": [
+        "SELECT countIf(origin_seen=1) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "HTTP/3 请求占比",
+      "queries": [
+        "SELECT 100.0*countIf(protocol='HTTP/3.0')/nullIf(count(),0) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "源站/上游 403",
+      "queries": [
+        "SELECT countIf(status=403 AND origin_seen=1) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "独立请求 URI",
+      "queries": [
+        "SELECT uniqExact(uri) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "P99 请求耗时",
+      "queries": [
+        "SELECT quantileTDigest(0.99)(duration_ms) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "请求速率 · QPS",
+      "queries": [
+        "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,count()/greatest(10,intDiv(${__interval_ms},1000)) AS QPS FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY time ORDER BY time"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "下行正文带宽 · 总量 / 缓存",
+      "queries": [
+        "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,8*sum(bytes)/greatest(10,intDiv(${__interval_ms},1000)) AS `总带宽`,8*sumIf(bytes,cache IN ('HIT','STALE','UPDATING','REVALIDATED'))/greatest(10,intDiv(${__interval_ms},1000)) AS `缓存带宽` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY time ORDER BY time"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "请求状态码分类趋势",
+      "queries": [
+        "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,concat(toString(intDiv(status,100)),'xx') AS metric,count() AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY time,metric ORDER BY time"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "请求耗时 · P50 / P95 / P99",
+      "queries": [
+        "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,quantileTDigest(0.50)(duration_ms) AS P50,quantileTDigest(0.95)(duration_ms) AS P95,quantileTDigest(0.99)(duration_ms) AS P99 FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY time ORDER BY time"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "缓存状态趋势",
+      "queries": [
+        "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,cache AS metric,count() AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY time,metric ORDER BY time"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "边缘拦截趋势",
+      "queries": [
+        "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,block_reason AS metric,count() AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND blocked=1 GROUP BY time,metric ORDER BY time"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "总请求状态码",
+      "queries": [
+        "SELECT toString(status) AS `状态码`,count() AS `请求数`,sum(bytes) AS `正文流量_字节`,round(avg(duration_ms),2) AS `平均耗时_ms` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY status ORDER BY `请求数` DESC"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "HTTP 协议分布",
+      "queries": [
+        "SELECT protocol AS `协议`,count() AS `请求数` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY protocol ORDER BY `请求数` DESC"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "L1 / L2 / 回源 / 绕过分布",
+      "queries": [
+        "SELECT cache_layer AS `缓存层`,cache AS `缓存状态`,count() AS `请求数`,sum(bytes) AS `正文流量_字节` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY cache_layer,cache ORDER BY `请求数` DESC"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "HTTP 方法分布",
+      "queries": [
+        "SELECT method AS `方法`,count() AS `请求数` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY method ORDER BY `请求数` DESC"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "Top 10 请求 IP",
+      "queries": [
+        "SELECT ip AS `请求IP`,count() AS `请求数`,countIf(blocked=1) AS `拦截数`,sum(bytes) AS `正文流量_字节`,any(country) AS `国家`,any(operator) AS `运营商_ASN机构` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY ip ORDER BY `请求数` DESC LIMIT 10"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "Top 10 请求站点",
+      "queries": [
+        "SELECT site AS `站点ID`,any(host) AS `域名`,count() AS `请求数`,uniqExact(ip) AS `独立IP`,sum(bytes) AS `正文流量_字节` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND site!='__unregistered__' GROUP BY site ORDER BY `请求数` DESC LIMIT 10"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "Top 10 请求 URI",
+      "queries": [
+        "SELECT uri AS `URI路径`,count() AS `请求数`,sum(bytes) AS `正文流量_字节`,round(quantileTDigest(0.95)(duration_ms),2) AS P95_ms FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY uri ORDER BY `请求数` DESC LIMIT 10"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "Top 10 拦截 IP",
+      "queries": [
+        "SELECT ip AS `请求IP`,count() AS `拦截数`,any(country) AS `国家`,any(operator) AS `运营商_ASN机构` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND blocked=1 GROUP BY ip ORDER BY `拦截数` DESC LIMIT 10"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "请求 IP 地理位置数量统计",
+      "queries": [
+        "SELECT country AS `国家_地区代码`,uniqExact(ip) AS `独立IP数`,count() AS `请求数`,countIf(blocked=1) AS `拦截数`,sum(bytes) AS `正文流量_字节` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY country ORDER BY `请求数` DESC"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "请求 IP ASN 统计",
+      "queries": [
+        "SELECT concat('AS',toString(asn)) AS ASN,any(asn_org) AS `ASN机构`,uniqExact(ip) AS `独立IP数`,count() AS `请求数`,countIf(blocked=1) AS `拦截数` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY asn ORDER BY `请求数` DESC LIMIT 30"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "请求 IP 运营商统计",
+      "queries": [
+        "SELECT operator AS `运营商_ASN机构`,uniqExact(ip) AS `独立IP数`,count() AS `请求数`,sum(bytes) AS `正文流量_字节` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY operator ORDER BY `请求数` DESC LIMIT 30"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "IPv4 / IPv6 请求分布",
+      "queries": [
+        "SELECT concat('IPv',toString(ip_family)) AS `地址族`,uniqExact(ip) AS `独立IP数`,count() AS `请求数` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) GROUP BY ip_family"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "节点 CPU 使用率",
+      "queries": [
+        "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,node AS metric,avg(cpu_pct) AS value FROM scdn.node_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) GROUP BY time,node ORDER BY time"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "节点内存使用率",
+      "queries": [
+        "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,node AS metric,avg(mem_pct) AS value FROM scdn.node_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) GROUP BY time,node ORDER BY time"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "节点缓存磁盘使用率",
+      "queries": [
+        "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,node AS metric,avg(cache_disk_pct) AS value FROM scdn.node_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) GROUP BY time,node ORDER BY time"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "节点网卡发送带宽",
+      "queries": [
+        "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,node AS metric,avg(tx_bps) AS value FROM scdn.node_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) GROUP BY time,node ORDER BY time"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "节点当前状态",
+      "queries": [
+        "SELECT node AS `节点`,seen AS `最后采集`,if(seen>now()-INTERVAL 60 SECOND AND sync_ok=1,'在线','离线或异常') AS `同步健康`,sites AS `启用站点`,round(cpu,2) AS `CPU_百分比`,round(memory,2) AS `内存_百分比`,round(disk,2) AS `缓存盘_百分比` FROM (SELECT node,max(time) seen,argMax(sync_ok,time) sync_ok,argMax(sites,time) sites,argMax(ban_records,time) records,argMax(cpu_pct,time) cpu,argMax(mem_pct,time) memory,argMax(cache_disk_pct,time) disk FROM scdn.node_samples WHERE node IN (${node:singlequote}) GROUP BY node) ORDER BY node"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN 集群 总览",
+      "title": "采集进度与历史覆盖",
+      "queries": [
+        "SELECT node AS `节点`,max(time) AS `最后采集`,argMax(success,time) AS `采集成功`,argMax(completed_files,time) AS `已补齐归档数`,argMax(source_files,time) AS `发现日志文件数`,sum(inserted) AS `本时间段写入行数_含重试`,sum(invalid) AS `无效行数`,argMax(error,time) AS `最近错误` FROM scdn.collection_health WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) GROUP BY node ORDER BY node"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 访问与缓存明细",
+      "title": "请求数",
+      "queries": [
+        "SELECT count() AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 访问与缓存明细",
+      "title": "独立IP",
+      "queries": [
+        "SELECT uniqExact(ip) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 访问与缓存明细",
+      "title": "正文流量",
+      "queries": [
+        "SELECT sum(bytes) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 访问与缓存明细",
+      "title": "P95 耗时",
+      "queries": [
+        "SELECT quantileTDigest(0.95)(duration_ms) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 访问与缓存明细",
+      "title": "5xx 请求",
+      "queries": [
+        "SELECT countIf(status>=500) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 访问与缓存明细",
+      "title": "边缘拒绝",
+      "queries": [
+        "SELECT countIf(blocked=1) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 访问与缓存明细",
+      "title": "请求趋势",
+      "queries": [
+        "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,node AS metric,count() AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0) GROUP BY time,node ORDER BY time"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 访问与缓存明细",
+      "title": "缓存分层与命中",
+      "queries": [
+        "SELECT cache_layer AS `层级`,cache AS `状态`,count() AS `请求数`,sum(bytes) AS `正文流量_字节` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0) GROUP BY cache_layer,cache ORDER BY `请求数` DESC"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 访问与缓存明细",
+      "title": "Top 20 慢 URI · 至少 3 次请求",
+      "queries": [
+        "SELECT host AS `域名`,uri AS URI,count() AS `请求数`,round(quantileTDigest(0.95)(duration_ms),2) AS P95_ms,round(avg(origin_ms),2) AS `平均代理耗时_ms` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0) GROUP BY host,uri HAVING count()>=3 ORDER BY P95_ms DESC LIMIT 20"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 访问与缓存明细",
+      "title": "Top 20 大流量 URI",
+      "queries": [
+        "SELECT host AS `域名`,uri AS URI,sum(bytes) AS `正文流量_字节`,count() AS `请求数`,round(100.0*countIf(cache IN ('HIT','STALE','UPDATING','REVALIDATED'))/nullIf(count(),0),2) AS `全请求缓存比例` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0) GROUP BY host,uri ORDER BY `正文流量_字节` DESC LIMIT 20"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 访问与缓存明细",
+      "title": "4xx URI Top 20",
+      "queries": [
+        "WITH ph_ranking AS (SELECT host AS `域名`,uri AS URI,status AS `状态码`,count() AS `请求数`,uniqExact(ip) AS `独立IP` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0) AND status>=400 AND status<500 GROUP BY host,uri,status ORDER BY `请求数` DESC LIMIT 20) SELECT * FROM ph_ranking UNION ALL SELECT '所选范围无 4xx 请求','—',CAST(NULL AS Nullable(UInt16)),CAST(NULL AS Nullable(UInt64)),CAST(NULL AS Nullable(UInt64)) WHERE NOT EXISTS (SELECT 1 FROM ph_ranking)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 访问与缓存明细",
+      "title": "5xx URI Top 20",
+      "queries": [
+        "WITH ph_ranking AS (SELECT host AS `域名`,uri AS URI,status AS `状态码`,count() AS `请求数` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0) AND status>=500 AND status<600 GROUP BY host,uri,status ORDER BY `请求数` DESC LIMIT 20) SELECT * FROM ph_ranking UNION ALL SELECT '所选范围无 5xx 请求','—',CAST(NULL AS Nullable(UInt16)),CAST(NULL AS Nullable(UInt64)) WHERE NOT EXISTS (SELECT 1 FROM ph_ranking)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 访问与缓存明细",
+      "title": "请求明细",
+      "queries": [
+        "SELECT time AS `时间`,node AS `节点`,site AS `站点`,ip AS IP,host AS `域名`,method AS `方法`,uri AS URI,status AS `状态码`,cache AS `缓存`,cache_layer AS `缓存层`,bytes AS `正文字节`,round(duration_ms,2) AS `耗时_ms`,country AS `国家`,asn AS ASN,request_id AS `请求ID` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0) ORDER BY time DESC LIMIT 200"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "边缘直接拒绝",
+      "queries": [
+        "SELECT countIf(blocked=1) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "域名访问控制",
+      "queries": [
+        "SELECT countIf(block_reason='域名访问控制') AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "边缘 429 限流",
+      "queries": [
+        "SELECT countIf(blocked=1 AND status=429) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "源站/上游 403",
+      "queries": [
+        "SELECT countIf(origin_seen=1 AND status=403) AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "实际拉黑 IP",
+      "queries": [
+        "SELECT uniqExactIf(ip,action='APPLIED' AND applied=1) AS value FROM scdn.bans WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (scope='*' OR scope IN (${site:singlequote})) AND (${ip:singlequote}='' OR ip=${ip:singlequote})"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "拉黑决策数",
+      "queries": [
+        "SELECT uniqExactIf(ban_id,action='APPLIED' AND applied=1) AS value FROM scdn.bans WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (scope='*' OR scope IN (${site:singlequote})) AND (${ip:singlequote}='' OR ip=${ip:singlequote})"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "边缘拒绝趋势",
+      "queries": [
+        "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,block_reason AS metric,count() AS value FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0) AND blocked=1 GROUP BY time,metric ORDER BY time"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "L7 / L3 拉黑决策趋势",
+      "queries": [
+        "WITH greatest(10,intDiv(${__interval_ms},1000)) AS step,\nintDiv(intDiv(${__from},1000),step)*step AS first_bucket,\nintDiv(intDiv(${__to},1000),step)*step AS last_bucket\nSELECT toDateTime(bucket,'UTC') AS time,concat('L',toString(layer)) AS metric,\nif((SELECT countIf(seen>now()-INTERVAL 60 SECOND AND ready=1) FROM (SELECT node,max(time) seen,argMax(ban_ready,time) ready,argMax(tuple(kernel_drop_counter),time).1 counter,argMax(ban_records,time) records FROM scdn.node_samples WHERE node IN (${node:singlequote}) GROUP BY node))=(SELECT count() FROM scdn.node_inventory FINAL WHERE enabled=1 AND node IN (${node:singlequote})),toNullable(ifNull(decisions,0)),NULL) AS value\nFROM (SELECT toInt64(first_bucket+number*step) AS bucket,arrayJoin([toUInt8(7),toUInt8(3)]) AS layer\n      FROM numbers(toUInt64(intDiv(last_bucket-first_bucket,step)+1))) AS timeline\nLEFT JOIN (SELECT toInt64(toUnixTimestamp(toStartOfInterval(time,toIntervalSecond(step)))) AS bucket,\n                  layer,uniqExact(ban_id) AS decisions FROM scdn.bans\n           WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (scope='*' OR scope IN (${site:singlequote})) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND layer IN (7,3) AND action='APPLIED' AND applied=1\n           GROUP BY bucket,layer) AS measured USING(bucket,layer)\nORDER BY time,metric"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "Top 20 拦截 IP",
+      "queries": [
+        "SELECT ip AS IP,count() AS `拦截数`,any(country) AS `国家`,any(operator) AS `ASN机构_运营商`,uniqExact(uri) AS `URI数` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0) AND blocked=1 GROUP BY ip ORDER BY `拦截数` DESC LIMIT 20"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "Top 20 拦截 URI",
+      "queries": [
+        "SELECT uri AS URI,count() AS `拦截数`,uniqExact(ip) AS `独立IP` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0) AND blocked=1 GROUP BY uri ORDER BY `拦截数` DESC LIMIT 20"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "未登记 Host Top 20",
+      "queries": [
+        "SELECT host AS Host,count() AS `请求数`,countIf(blocked=1) AS `拒绝数`,uniqExact(ip) AS `独立IP` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0) AND site='__unregistered__' GROUP BY host ORDER BY `请求数` DESC LIMIT 20"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "安全请求国家分布",
+      "queries": [
+        "SELECT country AS `国家`,count() AS `拦截数`,uniqExact(ip) AS `独立IP` FROM scdn.access WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND site IN (${site:singlequote}) AND country IN (${country:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) AND (${uri:singlequote}='' OR positionCaseInsensitive(uri,${uri:singlequote})>0) AND blocked=1 GROUP BY country ORDER BY `拦截数` DESC"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "所选期间审计事件",
+      "queries": [
+        "SELECT count() AS value FROM scdn.bans WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (scope='*' OR scope IN (${site:singlequote})) AND (${ip:singlequote}='' OR ip=${ip:singlequote})"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "当前生效封禁 IP",
+      "queries": [
+        "SELECT if((SELECT countIf(seen>now()-INTERVAL 60 SECOND AND ready=1) FROM (SELECT node,max(time) seen,argMax(ban_ready,time) ready,argMax(tuple(kernel_drop_counter),time).1 counter,argMax(ban_records,time) records FROM scdn.node_samples WHERE node IN (${node:singlequote}) GROUP BY node))=(SELECT count() FROM scdn.node_inventory FINAL WHERE enabled=1 AND node IN (${node:singlequote})),(SELECT uniqExactIf(ip,ip!='') FROM (SELECT JSONExtractString(record,'ip') ip FROM (SELECT arrayJoin(JSONExtractArrayRaw(records)) record FROM (SELECT node,max(time) seen,argMax(ban_ready,time) ready,argMax(tuple(kernel_drop_counter),time).1 counter,argMax(ban_records,time) records FROM scdn.node_samples WHERE node IN (${node:singlequote}) GROUP BY node) WHERE seen>now()-INTERVAL 60 SECOND AND ready=1) WHERE (${scope:singlequote}='all' OR JSONExtractInt(record,'internal')=0) AND (JSONExtractString(record,'scope')='*' OR JSONExtractString(record,'scope') IN (${site:singlequote})) AND (${ip:singlequote}='' OR ip=${ip:singlequote}))),NULL) AS value"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "封禁采集健康度",
+      "queries": [
+        "SELECT 100.0*countIf(seen>now()-INTERVAL 60 SECOND AND ready=1)/nullIf((SELECT count() FROM scdn.node_inventory FINAL WHERE enabled=1 AND node IN (${node:singlequote})),0) AS value FROM (SELECT node,max(time) seen,argMax(ban_ready,time) ready,argMax(tuple(kernel_drop_counter),time).1 counter,argMax(ban_records,time) records FROM scdn.node_samples WHERE node IN (${node:singlequote}) GROUP BY node)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "封禁采样延迟",
+      "queries": [
+        "SELECT max(dateDiff('second',seen,now())) AS value FROM (SELECT node,max(time) seen,argMax(ban_ready,time) ready,argMax(tuple(kernel_drop_counter),time).1 counter,argMax(ban_records,time) records FROM scdn.node_samples WHERE node IN (${node:singlequote}) GROUP BY node)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "统计说明",
+      "queries": []
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "最近封禁审计事件",
+      "queries": [
+        "WITH ph_records AS (SELECT time AS `时间`,node AS `执行节点`,ip AS IP,scope AS `站点范围`,concat('L',toString(layer)) AS `层级`,action AS `动作`,reason AS `原因`,origin AS `来源`,ban_id AS `决策ID` FROM scdn.bans WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) AND (${scope:singlequote}='all' OR internal=0) AND (scope='*' OR scope IN (${site:singlequote})) AND (${ip:singlequote}='' OR ip=${ip:singlequote}) ORDER BY time DESC LIMIT 100) SELECT * FROM ph_records UNION ALL SELECT CAST(NULL AS Nullable(DateTime64(3,'UTC'))),'无符合筛选的审计记录','—','—','—','无记录','当前时间与筛选范围没有封禁审计记录','—','—' WHERE NOT EXISTS (SELECT 1 FROM ph_records)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "当前活动封禁 · 节点去重前视图",
+      "queries": [
+        "WITH ph_records AS (SELECT node AS `节点`,JSONExtractString(record,'ip') AS IP,JSONExtractString(record,'scope') AS `站点范围`,JSONExtractInt(record,'layer') AS `层级`,JSONExtractString(record,'ban_id') AS `决策ID` FROM (SELECT node,arrayJoin(JSONExtractArrayRaw(records)) record FROM (SELECT node,max(time) seen,argMax(sync_ok,time) sync_ok,argMax(sites,time) sites,argMax(ban_records,time) records,argMax(cpu_pct,time) cpu,argMax(mem_pct,time) memory,argMax(cache_disk_pct,time) disk FROM scdn.node_samples WHERE node IN (${node:singlequote}) GROUP BY node) WHERE seen>now()-INTERVAL 60 SECOND) WHERE (${ip:singlequote}='' OR IP=${ip:singlequote}) AND (${scope:singlequote}='all' OR JSONExtractInt(record,'internal')=0) AND (JSONExtractString(record,'scope')='*' OR JSONExtractString(record,'scope') IN (${site:singlequote})) ORDER BY node,IP) SELECT * FROM ph_records UNION ALL SELECT if((SELECT countIf(seen>now()-INTERVAL 60 SECOND AND ready=1) FROM (SELECT node,max(time) seen,argMax(ban_ready,time) ready,argMax(tuple(kernel_drop_counter),time).1 counter,argMax(ban_records,time) records FROM scdn.node_samples WHERE node IN (${node:singlequote}) GROUP BY node))=(SELECT count() FROM scdn.node_inventory FINAL WHERE enabled=1 AND node IN (${node:singlequote})),'当前无生效封禁','执行视图采集不可用'),'—','—',CAST(NULL AS Nullable(Int64)),'—' WHERE NOT EXISTS (SELECT 1 FROM ph_records)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "内核 DROP 累计（含自检）",
+      "queries": [
+        "SELECT if(countIf(seen>now()-INTERVAL 60 SECOND AND ready=1 AND isNotNull(counter))=(SELECT count() FROM scdn.node_inventory FINAL WHERE enabled=1 AND node IN (${node:singlequote})),sumIf(counter,seen>now()-INTERVAL 60 SECOND AND ready=1 AND isNotNull(counter)),NULL) AS value FROM (SELECT node,max(time) seen,argMax(ban_ready,time) ready,argMax(tuple(kernel_drop_counter),time).1 counter,argMax(ban_records,time) records FROM scdn.node_samples WHERE node IN (${node:singlequote}) GROUP BY node)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "所选期间有效内核采样",
+      "queries": [
+        "SELECT countIf(isNotNull(kernel_drop_counter)) AS value FROM scdn.node_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote})"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "内核采集健康度",
+      "queries": [
+        "SELECT 100.0*countIf(seen>now()-INTERVAL 60 SECOND AND ready=1 AND isNotNull(counter))/nullIf((SELECT count() FROM scdn.node_inventory FINAL WHERE enabled=1 AND node IN (${node:singlequote})),0) AS value FROM (SELECT node,max(time) seen,argMax(ban_ready,time) ready,argMax(tuple(kernel_drop_counter),time).1 counter,argMax(ban_records,time) records FROM scdn.node_samples WHERE node IN (${node:singlequote}) GROUP BY node)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "内核采样延迟",
+      "queries": [
+        "SELECT max(dateDiff('second',seen,now())) AS value FROM (SELECT node,max(time) seen,argMax(ban_ready,time) ready,argMax(tuple(kernel_drop_counter),time).1 counter,argMax(ban_records,time) records FROM scdn.node_samples WHERE node IN (${node:singlequote}) GROUP BY node)"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "统计说明",
+      "queries": []
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "L3 丢弃计数增量",
+      "queries": [
+        "SELECT sumOrNull(kernel_drop_delta) AS value FROM scdn.node_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote})"
+      ]
+    },
+    {
+      "dashboard": "PH_OpenResty CDN · 安全与封禁明细",
+      "title": "L3 丢弃速率",
+      "queries": [
+        "SELECT toStartOfInterval(time,toIntervalSecond(greatest(10,intDiv(${__interval_ms},1000)))) AS time,node AS metric,avg(kernel_drop_pps) AS value FROM scdn.node_samples WHERE time >= fromUnixTimestamp64Milli(${__from}) AND time <= fromUnixTimestamp64Milli(${__to}) AND node IN (${node:singlequote}) GROUP BY time,node ORDER BY time"
+      ]
+    }
+  ],
+  "panel_count": 81
+}
