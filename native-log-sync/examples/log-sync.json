@@ -1,0 +1,40 @@
+{
+  "node": "edge_1",
+  "state_dir": "/var/lib/scdn-log-sync",
+  "batch_records": 512,
+  "batch_bytes": 33554432,
+  "line_bytes": 4194304,
+  "max_files": 4096,
+  "timeout_ms": 5000,
+  "connect_ms": 1000,
+  "retry_ms": 1000,
+  "sources": [
+    {"id": "access", "kind": "access", "format": "json", "start": "full", "paths": ["/var/log/nginx/access.jsonl*"]},
+    {"id": "ban", "kind": "ban", "format": "json", "start": "full", "paths": ["/var/log/scdn/ban.jsonl*"]},
+    {"id": "error", "kind": "log", "format": "auto", "start": "full", "paths": ["/var/log/nginx/error.log*"]}
+  ],
+  "sinks": [
+    {"id": "search", "type": "elasticsearch", "endpoint": "https://elasticsearch.example.test:9200", "index": "scdn-logs", "authorization_file": "/etc/scdn-log-sync/es-authorization"},
+    {"id": "analytics", "type": "clickhouse", "endpoint": "https://clickhouse.example.test:8443", "database": "scdn", "table": "logs", "username_file": "/etc/scdn-log-sync/ch-user", "password_file": "/etc/scdn-log-sync/ch-password"}
+  ],
+  "telemetry": {
+    "enabled": true,
+    "interval_ms": 1000,
+    "spool_bytes": 268435456,
+    "rotate_bytes": 8388608,
+    "pid_file": "/run/nginx.pid",
+    "cache_path": "/var/cache/nginx",
+    "sites_file": "/var/lib/scdn-sync/node/config/active.conf",
+    "ban_socket": "/run/scdn-ban/admin.sock",
+    "ban_counter_map": "/sys/fs/bpf/scdn-ban-edge_1/counters",
+    "packet_file": "/run/scdn-log-netmon/packets.json",
+    "endpoints": [
+      {"id": "sync", "socket": "/run/scdn/control.sock", "path": "/__scdn_sync/v1/status", "format": "json", "authorization_file": "/etc/scdn-log-sync/status-authorization"},
+      {"id": "edge", "socket": "/run/scdn/control.sock", "path": "/metrics", "format": "prometheus"},
+      {"id": "api", "socket": "/run/scdn/control.sock", "path": "/api-metrics", "format": "prometheus"},
+      {"id": "nginx", "url": "http://127.0.0.1:18085/node_metrics", "format": "json"},
+      {"id": "bot", "socket": "/run/scdn/control.sock", "path": "/bot-status", "format": "json"},
+      {"id": "auth_guard", "socket": "/run/scdn/control.sock", "path": "/auth-guard-status", "format": "json"}
+    ]
+  }
+}

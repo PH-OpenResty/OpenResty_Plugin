@@ -43,6 +43,7 @@ ban-store.lock
 *.old
 *.dump
 *.sql
+!native-log-sync/schema/clickhouse.sql
 *.o
 *.a
 *.so

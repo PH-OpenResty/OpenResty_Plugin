@@ -1,6 +1,6 @@
 # 安装、构建和首次运行
 
-统一构建生成 Sync、Config、Bot、Ban、Auth Guard、API、Edge、Tier、Purge 九个插件。业务模块需同版本编译，全量动态加载顺序建议 Config → Bot → Ban → Auth Guard → Tier → API → Edge → Purge → Sync；Auth Guard、Bot、Tier、Sync 和 Purge 可按功能独立使用。Purge 的私有日志/token 见 [手册](../native-purge/README.zh-CN.md)，Sync 的独立身份/token/mTLS 接入见 [迁移说明](SYNC-MIGRATION.zh-CN.md)。当前原生模块不依赖 Lua 或 Python；Auth 的应用协作库使用 Go，策略快照工具使用 Python，需按 [Auth 手册](../native-auth-guard/README.zh-CN.md)安装真实后端 hook。
+统一构建生成 Sync、Config、Bot、Ban、Auth Guard、API、Edge、Tier、Purge、Log Sync 十个插件。业务模块需同版本编译，全量动态加载顺序建议 Config → Bot → Ban → Auth Guard → Tier → API → Edge → Purge → Sync；Log Sync 可在这些模块之后加载，也可独立使用。Auth Guard、Bot、Tier、Sync 和 Purge 可按功能独立使用。Purge 的私有日志/token 见 [手册](../native-purge/README.zh-CN.md)，Sync 的独立身份/token/mTLS 接入见 [迁移说明](SYNC-MIGRATION.zh-CN.md)。当前原生模块不依赖 Lua 或 Python；Log Sync 后台核心使用 C++17，安装和权限见 [手册](../native-log-sync/README.zh-CN.md)。Auth 的应用协作库使用 Go，策略快照工具使用 Python，需按 [Auth 手册](../native-auth-guard/README.zh-CN.md)安装真实后端 hook。
 
 ## 1. 构建要求
 
@@ -10,11 +10,11 @@ Debian/Ubuntu 构建依赖：
 
 ```sh
 sudo apt-get update
-sudo apt-get install -y build-essential perl libpcre2-dev libssl-dev zlib1g-dev libcurl4-openssl-dev libjson-c-dev curl \
+sudo apt-get install -y build-essential pkg-config perl libpcre2-dev libssl-dev zlib1g-dev libcurl4-openssl-dev libjson-c-dev libbpf-dev curl \
   python3 python3-venv
 ```
 
-Alpine 的对应构建包为 `build-base perl pcre2-dev openssl-dev zlib-dev curl curl-dev json-c-dev`，测试还需 Python 和 `cryptography`。Auth 应用补丁及 Go fixture 需要 Go 1.24+。本地不具备 ASan 库时可运行普通构建；远程 CI 在 Ubuntu 上进行 ASan/UBSan 验证，不能据此声称本地也完成同样的检查。
+Alpine 的对应构建包为 `build-base pkgconf perl pcre2-dev openssl-dev zlib-dev curl curl-dev json-c-dev libbpf-dev`，测试还需 Python 和 `cryptography`；Log Sync 报文程序另需 clang 和 Linux 头文件。Auth 应用补丁及 Go fixture 需要 Go 1.24+。本地不具备 ASan 库时可运行普通构建；远程 CI 在 Ubuntu 上进行 ASan/UBSan 验证，不能据此声称本地也完成同样的检查。
 
 Sync 缓存任务链接 libcurl 7.85+，运行主机也需安装对应 libcurl 动态库；不启用任务时不创建轮询器。启用任务需要额外的私有目录、独立凭据和线程池，见 [缓存任务手册](CACHE-TASKS.zh-CN.md)。代理模板统一覆盖 `X-Clinet-IP`，接入规则见 [HTTP 头约定](HTTP-HEADERS.zh-CN.md)。
 
@@ -48,7 +48,7 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-openresty --pur
   --report /tmp/scdn-five-modules-results.json
 ```
 
-构建脚本从 OpenResty 官方地址下载固定归档并校验 SHA-256。`nginx` 模式仅解包其中的 Nginx 核心，不编入 Lua；`openresty` 模式构建完整 OpenResty。两种模式都启用 `--with-compat --with-http_ssl_module --with-http_v2_module --with-pcre-jit --with-threads`，默认将九个插件作为动态模块构建。Purge 正则匹配需要 PCRE2，不能使用旧 PCRE1 构建。
+构建脚本从 OpenResty 官方地址下载固定归档并校验 SHA-256。`nginx` 模式仅解包其中的 Nginx 核心，不编入 Lua；`openresty` 模式构建完整 OpenResty。两种模式都启用 `--with-compat --with-http_ssl_module --with-http_v2_module --with-pcre-jit --with-threads`，默认将十个插件作为动态模块构建。Purge 正则匹配需要 PCRE2，不能使用旧 PCRE1 构建。
 
 第三参数设置为 `static` 可静态编入，例如 `sh tools/build-runtime.sh /tmp/scdn-static openresty static`。测试相应增加 `--static`；配置中删除已静态编入模块对应的 load_module。该脚本生成隔离验证运行时，已有生产 Node 仍需保留其原有构建参数、模块及库。
 
@@ -74,7 +74,7 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-openresty --pur
 
 先保存现有二进制、模块、配置、站点源文件及证书，并确认可恢复的版本。通过目标二进制的 `-V` 核对 Nginx/OpenResty 版本、补丁、构建选项、TLS 库和架构。
 
-使用目标的匹配源码和原构建参数，按需指定 `native-sync`、`native-config`、`native-bot`、`native-api`、`native-edge`、`native-ban`、`native-auth-guard`、`native-tier`、`native-purge`；统一构建包含全部九个目录。保留目标已有模块、路径和编译参数，并满足 HTTP SSL、线程池、PCRE2 条件。`--with-compat` 不等于跨任意版本或构建的通用 ABI；不能只复制不兼容的 `.so`。
+使用目标的匹配源码和原构建参数，按需指定 `native-sync`、`native-config`、`native-bot`、`native-api`、`native-edge`、`native-ban`、`native-auth-guard`、`native-tier`、`native-purge`、`native-log-sync`；统一构建包含全部十个目录。保留目标已有模块、路径和编译参数，并满足 HTTP SSL、线程池、PCRE2 条件。`--with-compat` 不等于跨任意版本或构建的通用 ABI；不能只复制不兼容的 `.so`。
 
 确认兼容后将实际使用的 `.so` 安装到目标模块目录。以下为统一构建中 API/Edge 所需的加载顺序；Auth Guard 没有配置 realm 时保持关闭：
 
@@ -153,7 +153,7 @@ Config/Edge 按相同源码版本一起重编译后，可在站点数据启用 [
 
 ## 原生配置发布与分层缓存
 
-站点/证书同步的额外线程池、私有目录、RSA/Ed25519/mTLS 和受管 bootstrap 见 [发布手册](SYNC-PUBLICATION.zh-CN.md)。L1/L2 缓存读取链和停用 Lua flush 的条件见 [Tier 手册](../native-tier/README.zh-CN.md)。九模块及 Agent/BPF 源摘要均在 SOURCE-SHA256SUMS，完整业务共存测试为 native-tier/tests/coexist.py。
+站点/证书同步的额外线程池、私有目录、RSA/Ed25519/mTLS 和受管 bootstrap 见 [发布手册](SYNC-PUBLICATION.zh-CN.md)。L1/L2 缓存读取链和停用 Lua flush 的条件见 [Tier 手册](../native-tier/README.zh-CN.md)。十模块及 Agent/BPF 源摘要均在 SOURCE-SHA256SUMS，完整业务共存测试为 native-tier/tests/coexist.py。
 
 Tier 0.1.1 同时更新 front/backend 模板、条件头变量、L2 限额协议和默认缓存键。升级先使用独立实例/Socket 与新 cache zone/path 验证，不能让旧、新 Worker 混用同一个后端协议。新增验收为 `native-tier/tests/boundaries.py` 与 `native-sync/tests/cache_tasks.py --tier`；参数同样支持 `--prefix`、`--static`、`--report`。
 

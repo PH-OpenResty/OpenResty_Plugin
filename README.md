@@ -1,6 +1,6 @@
 # OpenResty Plugin
 
-九个纯 C 的 Nginx/OpenResty HTTP 插件：Bot 管理 UA/CIDR、搜索来源与扫描器拒绝；Auth Guard 提供有界登录/注册准入和应用创建前检查；Sync 提供 Master/Node 身份、站点/证书加密发布与热应用、缓存刷新与预热任务；Config/Edge 读取站点数据热更新路由、证书和缓存策略；API 自动识别动态 API、AI 与流式请求；Purge 提供持久化失效、源站校验及过时复用。Nginx/BPF 为 C，Ban Agent 与专用 Ban Store 为 C++17，Auth 后端协作库为 Go。这些原生模块不依赖 Lua，不生成站点 Lua、字节码或 `nginx.conf`。
+十个 Nginx/OpenResty HTTP 插件：Bot 管理 UA/CIDR、搜索来源与扫描器拒绝；Auth Guard 提供有界登录/注册准入和应用创建前检查；Sync 提供 Master/Node 身份、站点/证书加密发布与热应用、缓存刷新与预热任务；Config/Edge 读取站点数据热更新路由、证书和缓存策略；API 自动识别动态 API、AI 与流式请求；Purge 提供持久化失效、源站校验及过时复用；Log Sync 直接向 ES/CH 同步完整/增量 JSON 日志与节点/网络指标。Nginx/BPF 为 C，Ban Agent、Ban Store 和 Log Sync 后台核心为 C++17，Auth 后端协作库为 Go。这些原生模块不依赖 Lua，不生成站点 Lua、字节码或 `nginx.conf`。
 
 | 插件 | 职责 | 文档 |
 | --- | --- | --- |
@@ -14,6 +14,7 @@
 | `libscdn-ban-store.a` | Ban Agent 专用 IP 状态存储，内存索引、可选持久化、批量事务与恢复 | [Ban Store 手册](native-ban-store/README.zh-CN.md) |
 | `ngx_http_scdn_tier_module.so` | 原生热度选层、L1 → L2 → 源站、晋升/冷层保留、对象大小准入与原始到期 | [Tier 完整手册](native-tier/README.zh-CN.md) |
 | `ngx_http_scdn_purge_module.so` | 持久化精确/批量/通配符/正则/后缀/目录/整站/节点失效、源站条件校验、有界过时复用 | [Purge 完整手册](native-purge/README.zh-CN.md) |
+| `ngx_http_scdn_log_sync_module.so` | 后台 ES Bulk/CH JSONEachRow 直写、完整/增量日志、持久游标与重试、节点和 TCP/UDP 指标 | [Log Sync 手册](native-log-sync/README.zh-CN.md) |
 
 Edge 依赖 Config 的 C 接口；一起构建 API 时也调用其判定接口。业务模块必须使用同一源码版本编译，全量动态加载顺序建议 Config → Bot → Ban → Auth Guard → Tier → API → Edge → Purge → Sync；Auth Guard、Bot、Sync、Tier 与 Purge 可独立加载。代理、静态文件与缓存文件管理继续使用 Nginx 自带模块。通用 WAF/CC 限速仍由外部能力承担，Auth Guard 仅处理指定认证路由。
 
@@ -91,7 +92,7 @@ python native-api/tests/integration.py --prefix /tmp/scdn-plugin-nginx --purge -
   --report /tmp/scdn-five-modules-results.json
 ```
 
-系统构建依赖与 OpenResty 构建方式见 [安装文档](docs/INSTALL.zh-CN.md)。脚本固定下载归档并验证 SHA-256，构建九个插件，拒绝覆盖已有安装。
+系统构建依赖与 OpenResty 构建方式见 [安装文档](docs/INSTALL.zh-CN.md)。脚本固定下载归档并验证 SHA-256，构建十个插件，拒绝覆盖已有安装。Log Sync 另需 C++17、json-c、zlib 和 libbpf；可独立加载，默认没有配置文件时不开启后台线程。
 
 ## 配置如何生效
 
