@@ -19,6 +19,8 @@ Edge 依赖 Config 的 C 接口；一起构建 API 时也调用其判定接口�
 
 API 已补齐图片编辑/变体分类、按方法/路径/可选站点的协议别名，以及 Responses/Chat/Gemini/Messages 工具链原始传输回归。显式 [媒体工具](native-api/tools/media_artifact.py)可从已有 JSON/SSE/二进制结果完整解码并保存图片，使用独立 Pillow 依赖；它不在 Worker 解码、不调用模型，也不把文件保存冒充客户端已展示。Bot/注册防护的[设计与种子](docs/BOT-UA-AUTH-GUARD-RESEARCH-DESIGN.zh-CN.md)已有对应运行实现；Auth 必须安装真实应用 hook，当前本机认证短封不持久化、不升级 L3、不跨 Node 同步。
 
+API 的[渠道覆盖核对](docs/API-PROVIDER-COVERAGE-2026-11-18.zh-CN.md)覆盖固定版本 Sub2API 的 13 个具体渠道及组合入口，补齐 GLM v4/Coding、Responses 根别名、AGY 计数和辅助请求、TypeSafe/SystemOne、异步图片/视频/语音及实时入口。规则按方法和路径资源段匹配，目录/用量等辅助接口按普通动态 API 绕过缓存；协议标签不替代上游鉴权或能力检查。
+
 **Sync 0.3.0 已补齐原生站点配置与证书发布/应用。** Master 自动检查完整源快照并按 Node 加密签名，Node 验证、持久准备、热应用并等待全 Worker 确认，失败回退，结果可重报；详见 [发布手册](docs/SYNC-PUBLICATION.zh-CN.md)。这是独立的 native.snapshot.v2 协议，不与旧 Lua JWE/JWS API 混用；迁移需明确交接唯一配置写入权。
 
 Purge 可独立加载，不依赖其他插件，也不修改 Nginx 核心或私有缓存索引。它保证新请求不命中已失效版本，**不表示立即删除磁盘文件**；旧空间仍由 Nginx 管理。接入时必须把实际 cache key 改为 `$scdn_purge_key`。

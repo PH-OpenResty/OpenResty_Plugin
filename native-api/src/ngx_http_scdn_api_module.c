@@ -11,7 +11,8 @@
 
 enum { API_WEB, API_DYNAMIC, API_AI, API_STREAM, API_GRPC, API_WEBSOCKET, API_KINDS };
 enum { API_PROTOCOL_NONE, API_RESPONSES, API_CHAT, API_MESSAGES, API_GEMINI,
-    API_IMAGES, API_AUDIO, API_EMBEDDINGS, API_OLLAMA, API_GENERIC, API_PROTOCOLS };
+    API_IMAGES, API_AUDIO, API_EMBEDDINGS, API_OLLAMA, API_GENERIC,
+    API_SYSTEMONE, API_VIDEOS, API_REALTIME, API_PROTOCOLS };
 
 typedef struct {
     ngx_str_t path, site;
@@ -128,7 +129,8 @@ static ngx_str_t api_protocol_names[] = {
     ngx_string("none"), ngx_string("responses"), ngx_string("chat"),
     ngx_string("messages"), ngx_string("gemini"), ngx_string("images"),
     ngx_string("audio"), ngx_string("embeddings"), ngx_string("ollama"),
-    ngx_string("generic")
+    ngx_string("generic"), ngx_string("systemone"), ngx_string("videos"),
+    ngx_string("realtime")
 };
 
 static char *
@@ -368,26 +370,219 @@ api_suffix(const ngx_str_t *uri, const char *suffix)
         && ngx_memcmp(uri->data + uri->len - length, suffix, length) == 0;
 }
 
-static ngx_uint_t
-api_ai_path(ngx_str_t *uri)
+/* Match backwards so a namespaced suffix does not require scanning every
+ * possible mount prefix. A wildcard consumes exactly one nonempty segment;
+ * no regular expressions, allocations or unbounded subresource matches. */
+static ngx_flag_t
+api_route_match(const ngx_str_t *uri, const char *path, ngx_flag_t exact)
 {
-    static const struct { const char *path; ngx_uint_t protocol; } paths[] = {
-        {"/v1/chat/completions", API_CHAT}, {"/v1/completions", API_CHAT},
-        {"/v1/responses", API_RESPONSES}, {"/v1/messages", API_MESSAGES},
-        {"/v1/embeddings", API_EMBEDDINGS},
-        {"/v1/images/generations", API_IMAGES}, {"/v1/images/edits", API_IMAGES},
-        {"/v1/images/variations", API_IMAGES},
-        {"/v1/audio/transcriptions", API_AUDIO}, {"/v1/audio/translations", API_AUDIO},
-        {"/v1/audio/speech", API_AUDIO}, {"/api/chat", API_OLLAMA},
-        {"/api/generate", API_OLLAMA}, {"/api/embed", API_OLLAMA},
-        {"/api/embeddings", API_OLLAMA}, {":generateContent", API_GEMINI},
-        {":streamGenerateContent", API_GEMINI}, {NULL, API_PROTOCOL_NONE}
+    size_t u = uri->len, p = ngx_strlen(path), end;
+    while (p) {
+        if (path[p - 1] == '*') {
+            end = u;
+            while (u && uri->data[u - 1] != '/') u--;
+            if (u == end) return 0;
+            p--;
+        } else {
+            if (!u || uri->data[u - 1] != (u_char) path[p - 1]) return 0;
+            u--; p--;
+        }
+    }
+    return !exact || u == 0;
+}
+
+static ngx_flag_t
+api_responses_subpath(const ngx_str_t *uri)
+{
+    u_char *at = uri->data, *end = uri->data + uri->len, *part, *p;
+    ngx_str_t prefix;
+    ngx_uint_t segments;
+    size_t length;
+    ngx_flag_t non_dot;
+    /* Sub2API explicitly forwards POST Responses descendants. Match its bounded
+     * path contract: at most eight inert ASCII segments of 128 bytes each. */
+    while (at < end) {
+        at = (u_char *) ngx_strnstr(at, "/responses/", end - at);
+        if (at == NULL) return 0;
+        prefix.data = uri->data; prefix.len = at - uri->data;
+        part = at + sizeof("/responses/") - 1;
+        at = part;
+        if (prefix.len && !api_suffix(&prefix, "/v1")
+            && !api_suffix(&prefix, "/backend-api/codex")) continue;
+        segments = 0;
+        while (part < end) {
+            length = 0; non_dot = 0;
+            for (p = part; p < end && *p != '/'; p++) {
+                if (!((*p >= 'a' && *p <= 'z') || (*p >= 'A' && *p <= 'Z')
+                    || (*p >= '0' && *p <= '9') || *p == '_' || *p == '-' || *p == '.')) return 0;
+                length++; non_dot |= *p != '.';
+                if (length > 128) return 0;
+            }
+            if (!non_dot || ++segments > 8) return 0;
+            part = p < end ? p + 1 : end;
+        }
+        return 1;
+    }
+    return 0;
+}
+
+static ngx_flag_t
+api_builtin_path(ngx_http_request_t *r, api_request_t *ctx)
+{
+    static const struct {
+        const char *path;
+        ngx_uint_t methods, protocol, kind;
+        ngx_flag_t exact;
+    } paths[] = {
+#define API_READ (NGX_HTTP_GET|NGX_HTTP_HEAD)
+#define API_WRITE (NGX_HTTP_POST|NGX_HTTP_PATCH|NGX_HTTP_DELETE)
+#define API_ROUTE(path, method, protocol) {path, method, protocol, API_AI, 0}
+#define API_ROOT(path, method, protocol) {path, method, protocol, API_AI, 1}
+#define API_META(path, method, protocol) {path, method, protocol, API_DYNAMIC, 0}
+#define API_ROOT_META(path, method, protocol) {path, method, protocol, API_DYNAMIC, 1}
+        API_ROUTE("/v1/chat/completions", NGX_HTTP_POST, API_CHAT),
+        API_ROUTE("/v1/completions", NGX_HTTP_POST, API_CHAT),
+        API_ROUTE("/v1/responses", NGX_HTTP_POST|API_READ, API_RESPONSES),
+        API_ROUTE("/v1/responses/compact", NGX_HTTP_POST, API_RESPONSES),
+        API_ROUTE("/v1/responses/input_tokens", NGX_HTTP_POST, API_RESPONSES),
+        API_ROUTE("/v1/responses/*/cancel", NGX_HTTP_POST, API_RESPONSES),
+        API_ROUTE("/v1/responses/*/input_items", API_READ, API_RESPONSES),
+        API_ROUTE("/v1/responses/*", API_READ|NGX_HTTP_DELETE, API_RESPONSES),
+        API_ROOT("/responses", NGX_HTTP_POST|API_READ, API_RESPONSES),
+        API_ROOT("/responses/compact", NGX_HTTP_POST, API_RESPONSES),
+        API_ROOT("/responses/input_tokens", NGX_HTTP_POST, API_RESPONSES),
+        API_ROUTE("/backend-api/codex/responses", NGX_HTTP_POST|API_READ, API_RESPONSES),
+        API_ROUTE("/backend-api/codex/responses/compact", NGX_HTTP_POST, API_RESPONSES),
+        API_ROUTE("/backend-api/codex/responses/input_tokens", NGX_HTTP_POST, API_RESPONSES),
+        API_ROUTE("/v1/messages", NGX_HTTP_POST, API_MESSAGES),
+        API_ROUTE("/v1/messages/count_tokens", NGX_HTTP_POST, API_MESSAGES),
+        API_ROOT("/messages/count_tokens", NGX_HTTP_POST, API_MESSAGES),
+        API_ROUTE("/v1/embeddings", NGX_HTTP_POST, API_EMBEDDINGS),
+        API_ROOT("/chat/completions", NGX_HTTP_POST, API_CHAT),
+        API_ROOT("/embeddings", NGX_HTTP_POST, API_EMBEDDINGS),
+        /* GLM pay-as-you-go and Coding Plan use v4, without a /v1 segment. */
+        API_ROUTE("/api/paas/v4/chat/completions", NGX_HTTP_POST, API_CHAT),
+        API_ROUTE("/api/coding/paas/v4/chat/completions", NGX_HTTP_POST, API_CHAT),
+        API_ROUTE("/v1/systemone", NGX_HTTP_POST, API_SYSTEMONE),
+        API_ROUTE("/v1/images/generations", NGX_HTTP_POST, API_IMAGES),
+        API_ROUTE("/v1/images/edits", NGX_HTTP_POST, API_IMAGES),
+        API_ROUTE("/v1/images/variations", NGX_HTTP_POST, API_IMAGES),
+        API_ROUTE("/v1/images/generations/async", NGX_HTTP_POST, API_IMAGES),
+        API_ROUTE("/v1/images/edits/async", NGX_HTTP_POST, API_IMAGES),
+        API_ROUTE("/v1/images/tasks/*", API_READ, API_IMAGES),
+        API_ROUTE("/v1/images/batches", NGX_HTTP_POST|API_READ, API_IMAGES),
+        API_ROUTE("/v1/images/batches/*", API_READ|NGX_HTTP_DELETE, API_IMAGES),
+        API_ROUTE("/v1/images/batches/*/items", API_READ, API_IMAGES),
+        API_ROUTE("/v1/images/batches/*/items/*/content", API_READ, API_IMAGES),
+        API_ROUTE("/v1/images/batches/*/download", API_READ, API_IMAGES),
+        API_ROUTE("/v1/images/batches/*/cancel", NGX_HTTP_POST, API_IMAGES),
+        API_ROUTE("/v1/images/batches/*/outputs", NGX_HTTP_DELETE, API_IMAGES),
+        API_ROOT("/images/generations", NGX_HTTP_POST, API_IMAGES),
+        API_ROOT("/images/edits", NGX_HTTP_POST, API_IMAGES),
+        API_ROOT("/images/generations/async", NGX_HTTP_POST, API_IMAGES),
+        API_ROOT("/images/edits/async", NGX_HTTP_POST, API_IMAGES),
+        API_ROOT("/images/tasks/*", API_READ, API_IMAGES),
+        API_ROUTE("/v1/videos", NGX_HTTP_POST, API_VIDEOS),
+        API_ROUTE("/v1/videos/generations", NGX_HTTP_POST, API_VIDEOS),
+        API_ROUTE("/v1/videos/edits", NGX_HTTP_POST, API_VIDEOS),
+        API_ROUTE("/v1/videos/extensions", NGX_HTTP_POST, API_VIDEOS),
+        API_ROUTE("/v1/videos/*", API_READ, API_VIDEOS),
+        API_ROUTE("/v1/videos/*/content", API_READ, API_VIDEOS),
+        API_ROUTE("/v1/videos/generations/*", API_READ, API_VIDEOS),
+        API_ROUTE("/v1/videos/edits/*", API_READ, API_VIDEOS),
+        API_ROUTE("/v1/videos/extensions/*", API_READ, API_VIDEOS),
+        API_ROUTE("/v1/videos/generations/*/content", API_READ, API_VIDEOS),
+        API_ROUTE("/v1/videos/edits/*/content", API_READ, API_VIDEOS),
+        API_ROUTE("/v1/videos/extensions/*/content", API_READ, API_VIDEOS),
+        API_ROOT("/videos", NGX_HTTP_POST, API_VIDEOS),
+        API_ROOT("/videos/generations", NGX_HTTP_POST, API_VIDEOS),
+        API_ROOT("/videos/edits", NGX_HTTP_POST, API_VIDEOS),
+        API_ROOT("/videos/extensions", NGX_HTTP_POST, API_VIDEOS),
+        API_ROOT("/videos/*", API_READ, API_VIDEOS),
+        API_ROOT("/videos/*/content", API_READ, API_VIDEOS),
+        API_ROOT("/videos/generations/*", API_READ, API_VIDEOS),
+        API_ROOT("/videos/edits/*", API_READ, API_VIDEOS),
+        API_ROOT("/videos/extensions/*", API_READ, API_VIDEOS),
+        API_ROOT("/videos/generations/*/content", API_READ, API_VIDEOS),
+        API_ROOT("/videos/edits/*/content", API_READ, API_VIDEOS),
+        API_ROOT("/videos/extensions/*/content", API_READ, API_VIDEOS),
+        API_ROUTE("/contents/generations/tasks", NGX_HTTP_POST, API_VIDEOS),
+        API_ROUTE("/contents/generations/tasks/*", API_READ|NGX_HTTP_DELETE, API_VIDEOS),
+        API_ROUTE("/v1/audio/transcriptions", NGX_HTTP_POST, API_AUDIO),
+        API_ROUTE("/v1/audio/translations", NGX_HTTP_POST, API_AUDIO),
+        API_ROUTE("/v1/audio/speech", NGX_HTTP_POST, API_AUDIO),
+        API_ROUTE("/v1/tts", NGX_HTTP_POST, API_AUDIO),
+        API_ROUTE("/v1/stt", NGX_HTTP_POST, API_AUDIO),
+        API_ROUTE("/v1/custom-voices", NGX_HTTP_POST|API_READ, API_AUDIO),
+        API_ROUTE("/v1/custom-voices/*", API_READ|NGX_HTTP_PATCH|NGX_HTTP_DELETE, API_AUDIO),
+        API_ROUTE("/v1/custom-voices/*/audio", API_READ, API_AUDIO),
+        API_ROOT("/tts", NGX_HTTP_POST, API_AUDIO),
+        API_ROOT("/stt", NGX_HTTP_POST, API_AUDIO),
+        API_ROOT("/custom-voices", NGX_HTTP_POST|API_READ, API_AUDIO),
+        API_ROOT("/custom-voices/*", API_READ|NGX_HTTP_PATCH|NGX_HTTP_DELETE, API_AUDIO),
+        API_ROOT("/custom-voices/*/audio", API_READ, API_AUDIO),
+        API_ROUTE("/v1/live", NGX_HTTP_POST, API_REALTIME),
+        API_ROUTE("/v1/live/*", API_READ, API_REALTIME),
+        API_ROUTE("/v1/realtime", API_READ, API_REALTIME),
+        API_ROOT("/realtime", API_READ, API_REALTIME),
+        API_ROUTE("/backend-api/codex/realtime/calls", NGX_HTTP_POST, API_REALTIME),
+        API_ROUTE("/v1/alpha/search", NGX_HTTP_POST, API_GENERIC),
+        API_ROOT("/alpha/search", NGX_HTTP_POST, API_GENERIC),
+        API_ROUTE("/backend-api/codex/alpha/search", NGX_HTTP_POST, API_GENERIC),
+        API_ROUTE("/v1/web_search", NGX_HTTP_POST, API_GENERIC),
+        API_ROUTE("/v1/x_search", NGX_HTTP_POST, API_GENERIC),
+        API_ROOT("/web_search", NGX_HTTP_POST, API_GENERIC),
+        API_ROOT("/x_search", NGX_HTTP_POST, API_GENERIC),
+        API_ROUTE("/api/chat", NGX_HTTP_POST, API_OLLAMA),
+        API_ROUTE("/api/generate", NGX_HTTP_POST, API_OLLAMA),
+        API_ROUTE("/api/embed", NGX_HTTP_POST, API_OLLAMA),
+        API_ROUTE("/api/embeddings", NGX_HTTP_POST, API_OLLAMA),
+        API_ROUTE(":generateContent", NGX_HTTP_POST, API_GEMINI),
+        API_ROUTE(":streamGenerateContent", NGX_HTTP_POST, API_GEMINI),
+        API_ROUTE(":countTokens", NGX_HTTP_POST, API_GEMINI),
+        /* Model catalogs, usage and initialization are dynamic API traffic,
+         * without forcing the long-running generation profile. */
+        API_META("/v1/models", API_READ, API_GENERIC),
+        API_META("/v1/models/*", API_READ, API_GENERIC),
+        API_META("/v1/usage", API_READ, API_GENERIC),
+        API_META("/v1/sub2api/billing", API_READ, API_GENERIC),
+        API_ROOT_META("/models", API_READ, API_GENERIC),
+        API_ROOT_META("/models/*", API_READ, API_GENERIC),
+        API_META("/antigravity/models", API_READ, API_GEMINI),
+        API_META("/v1beta/models", API_READ, API_GEMINI),
+        API_META("/v1beta/models/*", API_READ, API_GEMINI),
+        API_META("/v1beta/cachedContents", API_READ|API_WRITE, API_GEMINI),
+        API_META("/v1beta/cachedContents/*", API_READ|NGX_HTTP_PATCH|NGX_HTTP_DELETE, API_GEMINI),
+        API_META("/v1internal:fetchAvailableModels", NGX_HTTP_POST, API_GEMINI),
+        API_META("/v1internal:loadCodeAssist", NGX_HTTP_POST, API_GEMINI),
+        API_META("/v1internal:onboardUser", NGX_HTTP_POST, API_GEMINI),
+        API_META("/backend-api/codex/models", API_READ, API_GENERIC),
+        API_ROUTE("/backend-api/codex/*", API_READ, API_REALTIME)
+#undef API_READ
+#undef API_WRITE
+#undef API_ROUTE
+#undef API_ROOT
+#undef API_META
+#undef API_ROOT_META
     };
     ngx_uint_t i;
-    for (i = 0; paths[i].path != NULL; i++) {
-        if (api_suffix(uri, paths[i].path)) return paths[i].protocol;
+    for (i = 0; i < sizeof(paths) / sizeof(paths[0]); i++) {
+        if ((r->method & paths[i].methods)
+            && api_route_match(&r->uri, paths[i].path, paths[i].exact)) {
+            ctx->protocol = paths[i].protocol;
+            ctx->kind = paths[i].kind;
+            if (ctx->kind == API_AI) { ngx_str_set(&ctx->reason, "ai_endpoint"); }
+            else { ngx_str_set(&ctx->reason, "api_endpoint"); }
+            return 1;
+        }
     }
-    return API_PROTOCOL_NONE;
+    if (r->method == NGX_HTTP_POST && api_responses_subpath(&r->uri)) {
+        ctx->protocol = API_RESPONSES;
+        ctx->kind = API_AI;
+        ngx_str_set(&ctx->reason, "ai_endpoint");
+        return 1;
+    }
+    return 0;
 }
 
 static ngx_uint_t
@@ -480,9 +675,10 @@ api_classify_headers(ngx_http_request_t *r, api_request_t *ctx)
     ctx->protocol = api_configured_path(r);
     if (ctx->protocol) api_set_kind(ctx, API_AI, "configured_endpoint");
     else {
-        ctx->protocol = api_ai_path(&r->uri);
-        if (!ctx->protocol && anthropic) ctx->protocol = API_MESSAGES;
-        if (ctx->protocol) api_set_kind(ctx, API_AI, "ai_endpoint");
+        if (!api_builtin_path(r, ctx) && anthropic) {
+            ctx->protocol = API_MESSAGES;
+            api_set_kind(ctx, API_AI, "ai_endpoint");
+        }
     }
     if (content && (api_mime(&content->value, "application/grpc")
         || api_contains(&content->value, "application/grpc+"))) {
@@ -559,7 +755,7 @@ ngx_http_scdn_api_prepare(ngx_http_request_t *r)
     if (ctx->prepared) { return NGX_DECLINED; }
     api_classify_headers(r, ctx);
     encoding = api_find_header(r, "content-encoding");
-    if (r != r->main || ctx->kind == API_AI || ctx->kind == API_GRPC
+    if (r != r->main || ctx->protocol != API_PROTOCOL_NONE || ctx->kind == API_GRPC
         || ctx->kind == API_WEBSOCKET || conf->inspect == 0
         || r->headers_in.content_type == NULL
         || !api_json_mime(&r->headers_in.content_type->value)

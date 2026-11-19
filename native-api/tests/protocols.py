@@ -90,8 +90,8 @@ def main():
         do_POST=respond
         do_GET=respond
     fixture.Origin=Origin
-    rules='''scdn_api_endpoint responses POST /responses plain;
- scdn_api_endpoint responses POST /responses/compact plain;
+    rules='''scdn_api_endpoint responses POST /scoped-responses plain;
+ scdn_api_endpoint responses POST /scoped-responses/compact plain;
  scdn_api_endpoint responses GET /v1/responses/* plain;
  scdn_api_endpoint images POST /images/edits plain;
  scdn_api_endpoint images POST /v1/images/edits/async plain;
@@ -152,20 +152,20 @@ def main():
                 response=connection.getresponse();data=response.read();headers=dict((k.lower(),v) for k,v in response.getheaders());connection.close()
                 check('streaming upload reaches origin before finish '+str(chunked),arrived)
                 check('streaming upload body exact '+str(chunked),headers.get('x-request-hash')==hashlib.sha256(upload).hexdigest() and data==wire['images'])
-            for path,method,protocol in [('/responses','POST','responses'),('/responses/compact','POST','responses'),('/images/edits','POST','images'),
+            for path,method,protocol in [('/scoped-responses','POST','responses'),('/scoped-responses/compact','POST','responses'),('/images/edits','POST','images'),
                     ('/v1/images/edits/async','POST','images'),('/v1/images/tasks/task_1','GET','images'),
                     ('/v1/responses/resp_1','GET','responses'),('/vendor/messages','POST','messages'),('/vendor/other','POST','generic')]:
                 status,headers,_=review.request(path,method,b'opaque' if method=='POST' else None,{'X-Wire-Fixture':'responses','Content-Type':'application/octet-stream'})
                 check('registered method/site alias '+path,status==200 and headers.get('x-protocol')==protocol and headers.get('x-reason')=='configured_endpoint')
             status,headers,_=review.request('/maximum-site','POST',b'opaque',{'X-Wire-Fixture':'responses'},host='maximum-site.example.test')
             check('maximum Config site identifier length is supported',status==200 and headers.get('x-protocol')=='responses')
-            for path,method,host in [('/responses','GET','www.example.test'),('/responses','POST','tls.example.test'),
+            for path,method,host in [('/scoped-responses','GET','www.example.test'),('/scoped-responses','POST','tls.example.test'),
                     ('/v1/images/edits-extra','POST','www.example.test'),('/vendor','POST','www.example.test')]:
                 status,headers,_=review.request(path,method,b'opaque' if method=='POST' else None,{'X-Wire-Fixture':'responses','Content-Type':'application/octet-stream'},host=host)
                 check('no overbroad classification '+path+method+host,status==200 and headers.get('x-protocol')=='none' and headers.get('x-kind')!='ai')
             config=review.config()
             for invalid in ('scdn_api_endpoint unknown POST /invalid;', 'scdn_api_endpoint responses BAD /invalid;',
-                    'scdn_api_endpoint responses POST /bad*path;', 'scdn_api_endpoint responses POST /responses plain;',
+                    'scdn_api_endpoint responses POST /bad*path;', 'scdn_api_endpoint responses POST /scoped-responses plain;',
                     'scdn_api_endpoint responses POST /invalid '+('A'*97)+';'):
                 bad=Path(directory)/'invalid.conf';bad.write_text(config.replace('scdn_api_zone api_counters 64k;', 'scdn_api_zone api_counters 64k; '+invalid))
                 result=subprocess.run([str(review.nginx),'-t','-p',directory+'/', '-c',str(bad)],capture_output=True)

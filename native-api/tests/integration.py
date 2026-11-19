@@ -581,7 +581,7 @@ http {{
             if accept:
                 request_headers['Accept'] = 'text/event-stream'
             started = time.monotonic()
-            connection.request('GET', path, headers=request_headers)
+            connection.request('POST' if expected == 'ai' else 'GET', path, headers=request_headers)
             response = connection.getresponse()
             first = response.readline()
             first_elapsed = time.monotonic() - started

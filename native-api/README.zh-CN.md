@@ -71,7 +71,11 @@ proxy_no_cache $scdn_api_skip_cache;
 | WebSocket Upgrade | `websocket` | HTTP/1.1 Upgrade profile，保留双向数据通道 |
 | 缺少以上信号 | `web` | 保留普通站点代理和公共资源缓存能力 |
 
-模型端点包括常见 Chat Completions、Responses、Messages、Embeddings、图片/音频接口、Ollama `/api/chat` 和 `/api/generate`，以及 Gemini `:generateContent` / `:streamGenerateContent`。匹配规范化 URI 的大小写敏感端点后缀，不在任意正文字符串里搜索这些词。
+模型端点包括 Chat Completions、Responses/compact/input_tokens、Messages/count_tokens、Embeddings、图片异步任务/批次、视频任务/内容、语音、自定义声音、Realtime、TypeSafe/SystemOne、Ollama 和 Gemini/AGY `:generateContent` / `:streamGenerateContent` / `:countTokens`。GLM 国内/国际按量与 Coding 的 `/api/paas/v4/chat/completions`、`/api/coding/paas/v4/chat/completions` 已内置；OpenCode Go/Zen/Inference、MiniMax、Kimi、DeepSeek、Command Code、Cline 的已核对路径见[完整渠道覆盖表](../docs/API-PROVIDER-COVERAGE-2026-11-18.zh-CN.md)。
+
+规则同时检查 HTTP 方法和大小写敏感的规范化 URI。带 `/v1/`、GLM 等明确命名空间的路径沿用部署前缀兼容；`/responses`、`/responses/compact`、`/chat/completions` 等无版本根别名只精确匹配根路径。动态资源段只匹配一段非空路径，不吞掉额外子目录。查询参数不参与路径识别，不在任意正文字符串里搜索端点词。
+
+模型目录、用量、Sub2API billing、Gemini cachedContents 和 AGY `fetchAvailableModels/loadCodeAssist/onboardUser` 在读取正文前识别为普通动态 API，并带协议元数据，绕过公共缓存；这些辅助操作继续使用普通 API profile。生成、计数与媒体原始传输使用 AI profile；WebSocket/gRPC 的专用代理选择仍优先于 AI。
 
 这是可解释的协议与结构识别，不是业务语义证明。自定义二进制协议、压缩请求体、大型或分块 JSON、非标准字段、完全不透明的接口，可能只能判为普通 API；收到 SSE 也不能证明使用了 AI。识别结果只用于代理策略，不作为授权、计费或安全白名单。
 
@@ -105,8 +109,8 @@ profile 未配置时使用 Edge 原有的代理 location。不要把不存在的
 | 变量 | 内容 |
 | --- | --- |
 | `$scdn_api_kind` | `web/api/ai/stream/grpc/websocket` |
-| `$scdn_api_reason` | `default/request_api/accept_sse/ai_endpoint/configured_endpoint/json_schema/grpc_content_type/websocket_upgrade/response_stream/response_json` |
-| `$scdn_api_protocol` | `none/responses/chat/messages/gemini/images/audio/embeddings/ollama/generic`；分类元数据，不是身份或授权 |
+| `$scdn_api_reason` | `default/request_api/accept_sse/ai_endpoint/api_endpoint/configured_endpoint/json_schema/grpc_content_type/websocket_upgrade/response_stream/response_json` |
+| `$scdn_api_protocol` | `none/responses/chat/messages/gemini/images/audio/embeddings/ollama/generic/systemone/videos/realtime`；分类元数据，不是身份或授权 |
 | `$scdn_api_skip_cache` | 非公共 web 请求或携带身份/禁止缓存信号时为 1，否则 0 |
 | `$scdn_api_stream` | 已有明确流式信号时为 1，否则 0；AI 非流式调用也可为 0 |
 | `$scdn_api_connection` | WebSocket 时为 `upgrade`，其他请求为空 |
@@ -116,15 +120,15 @@ profile 未配置时使用 Edge 原有的代理 location。不要把不存在的
 
 ## 协议别名与原始工具链
 
-内置端点采用原有规范化 URI 后缀约定。上游的根路径、compact、异步任务或自定义入口需要管理员明确登记，例如：
+已核对的根路径、compact、异步图片、视频与语音任务具有内置规则；自定义挂载或未登记协议入口仍可由管理员显式配置，例如：
 
 ```nginx
-scdn_api_endpoint responses POST /responses api-site;
-scdn_api_endpoint responses POST /responses/compact api-site;
-scdn_api_endpoint responses GET /v1/responses/* api-site;
-scdn_api_endpoint images POST /images/edits api-site;
-scdn_api_endpoint images POST /v1/images/edits/async api-site;
-scdn_api_endpoint images GET /v1/images/tasks/* api-site;
+scdn_api_endpoint responses POST /vendor/responses api-site;
+scdn_api_endpoint responses POST /vendor/responses/compact api-site;
+scdn_api_endpoint responses GET /vendor/responses/* api-site;
+scdn_api_endpoint images POST /vendor/images/edits api-site;
+scdn_api_endpoint systemone POST /vendor/decision api-site;
+scdn_api_endpoint videos POST /vendor/render api-site;
 ```
 
 `SITE_ID` 来自 Config/Edge 的稳定站点 ID，不能由客户端头选择。省略时作用于该 Nginx 配置作用域，适合独立 server/location。未加载 Edge 时带站点的规则不匹配。子配置追加父配置规则；重复的方法、路径、站点组合拒绝启动；最长路径优先，同长度优先站点规则。显式配置先于内置端点识别，尾部 `/*` 只匹配带该目录边界的路径，不是正则。
@@ -148,7 +152,7 @@ python native-api/tools/media_artifact.py --input /tmp/image-response.json --out
 
 输出包含 `manifest_path`、图片文件和 `preview_markdown`，其中 `attachment_emitted=false`、`client_display_verified=false`。调用方仍须通过自己支持的附件接口返回图片，或展示真实绝对本地路径。文件落在服务器上时不能把该路径当作用户电脑的路径；只有路径不等于附件，Base64、HTTP 200 或文字“已生成”也不等于已展示。
 
-测试均使用本地确定性图片与隔离 origin，不需要厂商凭据。运行 `native-api/tests/protocols.py --prefix /tmp/isolated/runtime --report /tmp/protocols.json` 和 `native-api/tests/media_artifact.py --report /tmp/media.json`；前者支持 `--static`，覆盖四协议 raw、签名/工具结果、未知事件、大图片、定长/分块提前上传、站点别名和错误配置；后者验证提取、解码、部分失败、预算和 URL/输出边界。
+测试均使用本地确定性图片与隔离 origin，不需要厂商凭据。运行 `native-api/tests/protocols.py --prefix /tmp/isolated/runtime --report /tmp/protocols.json` 和 `native-api/tests/media_artifact.py --report /tmp/media.json`；前者支持 `--static`，覆盖四协议 raw、签名/工具结果、未知事件、大图片、定长/分块提前上传、站点别名和错误配置；后者验证提取、解码、部分失败、预算和 URL/输出边界。渠道覆盖回归为 `native-api/tests/providers.py --prefix /tmp/isolated/runtime --report /tmp/providers.json`，同样支持 `--static`，使用固定上游目录与真实路由样本，在关闭正文嗅探时验证分类、原始传输、方法/资源段边界、早期上传和 WebSocket。
 
 ## 流式、超时与取消
 

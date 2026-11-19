@@ -1,0 +1,379 @@
+{
+  "date": "2026-11-18",
+  "source": {
+    "repository": "Wei-Shaw/sub2api",
+    "revision": "2af3f1e15c98c893a89255a037f551046883b8c0",
+    "catalog_path": "frontend/src/constants/platformCatalog.builtin.json",
+    "catalog_sha256": "4b623716857f74de963940450e3bc8e0542f4dcdefefac94cac46da243d3bbc2"
+  },
+  "platforms": [
+    {
+      "id": "anthropic",
+      "name": "Anthropic",
+      "requests": [
+        {
+          "mode": "default",
+          "method": "POST",
+          "url": "https://api.anthropic.com/v1/messages",
+          "protocol": "messages"
+        }
+      ]
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "requests": [
+        {
+          "mode": "default",
+          "method": "POST",
+          "url": "https://api.openai.com/v1/responses",
+          "protocol": "responses"
+        },
+        {
+          "mode": "default",
+          "method": "POST",
+          "url": "https://chatgpt.com/backend-api/codex/responses",
+          "protocol": "responses"
+        }
+      ]
+    },
+    {
+      "id": "gemini",
+      "name": "Gemini",
+      "requests": [
+        {
+          "mode": "default",
+          "method": "POST",
+          "url": "https://generativelanguage.googleapis.com/v1beta/models/example:generateContent",
+          "protocol": "gemini"
+        },
+        {
+          "mode": "default",
+          "method": "POST",
+          "url": "https://generativelanguage.googleapis.com/v1beta/models/example:streamGenerateContent?alt=sse",
+          "protocol": "gemini"
+        }
+      ]
+    },
+    {
+      "id": "antigravity",
+      "name": "Antigravity",
+      "requests": [
+        {
+          "mode": "default",
+          "method": "POST",
+          "url": "https://cloudcode-pa.googleapis.com/v1internal:generateContent",
+          "protocol": "gemini"
+        },
+        {
+          "mode": "default",
+          "method": "POST",
+          "url": "https://cloudcode-pa.googleapis.com/v1internal:streamGenerateContent?alt=sse",
+          "protocol": "gemini"
+        },
+        {
+          "mode": "default",
+          "method": "POST",
+          "url": "https://gateway.example.test/antigravity/v1/messages",
+          "protocol": "messages"
+        }
+      ]
+    },
+    {
+      "id": "grok",
+      "name": "Grok",
+      "requests": [
+        {
+          "mode": "default",
+          "method": "POST",
+          "url": "https://api.x.ai/v1/responses",
+          "protocol": "responses"
+        },
+        {
+          "mode": "default",
+          "method": "POST",
+          "url": "https://api.x.ai/v1/chat/completions",
+          "protocol": "chat"
+        }
+      ]
+    },
+    {
+      "id": "kimi",
+      "name": "Kimi",
+      "requests": [
+        {
+          "mode": "payg",
+          "method": "POST",
+          "url": "https://api.moonshot.cn/anthropic/v1/messages",
+          "protocol": "messages"
+        },
+        {
+          "mode": "payg",
+          "method": "POST",
+          "url": "https://api.moonshot.cn/v1/chat/completions",
+          "protocol": "chat"
+        },
+        {
+          "mode": "payg",
+          "method": "POST",
+          "url": "https://api.moonshot.cn/v1/responses",
+          "protocol": "responses"
+        },
+        {
+          "mode": "coding",
+          "method": "POST",
+          "url": "https://api.kimi.com/coding/v1/messages",
+          "protocol": "messages"
+        },
+        {
+          "mode": "coding",
+          "method": "POST",
+          "url": "https://api.kimi.com/coding/v1/chat/completions",
+          "protocol": "chat"
+        },
+        {
+          "mode": "coding",
+          "method": "POST",
+          "url": "https://api.kimi.com/coding/v1/responses",
+          "protocol": "responses"
+        }
+      ]
+    },
+    {
+      "id": "zhipu",
+      "name": "Zhipu GLM",
+      "requests": [
+        {
+          "mode": "payg",
+          "method": "POST",
+          "url": "https://open.bigmodel.cn/api/anthropic/v1/messages",
+          "protocol": "messages"
+        },
+        {
+          "mode": "payg",
+          "method": "POST",
+          "url": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+          "protocol": "chat"
+        },
+        {
+          "mode": "coding",
+          "method": "POST",
+          "url": "https://open.bigmodel.cn/api/anthropic/v1/messages",
+          "protocol": "messages"
+        },
+        {
+          "mode": "coding",
+          "method": "POST",
+          "url": "https://open.bigmodel.cn/api/coding/paas/v4/chat/completions",
+          "protocol": "chat"
+        }
+      ]
+    },
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "requests": [
+        {
+          "mode": "payg",
+          "method": "POST",
+          "url": "https://api.deepseek.com/anthropic/v1/messages",
+          "protocol": "messages"
+        },
+        {
+          "mode": "payg",
+          "method": "POST",
+          "url": "https://api.deepseek.com/v1/chat/completions",
+          "protocol": "chat"
+        },
+        {
+          "mode": "payg",
+          "method": "POST",
+          "url": "https://api.deepseek.com/responses",
+          "protocol": "responses"
+        }
+      ]
+    },
+    {
+      "id": "minimax",
+      "name": "MiniMax",
+      "requests": [
+        {
+          "mode": "payg",
+          "method": "POST",
+          "url": "https://api.minimaxi.com/anthropic/v1/messages",
+          "protocol": "messages"
+        },
+        {
+          "mode": "payg",
+          "method": "POST",
+          "url": "https://api.minimaxi.com/v1/chat/completions",
+          "protocol": "chat"
+        },
+        {
+          "mode": "payg",
+          "method": "POST",
+          "url": "https://api.minimaxi.com/v1/responses",
+          "protocol": "responses"
+        },
+        {
+          "mode": "coding",
+          "method": "POST",
+          "url": "https://api.minimaxi.com/anthropic/v1/messages",
+          "protocol": "messages"
+        },
+        {
+          "mode": "coding",
+          "method": "POST",
+          "url": "https://api.minimaxi.com/v1/chat/completions",
+          "protocol": "chat"
+        },
+        {
+          "mode": "coding",
+          "method": "POST",
+          "url": "https://api.minimaxi.com/v1/responses",
+          "protocol": "responses"
+        }
+      ]
+    },
+    {
+      "id": "opencode_go",
+      "name": "OpenCode",
+      "requests": [
+        {
+          "mode": "go",
+          "method": "POST",
+          "url": "https://opencode.ai/zen/go/v1/messages",
+          "protocol": "messages"
+        },
+        {
+          "mode": "go",
+          "method": "POST",
+          "url": "https://opencode.ai/zen/go/v1/chat/completions",
+          "protocol": "chat"
+        },
+        {
+          "mode": "go",
+          "method": "POST",
+          "url": "https://opencode.ai/zen/go/v1/responses",
+          "protocol": "responses"
+        },
+        {
+          "mode": "zen",
+          "method": "POST",
+          "url": "https://opencode.ai/zen/v1/messages",
+          "protocol": "messages"
+        },
+        {
+          "mode": "zen",
+          "method": "POST",
+          "url": "https://opencode.ai/zen/v1/chat/completions",
+          "protocol": "chat"
+        },
+        {
+          "mode": "zen",
+          "method": "POST",
+          "url": "https://opencode.ai/zen/v1/responses",
+          "protocol": "responses"
+        }
+      ]
+    },
+    {
+      "id": "typesafe",
+      "name": "TypeSafe / Jev",
+      "requests": [
+        {
+          "mode": "default",
+          "method": "POST",
+          "url": "https://api.typesafe.ai/v1/systemone",
+          "protocol": "systemone"
+        }
+      ]
+    },
+    {
+      "id": "command_code",
+      "name": "Command Code",
+      "requests": [
+        {
+          "mode": "payg",
+          "method": "POST",
+          "url": "https://api.commandcode.ai/provider/v1/messages",
+          "protocol": "messages"
+        },
+        {
+          "mode": "payg",
+          "method": "POST",
+          "url": "https://api.commandcode.ai/provider/v1/chat/completions",
+          "protocol": "chat"
+        },
+        {
+          "mode": "payg",
+          "method": "POST",
+          "url": "https://api.commandcode.ai/provider/v1/responses",
+          "protocol": "responses"
+        }
+      ]
+    },
+    {
+      "id": "cline",
+      "name": "Cline",
+      "requests": [
+        {
+          "mode": "payg",
+          "method": "POST",
+          "url": "https://api.cline.bot/api/v1/chat/completions",
+          "protocol": "chat"
+        }
+      ]
+    }
+  ],
+  "official_variants": [
+    {
+      "provider": "zhipu",
+      "method": "POST",
+      "url": "https://api.z.ai/api/paas/v4/chat/completions",
+      "protocol": "chat"
+    },
+    {
+      "provider": "zhipu",
+      "method": "POST",
+      "url": "https://api.z.ai/api/coding/paas/v4/chat/completions",
+      "protocol": "chat"
+    },
+    {
+      "provider": "minimax",
+      "method": "POST",
+      "url": "https://api.minimax.io/v1/chat/completions",
+      "protocol": "chat"
+    },
+    {
+      "provider": "minimax",
+      "method": "POST",
+      "url": "https://api.minimax.io/anthropic/v1/messages",
+      "protocol": "messages"
+    },
+    {
+      "provider": "opencode_go",
+      "method": "POST",
+      "url": "https://opencode.ai/inference/openai/v1/responses",
+      "protocol": "responses"
+    },
+    {
+      "provider": "opencode_go",
+      "method": "POST",
+      "url": "https://opencode.ai/inference/anthropic/v1/messages",
+      "protocol": "messages"
+    },
+    {
+      "provider": "opencode_go",
+      "method": "POST",
+      "url": "https://opencode.ai/inference/systemone/v1/systemone",
+      "protocol": "systemone"
+    },
+    {
+      "provider": "opencode_go",
+      "method": "POST",
+      "url": "https://opencode.ai/inference/google/v1beta/models/example:generateContent",
+      "protocol": "gemini"
+    }
+  ]
+}
