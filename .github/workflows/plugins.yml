@@ -195,6 +195,7 @@ jobs:
           if [ "$PLUGIN_LINKAGE" = static ]; then extra+=(--static); fi
           python native-api/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/api-results.json"
           python native-api/tests/protocols.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/api-protocol-results.json"
+          python native-api/tests/providers.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/api-provider-results.json"
           python native-api/tests/media_artifact.py --report "$RUNNER_TEMP/api-media-results.json"
           python native-api/tests/access_phases.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/api-access-results.json"
           python native-bot/tests/integration.py --prefix "$RUNNER_TEMP/scdn-plugin" "${extra[@]}" --report "$RUNNER_TEMP/bot-results.json"
@@ -269,6 +270,7 @@ jobs:
         with:
           name: all-plugins-${{ matrix.runtime }}-${{ matrix.linkage }}-results
           path: |
+            ${{ runner.temp }}/api-provider-results.json
             ${{ runner.temp }}/auth-go-results.jsonl
             ${{ runner.temp }}/auth-tools-results.json
             ${{ runner.temp }}/auth-runtime-results.json

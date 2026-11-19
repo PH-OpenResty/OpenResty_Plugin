@@ -1,0 +1,885 @@
+{
+  "source": {
+    "repository": "Wei-Shaw/sub2api",
+    "revision": "2af3f1e15c98c893a89255a037f551046883b8c0",
+    "path": "backend/internal/server/routes/gateway.go",
+    "sha256": "95a6f2d910a6bf2b27e121c1874781d62354b51fdadf4586b5855c84dd77008a"
+  },
+  "routes": [
+    {
+      "method": "GET",
+      "route": "/v1/sub2api/billing",
+      "path": "/v1/sub2api/billing",
+      "kind": "api",
+      "protocol": "generic"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/messages",
+      "path": "/v1/messages",
+      "kind": "ai",
+      "protocol": "messages"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/systemone",
+      "path": "/v1/systemone",
+      "kind": "ai",
+      "protocol": "systemone"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/messages/count_tokens",
+      "path": "/v1/messages/count_tokens",
+      "kind": "ai",
+      "protocol": "messages"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/models",
+      "path": "/v1/models",
+      "kind": "api",
+      "protocol": "generic"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/models/:model",
+      "path": "/v1/models/sample_model",
+      "kind": "api",
+      "protocol": "generic"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/usage",
+      "path": "/v1/usage",
+      "kind": "api",
+      "protocol": "generic"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/live",
+      "path": "/v1/live",
+      "kind": "ai",
+      "protocol": "realtime"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/live/:call_id",
+      "path": "/v1/live/sample_call_id",
+      "kind": "ai",
+      "protocol": "realtime"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/responses",
+      "path": "/v1/responses",
+      "kind": "ai",
+      "protocol": "responses"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/responses/*subpath",
+      "path": "/v1/responses/compact",
+      "kind": "ai",
+      "protocol": "responses"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/alpha/search",
+      "path": "/v1/alpha/search",
+      "kind": "ai",
+      "protocol": "generic"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/responses",
+      "path": "/v1/responses",
+      "kind": "ai",
+      "protocol": "responses"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/chat/completions",
+      "path": "/v1/chat/completions",
+      "kind": "ai",
+      "protocol": "chat"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/embeddings",
+      "path": "/v1/embeddings",
+      "kind": "ai",
+      "protocol": "embeddings"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/images/generations",
+      "path": "/v1/images/generations",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/images/edits",
+      "path": "/v1/images/edits",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/images/generations/async",
+      "path": "/v1/images/generations/async",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/images/edits/async",
+      "path": "/v1/images/edits/async",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/images/tasks/:task_id",
+      "path": "/v1/images/tasks/sample_task_id",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/images/batches",
+      "path": "/v1/images/batches",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/images/batches",
+      "path": "/v1/images/batches",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/images/batches/models",
+      "path": "/v1/images/batches/models",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/images/batches/:id",
+      "path": "/v1/images/batches/sample_id",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/images/batches/:id/items",
+      "path": "/v1/images/batches/sample_id/items",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/images/batches/:id/items/:custom_id/content",
+      "path": "/v1/images/batches/sample_id/items/sample_custom_id/content",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/images/batches/:id/download",
+      "path": "/v1/images/batches/sample_id/download",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/images/batches/:id/cancel",
+      "path": "/v1/images/batches/sample_id/cancel",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/images/batches/:id",
+      "path": "/v1/images/batches/sample_id",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/images/batches/:id/outputs",
+      "path": "/v1/images/batches/sample_id/outputs",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/videos",
+      "path": "/v1/videos",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/videos/generations",
+      "path": "/v1/videos/generations",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/videos/edits",
+      "path": "/v1/videos/edits",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/videos/extensions",
+      "path": "/v1/videos/extensions",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/videos/generations/:request_id/content",
+      "path": "/v1/videos/generations/sample_request_id/content",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/videos/edits/:request_id/content",
+      "path": "/v1/videos/edits/sample_request_id/content",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/videos/extensions/:request_id/content",
+      "path": "/v1/videos/extensions/sample_request_id/content",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/videos/generations/:request_id",
+      "path": "/v1/videos/generations/sample_request_id",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/videos/edits/:request_id",
+      "path": "/v1/videos/edits/sample_request_id",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/videos/extensions/:request_id",
+      "path": "/v1/videos/extensions/sample_request_id",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/videos/:request_id",
+      "path": "/v1/videos/sample_request_id",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/videos/:request_id/content",
+      "path": "/v1/videos/sample_request_id/content",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/tts",
+      "path": "/v1/tts",
+      "kind": "ai",
+      "protocol": "audio"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/stt",
+      "path": "/v1/stt",
+      "kind": "ai",
+      "protocol": "audio"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/custom-voices",
+      "path": "/v1/custom-voices",
+      "kind": "ai",
+      "protocol": "audio"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/custom-voices",
+      "path": "/v1/custom-voices",
+      "kind": "ai",
+      "protocol": "audio"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/custom-voices/:voice_id/audio",
+      "path": "/v1/custom-voices/sample_voice_id/audio",
+      "kind": "ai",
+      "protocol": "audio"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/custom-voices/:voice_id",
+      "path": "/v1/custom-voices/sample_voice_id",
+      "kind": "ai",
+      "protocol": "audio"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1/custom-voices/:voice_id",
+      "path": "/v1/custom-voices/sample_voice_id",
+      "kind": "ai",
+      "protocol": "audio"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/custom-voices/:voice_id",
+      "path": "/v1/custom-voices/sample_voice_id",
+      "kind": "ai",
+      "protocol": "audio"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/realtime",
+      "path": "/v1/realtime",
+      "kind": "ai",
+      "protocol": "realtime"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/web_search",
+      "path": "/v1/web_search",
+      "kind": "ai",
+      "protocol": "generic"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/x_search",
+      "path": "/v1/x_search",
+      "kind": "ai",
+      "protocol": "generic"
+    },
+    {
+      "method": "GET",
+      "route": "/v1beta/models",
+      "path": "/v1beta/models",
+      "kind": "api",
+      "protocol": "gemini"
+    },
+    {
+      "method": "GET",
+      "route": "/v1beta/models/:model",
+      "path": "/v1beta/models/sample_model",
+      "kind": "api",
+      "protocol": "gemini"
+    },
+    {
+      "method": "POST",
+      "route": "/v1beta/models/*modelAction",
+      "path": "/v1beta/models/example:generateContent",
+      "kind": "ai",
+      "protocol": "gemini"
+    },
+    {
+      "method": "POST",
+      "route": "/v1beta/cachedContents",
+      "path": "/v1beta/cachedContents",
+      "kind": "api",
+      "protocol": "gemini"
+    },
+    {
+      "method": "GET",
+      "route": "/v1beta/cachedContents",
+      "path": "/v1beta/cachedContents",
+      "kind": "api",
+      "protocol": "gemini"
+    },
+    {
+      "method": "GET",
+      "route": "/v1beta/cachedContents/:cacheID",
+      "path": "/v1beta/cachedContents/:cacheID",
+      "kind": "api",
+      "protocol": "gemini"
+    },
+    {
+      "method": "PATCH",
+      "route": "/v1beta/cachedContents/:cacheID",
+      "path": "/v1beta/cachedContents/:cacheID",
+      "kind": "api",
+      "protocol": "gemini"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1beta/cachedContents/:cacheID",
+      "path": "/v1beta/cachedContents/:cacheID",
+      "kind": "api",
+      "protocol": "gemini"
+    },
+    {
+      "method": "POST",
+      "route": "/backend-api/codex/realtime/calls",
+      "path": "/backend-api/codex/realtime/calls",
+      "kind": "ai",
+      "protocol": "realtime"
+    },
+    {
+      "method": "GET",
+      "route": "/backend-api/codex/:call_id",
+      "path": "/backend-api/codex/sample_call_id",
+      "kind": "ai",
+      "protocol": "realtime"
+    },
+    {
+      "method": "POST",
+      "route": "/backend-api/codex/responses",
+      "path": "/backend-api/codex/responses",
+      "kind": "ai",
+      "protocol": "responses"
+    },
+    {
+      "method": "POST",
+      "route": "/backend-api/codex/responses/*subpath",
+      "path": "/backend-api/codex/responses/compact",
+      "kind": "ai",
+      "protocol": "responses"
+    },
+    {
+      "method": "POST",
+      "route": "/backend-api/codex/alpha/search",
+      "path": "/backend-api/codex/alpha/search",
+      "kind": "ai",
+      "protocol": "generic"
+    },
+    {
+      "method": "GET",
+      "route": "/backend-api/codex/responses",
+      "path": "/backend-api/codex/responses",
+      "kind": "ai",
+      "protocol": "responses"
+    },
+    {
+      "method": "GET",
+      "route": "/backend-api/codex/models",
+      "path": "/backend-api/codex/models",
+      "kind": "api",
+      "protocol": "generic"
+    },
+    {
+      "method": "POST",
+      "route": "/antigravity/v1/messages",
+      "path": "/antigravity/v1/messages",
+      "kind": "ai",
+      "protocol": "messages"
+    },
+    {
+      "method": "POST",
+      "route": "/antigravity/v1/messages/count_tokens",
+      "path": "/antigravity/v1/messages/count_tokens",
+      "kind": "ai",
+      "protocol": "messages"
+    },
+    {
+      "method": "GET",
+      "route": "/antigravity/v1/models",
+      "path": "/antigravity/v1/models",
+      "kind": "api",
+      "protocol": "generic"
+    },
+    {
+      "method": "GET",
+      "route": "/antigravity/v1/usage",
+      "path": "/antigravity/v1/usage",
+      "kind": "api",
+      "protocol": "generic"
+    },
+    {
+      "method": "GET",
+      "route": "/antigravity/v1beta/models",
+      "path": "/antigravity/v1beta/models",
+      "kind": "api",
+      "protocol": "gemini"
+    },
+    {
+      "method": "GET",
+      "route": "/antigravity/v1beta/models/:model",
+      "path": "/antigravity/v1beta/models/sample_model",
+      "kind": "api",
+      "protocol": "gemini"
+    },
+    {
+      "method": "POST",
+      "route": "/antigravity/v1beta/models/*modelAction",
+      "path": "/antigravity/v1beta/models/example:generateContent",
+      "kind": "ai",
+      "protocol": "gemini"
+    },
+    {
+      "method": "POST",
+      "route": "/responses",
+      "path": "/responses",
+      "kind": "ai",
+      "protocol": "responses"
+    },
+    {
+      "method": "POST",
+      "route": "/responses/*subpath",
+      "path": "/responses/compact",
+      "kind": "ai",
+      "protocol": "responses"
+    },
+    {
+      "method": "POST",
+      "route": "/alpha/search",
+      "path": "/alpha/search",
+      "kind": "ai",
+      "protocol": "generic"
+    },
+    {
+      "method": "GET",
+      "route": "/responses",
+      "path": "/responses",
+      "kind": "ai",
+      "protocol": "responses"
+    },
+    {
+      "method": "GET",
+      "route": "/models",
+      "path": "/models",
+      "kind": "api",
+      "protocol": "generic"
+    },
+    {
+      "method": "GET",
+      "route": "/models/:model",
+      "path": "/models/sample_model",
+      "kind": "api",
+      "protocol": "generic"
+    },
+    {
+      "method": "POST",
+      "route": "/messages/count_tokens",
+      "path": "/messages/count_tokens",
+      "kind": "ai",
+      "protocol": "messages"
+    },
+    {
+      "method": "POST",
+      "route": "/chat/completions",
+      "path": "/chat/completions",
+      "kind": "ai",
+      "protocol": "chat"
+    },
+    {
+      "method": "POST",
+      "route": "/embeddings",
+      "path": "/embeddings",
+      "kind": "ai",
+      "protocol": "embeddings"
+    },
+    {
+      "method": "POST",
+      "route": "/images/generations",
+      "path": "/images/generations",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "POST",
+      "route": "/images/edits",
+      "path": "/images/edits",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "POST",
+      "route": "/images/generations/async",
+      "path": "/images/generations/async",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "POST",
+      "route": "/images/edits/async",
+      "path": "/images/edits/async",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "GET",
+      "route": "/images/tasks/:task_id",
+      "path": "/images/tasks/sample_task_id",
+      "kind": "ai",
+      "protocol": "images"
+    },
+    {
+      "method": "POST",
+      "route": "/videos",
+      "path": "/videos",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "POST",
+      "route": "/videos/generations",
+      "path": "/videos/generations",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "POST",
+      "route": "/videos/edits",
+      "path": "/videos/edits",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "POST",
+      "route": "/videos/extensions",
+      "path": "/videos/extensions",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/videos/generations/:request_id/content",
+      "path": "/videos/generations/sample_request_id/content",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/videos/edits/:request_id/content",
+      "path": "/videos/edits/sample_request_id/content",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/videos/extensions/:request_id/content",
+      "path": "/videos/extensions/sample_request_id/content",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/videos/generations/:request_id",
+      "path": "/videos/generations/sample_request_id",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/videos/edits/:request_id",
+      "path": "/videos/edits/sample_request_id",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/videos/extensions/:request_id",
+      "path": "/videos/extensions/sample_request_id",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/videos/:request_id",
+      "path": "/videos/sample_request_id",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/videos/:request_id/content",
+      "path": "/videos/sample_request_id/content",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "POST",
+      "route": "/tts",
+      "path": "/tts",
+      "kind": "ai",
+      "protocol": "audio"
+    },
+    {
+      "method": "POST",
+      "route": "/stt",
+      "path": "/stt",
+      "kind": "ai",
+      "protocol": "audio"
+    },
+    {
+      "method": "POST",
+      "route": "/custom-voices",
+      "path": "/custom-voices",
+      "kind": "ai",
+      "protocol": "audio"
+    },
+    {
+      "method": "GET",
+      "route": "/custom-voices",
+      "path": "/custom-voices",
+      "kind": "ai",
+      "protocol": "audio"
+    },
+    {
+      "method": "GET",
+      "route": "/custom-voices/:voice_id/audio",
+      "path": "/custom-voices/sample_voice_id/audio",
+      "kind": "ai",
+      "protocol": "audio"
+    },
+    {
+      "method": "GET",
+      "route": "/custom-voices/:voice_id",
+      "path": "/custom-voices/sample_voice_id",
+      "kind": "ai",
+      "protocol": "audio"
+    },
+    {
+      "method": "PATCH",
+      "route": "/custom-voices/:voice_id",
+      "path": "/custom-voices/sample_voice_id",
+      "kind": "ai",
+      "protocol": "audio"
+    },
+    {
+      "method": "DELETE",
+      "route": "/custom-voices/:voice_id",
+      "path": "/custom-voices/sample_voice_id",
+      "kind": "ai",
+      "protocol": "audio"
+    },
+    {
+      "method": "GET",
+      "route": "/realtime",
+      "path": "/realtime",
+      "kind": "ai",
+      "protocol": "realtime"
+    },
+    {
+      "method": "POST",
+      "route": "/web_search",
+      "path": "/web_search",
+      "kind": "ai",
+      "protocol": "generic"
+    },
+    {
+      "method": "POST",
+      "route": "/x_search",
+      "path": "/x_search",
+      "kind": "ai",
+      "protocol": "generic"
+    },
+    {
+      "method": "GET",
+      "route": "/antigravity/models",
+      "path": "/antigravity/models",
+      "kind": "api",
+      "protocol": "gemini"
+    },
+    {
+      "method": "POST",
+      "route": "/api/v3/contents/generations/tasks",
+      "path": "/api/v3/contents/generations/tasks",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/api/v3/contents/generations/tasks/:task_id",
+      "path": "/api/v3/contents/generations/tasks/sample_task_id",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "DELETE",
+      "route": "/api/v3/contents/generations/tasks/:task_id",
+      "path": "/api/v3/contents/generations/tasks/sample_task_id",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "POST",
+      "route": "/v3/contents/generations/tasks",
+      "path": "/v3/contents/generations/tasks",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/v3/contents/generations/tasks/:task_id",
+      "path": "/v3/contents/generations/tasks/sample_task_id",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v3/contents/generations/tasks/:task_id",
+      "path": "/v3/contents/generations/tasks/sample_task_id",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "POST",
+      "route": "/v1/contents/generations/tasks",
+      "path": "/v1/contents/generations/tasks",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/v1/contents/generations/tasks/:task_id",
+      "path": "/v1/contents/generations/tasks/sample_task_id",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "DELETE",
+      "route": "/v1/contents/generations/tasks/:task_id",
+      "path": "/v1/contents/generations/tasks/sample_task_id",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "POST",
+      "route": "/contents/generations/tasks",
+      "path": "/contents/generations/tasks",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "GET",
+      "route": "/contents/generations/tasks/:task_id",
+      "path": "/contents/generations/tasks/sample_task_id",
+      "kind": "ai",
+      "protocol": "videos"
+    },
+    {
+      "method": "DELETE",
+      "route": "/contents/generations/tasks/:task_id",
+      "path": "/contents/generations/tasks/sample_task_id",
+      "kind": "ai",
+      "protocol": "videos"
+    }
+  ]
+}

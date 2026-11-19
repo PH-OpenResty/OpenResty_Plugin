@@ -26,7 +26,7 @@
 
 | 协议 | 入口范围 | 工具链必须保留 | 媒体及流式重点 |
 | --- | --- | --- | --- |
-| OpenAI Responses | `/v1/responses`，以及已登记的 `/responses`、Codex 路由别名和资源子路径 | 工具定义、`function_call`、`call_id`、`function_call_output`、并行调用、状态/错误/usage、不透明 reasoning/工具字段 | output item、文本/工具参数增量、图片 partial/final、`image_generation_call.result`、响应终态 |
+| OpenAI Responses | `/v1/responses`，以及内置的 `/responses`、compact/input_tokens、Codex 路由和已核对资源子路径；自定义路径可登记 | 工具定义、`function_call`、`call_id`、`function_call_output`、并行调用、状态/错误/usage、不透明 reasoning/工具字段 | output item、文本/工具参数增量、图片 partial/final、`image_generation_call.result`、响应终态 |
 | OpenAI Chat | `/v1/chat/completions` 及已登记别名 | `tool_calls`、`tool_call_id`、arguments 增量、tool 消息、`finish_reason`、usage | JSON、SSE、多 choice、未知扩展字段、图片 URL/data URL 等提供者扩展 |
 | Google Gemini | 已登记版本的 `/models/...:generateContent`、`:streamGenerateContent` | `functionCall`/`functionResponse`、ID、`thoughtSignature`、不透明 parts 和安全/结束元数据 | `inlineData`/`fileData`、文本与图片混合、`alt=sse`、多 candidate；新 Interactions 路由按能力另行登记 |
 | Anthropic Messages | `/v1/messages`、已登记别名及 `count_tokens` 等辅助入口 | `tool_use`/`tool_result`、`tool_use_id`、thinking/signature、服务端工具结果、stop reason | `content_block_*`、`input_json_delta.partial_json`、message 终态、工具结果中的图片块 |
@@ -36,7 +36,7 @@ Anthropic Messages 此处指其内容与工具协议，不据此声称它具有�
 
 Sub2API 基线同时登记 `/v1/responses` 与根 `/responses`、`/chat/completions`、图片 edits/generations、async/tasks/batches；仅识别 `/v1/*` 不足以覆盖真实部署。NewAPI 的协议适配、任务插件和结果转换已经在上游实现；CDN 不再叠加一轮隐式跨协议转换。
 
-路径目录由站点/受信上游声明绑定，使用方法、规范化路径、参数化资源段、版本与可选部署前缀。不能把任意网页 `/messages` 或全部 `/v1/*` 自动认定为模型调用。`/responses/compact`、检索/取消等资源需要按上游版本登记，不用无限制后缀通配符猜测。
+路径目录使用方法、规范化路径、参数化资源段、版本与可选部署前缀。不能把任意网页 `/messages` 或全部 `/v1/*` 自动认定为模型调用。2026-11-18 的[渠道覆盖核对](API-PROVIDER-COVERAGE-2026-11-18.zh-CN.md)已将 compact、计数、异步媒体、检索/取消等已确认路径纳入内置表；自定义路径继续由站点/受信上游显式登记，不用无限制后缀通配符猜测。
 
 ## 3. 默认 `raw` 模式
 

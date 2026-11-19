@@ -1,0 +1,163 @@
+{
+  "date": "2026-11-18",
+  "base_commit": "1b02b4f36856d89de5d47416e87dea8293f34aa9",
+  "passed": true,
+  "upstream_revision": "2af3f1e15c98c893a89255a037f551046883b8c0",
+  "concrete_providers": 13,
+  "default_provider_requests": 40,
+  "official_variants": 8,
+  "gateway_route_samples": 125,
+  "classifier_source_sha256": "f3b12c263507230064abca4d47d69276d5cddb71881b41580662fc0f2b66bc12",
+  "environment": "WSL2 Linux x86_64 Alpine; isolated nine-module builds",
+  "build_validation": "Three clean isolated builds followed by final classifier recompilation using equivalent preserved build trees.",
+  "sanitizers": "The nginx dynamic build uses UBSan traps and -Werror. Remote CI also runs ASan/UBSan.",
+  "runtimes": [
+    {
+      "runtime": "nginx",
+      "linkage": "dynamic",
+      "version": "nginx version: openresty/1.31.8.1",
+      "checks": 836,
+      "suites": [
+        {
+          "suite": "providers",
+          "checks": 615,
+          "report_sha256": "a8a34f0ed3778e5fbf263c1366e5dea9e001b0e04d7ae071e308815f5164f5a5"
+        },
+        {
+          "suite": "protocols",
+          "checks": 66,
+          "report_sha256": "49c94e7700d7934363218e3b345bb073e36a02a0f36ed47c54b58b91f13d183b"
+        },
+        {
+          "suite": "api",
+          "checks": 47,
+          "report_sha256": "b569f74e2a8659ed0cf6984d6b46065b78beae16c1201b1751a7f57e5443949f"
+        },
+        {
+          "suite": "templates",
+          "checks": 47,
+          "report_sha256": "d0d904b93727439f56e66731800e39c6148f3f54daaaef7e28473b3149f08f96"
+        },
+        {
+          "suite": "api-access",
+          "checks": 8,
+          "report_sha256": "f166a3f31f79295d7b9ac6d510690043e17e4012f6a5ac0baa94440aa3b48e4b"
+        },
+        {
+          "suite": "api-coexist",
+          "checks": 53,
+          "report_sha256": "0daa828c73ac0a53f93eb7d1153e9e3fa2a55c85c7e5f69a739a927bbb9f5fc3"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact": "nginx",
+          "sha256": "285c6c3523da1458512bd8233c9b4831608d6dc1bd59bb50c22fce974d6e3083"
+        },
+        {
+          "artifact": "ngx_http_scdn_api_module.so",
+          "sha256": "abd62834f399ee7e1e3284a19c69baa1fc0aea62b35d2079280edc75c9b50f19"
+        }
+      ]
+    },
+    {
+      "runtime": "openresty",
+      "linkage": "dynamic",
+      "version": "nginx version: openresty/1.31.8.1",
+      "checks": 836,
+      "suites": [
+        {
+          "suite": "providers",
+          "checks": 615,
+          "report_sha256": "a8a34f0ed3778e5fbf263c1366e5dea9e001b0e04d7ae071e308815f5164f5a5"
+        },
+        {
+          "suite": "protocols",
+          "checks": 66,
+          "report_sha256": "49c94e7700d7934363218e3b345bb073e36a02a0f36ed47c54b58b91f13d183b"
+        },
+        {
+          "suite": "api",
+          "checks": 47,
+          "report_sha256": "dc766ca94566dadd23342a7a93d60dbfdf7684653df960c39dfece24fbffcce2"
+        },
+        {
+          "suite": "templates",
+          "checks": 47,
+          "report_sha256": "637bfe0bc1d20bef0932335f7f1aa2a5cdb7d45e151a405cae05e70f3ff17d41"
+        },
+        {
+          "suite": "api-access",
+          "checks": 8,
+          "report_sha256": "f166a3f31f79295d7b9ac6d510690043e17e4012f6a5ac0baa94440aa3b48e4b"
+        },
+        {
+          "suite": "api-coexist",
+          "checks": 53,
+          "report_sha256": "28927db187c3517a4b01ad9f6f5017633cd510d259e8779b2902db03e13b7857"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact": "nginx",
+          "sha256": "1f1e242abac975fca6a750c6672471f2fb86c8eebd8f5eb662c211780957b5ff"
+        },
+        {
+          "artifact": "ngx_http_scdn_api_module.so",
+          "sha256": "7dae47666811d589d800278e7acafa5b5ac8569d96a4662cb5537e72579980f3"
+        }
+      ]
+    },
+    {
+      "runtime": "openresty",
+      "linkage": "static",
+      "version": "nginx version: openresty/1.31.8.1",
+      "checks": 836,
+      "suites": [
+        {
+          "suite": "providers",
+          "checks": 615,
+          "report_sha256": "a8a34f0ed3778e5fbf263c1366e5dea9e001b0e04d7ae071e308815f5164f5a5"
+        },
+        {
+          "suite": "protocols",
+          "checks": 66,
+          "report_sha256": "49c94e7700d7934363218e3b345bb073e36a02a0f36ed47c54b58b91f13d183b"
+        },
+        {
+          "suite": "api",
+          "checks": 47,
+          "report_sha256": "b4740937bb82bef74fb2b9f165b7e460aab919a9fb17baef2d5b6b198d118d0e"
+        },
+        {
+          "suite": "templates",
+          "checks": 47,
+          "report_sha256": "a1de6fe6be17fe1e50611a29ced95e82888ea1097a9bc7d1a24887d5bc5a9ee2"
+        },
+        {
+          "suite": "api-access",
+          "checks": 8,
+          "report_sha256": "f166a3f31f79295d7b9ac6d510690043e17e4012f6a5ac0baa94440aa3b48e4b"
+        },
+        {
+          "suite": "api-coexist",
+          "checks": 53,
+          "report_sha256": "28273517b22f502c7b9a692705e5398f5bfa548aacc6653581d7d3d1c4bcf240"
+        }
+      ],
+      "artifacts": [
+        {
+          "artifact": "nginx",
+          "sha256": "01e0f577ea11ff025efb7ccab5a3eee37ae30594f52a4143eb7ddc281a7a7292"
+        }
+      ]
+    }
+  ],
+  "total_checks": 2508,
+  "production_modified": false,
+  "real_vendor_api_calls": 0,
+  "limitations": [
+    "Provider URL and local proxy fixture coverage is not live provider authorization or feature validation.",
+    "The pinned registry and gateway router define this compatibility snapshot; future or private routes can use explicit endpoint configuration."
+  ]
+}
