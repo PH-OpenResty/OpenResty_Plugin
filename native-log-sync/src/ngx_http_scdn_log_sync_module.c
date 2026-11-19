@@ -1,7 +1,9 @@
-#include "scdn_log_sync.h"
+/* clang-format off: ngx_config.h defines feature macros before libc headers. */
 #include <ngx_config.h>
 #include <ngx_core.h>
 #include <ngx_http.h>
+#include "scdn_log_sync.h"
+/* clang-format on */
 extern ngx_module_t ngx_http_scdn_log_sync_module;
 
 typedef struct {

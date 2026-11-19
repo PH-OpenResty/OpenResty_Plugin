@@ -43,7 +43,7 @@
         },
         {
           "artifact": "ngx_http_scdn_log_sync_module.so",
-          "digest": "6f1c7fcc93ea19216d4c8d6eaf99a50ce592e5f89372a8ccfa3060505c84e4e8"
+          "digest": "189bbbd47651bce3d8586a63a042733b8d72d2a1fac4d432cb5abbc33b17ba37"
         }
       ]
     },
@@ -85,7 +85,7 @@
         },
         {
           "artifact": "ngx_http_scdn_log_sync_module.so",
-          "digest": "2adc5da10f91db8567477721d817b0970fd4962f320043fcc96c5ac2caaf1573"
+          "digest": "58641ad1c8779735b50ab2ed046c056728288a4a350dd782c6bb374c210c4a34"
         }
       ]
     },
@@ -123,7 +123,7 @@
       "artifacts": [
         {
           "artifact": "nginx",
-          "digest": "0002ddf846361efd1325a56ad7d6120a12f38da74d9f5f9e7943290377e985ff"
+          "digest": "a277bf9565e13f78b9a8ef7ae8346be025ee4483be9def185ed14afc0625f769"
         }
       ]
     }
@@ -151,7 +151,7 @@
     }
   ],
   "total_checks": 2531,
-  "source_manifest_digest": "74f468ec041dd088faacb67496c27f6614dbdecaaab8e5825418811ab9c91fa0",
+  "source_manifest_digest": "dd7de513525215d840fb0bdc2be7872b4b9197ab0d3e2ec1f12c4b69736bb072",
   "backend_versions": {
     "elasticsearch": "8.17.4",
     "clickhouse": "25.8.33.6"

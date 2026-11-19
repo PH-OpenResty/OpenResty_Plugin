@@ -4,7 +4,6 @@
 #include <cmath>
 #include <cstdlib>
 #include <ctime>
-#include <regex>
 #include <sys/stat.h>
 
 namespace logs {
@@ -237,10 +236,27 @@ J normalize(const Config &c, const Source &source, const J &fields,
               : "");
   double origin_ms = 0;
   auto raw = scalar(fields, "urt", scalar(fields, "upstream_response_time"));
-  static const std::regex duration("[0-9]+(?:\\.[0-9]+)?");
-  for (auto it = std::sregex_iterator(raw.begin(), raw.end(), duration);
-       it != std::sregex_iterator(); ++it)
-    origin_ms += std::stod(it->str()) * 1000;
+  for (size_t i = 0; i < raw.size();) {
+    if (raw[i] < '0' || raw[i] > '9') {
+      i++;
+      continue;
+    }
+    double seconds = 0;
+    while (i < raw.size() && raw[i] >= '0' && raw[i] <= '9')
+      seconds = seconds * 10 + (raw[i++] - '0');
+    if (i + 1 < raw.size() && raw[i] == '.' && raw[i + 1] >= '0' &&
+        raw[i + 1] <= '9') {
+      i++;
+      double scale = .1;
+      while (i < raw.size() && raw[i] >= '0' && raw[i] <= '9') {
+        seconds += (raw[i++] - '0') * scale;
+        scale *= .1;
+      }
+    }
+    need(std::isfinite(seconds) && std::isfinite(origin_ms + seconds * 1000),
+         STATE);
+    origin_ms += seconds * 1000;
+  }
   json_object_object_add(row.get(), "origin_ms",
                          json_object_new_double(origin_ms));
   put(row, "cache_layer", scalar(fields, "cache_layer", "unknown"));
