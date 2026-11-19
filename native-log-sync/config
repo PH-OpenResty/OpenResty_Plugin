@@ -6,5 +6,5 @@ ngx_module_name=ngx_http_scdn_log_sync_module
 ngx_module_srcs="$ngx_addon_dir/src/ngx_http_scdn_log_sync_module.c"
 ngx_module_incs="$ngx_addon_dir/src"
 ngx_module_deps="$ngx_addon_dir/src/scdn_log_sync.h"
-ngx_module_libs="$log_build/libscdn-log-sync.a -lstdc++ -ljson-c -lcurl -lcrypto -lz -lbpf -lpthread"
+ngx_module_libs="$log_build/libscdn-log-sync.a -lstdc++ -ljson-c -lcurl -lcrypto -lz -lbpf -lpthread -lm"
 . auto/module

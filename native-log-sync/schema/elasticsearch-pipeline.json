@@ -2,6 +2,18 @@
   "description": "Use original event time, with a safe ingestion-time fallback.",
   "processors": [
     {
+      "set": {
+        "field": "received_at",
+        "value": "{{{_ingest.timestamp}}}"
+      }
+    },
+    {
+      "script": {
+        "if": "ctx.kind == 'metrics' && ctx.metrics != null && ctx.metrics.time instanceof Number",
+        "source": "ctx.metrics.source_clock_skew_ms = java.time.Instant.parse(ctx.received_at).toEpochMilli() - ((Number)ctx.metrics.time).longValue()"
+      }
+    },
+    {
       "date": {
         "if": "ctx.kind == 'access' && ctx.normalized != null && ctx.normalized.time != null",
         "field": "normalized.time",

@@ -85,6 +85,8 @@ def main():
             check('ES ingest pipeline uses original event time for historical queries',abs(original_time.timestamp()-now.timestamp())<.002)
             response=json.loads(http(args.es+'/'+index+'/_search',json.dumps({'size':0,'aggs':{'memory':{'avg':{'field':'metrics.mem_pct'}}}}),'POST'))
             check('Elasticsearch metrics are numeric and support real aggregations',response['aggregations']['memory']['value'] is not None)
+            delay=float(query('SELECT source_clock_skew_ms FROM '+database+'.node_samples').strip())
+            check('receiver computes actual sample delivery age instead of a constant zero',0<=delay<30000)
             query('INSERT INTO '+database+".node_inventory VALUES ('test_node','192.0.2.1','edge',1)")
             catalog=json.loads((ROOT/'schema/metrics-catalog.json').read_text())
             count=0

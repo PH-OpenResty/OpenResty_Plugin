@@ -146,12 +146,12 @@
     },
     {
       "suite": "backends",
-      "checks": 16,
-      "report_digest": "f4602a6f7248fec42add7d965864598a6c511edb09abfa097063857798066497"
+      "checks": 17,
+      "report_digest": "0c1d12719f56abf84faba53b73755fbeb967552246f8ecb51d22843a232ae6a5"
     }
   ],
-  "total_checks": 2531,
-  "source_manifest_digest": "dd7de513525215d840fb0bdc2be7872b4b9197ab0d3e2ec1f12c4b69736bb072",
+  "total_checks": 2532,
+  "source_manifest_digest": "e56f95a17b5fb8bab624b12800924e897024374a3b9afc95de9cf2823bb3b46d",
   "backend_versions": {
     "elasticsearch": "8.17.4",
     "clickhouse": "25.8.33.6"

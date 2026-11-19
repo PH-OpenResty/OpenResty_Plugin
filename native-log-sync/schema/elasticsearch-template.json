@@ -416,6 +416,9 @@
         },
         "@timestamp": {
           "type": "date"
+        },
+        "received_at": {
+          "type": "date"
         }
       }
     },

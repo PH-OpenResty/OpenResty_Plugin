@@ -7,7 +7,7 @@ ROOT=Path(__file__).resolve().parents[1]
 base='''CREATE DATABASE IF NOT EXISTS scdn;
 CREATE TABLE IF NOT EXISTS scdn.logs
 (
- event_id FixedString(64), timestamp DateTime64(3, 'UTC'), node LowCardinality(String),
+ event_id FixedString(64), timestamp DateTime64(3, 'UTC'), received_at DateTime64(3, 'UTC') DEFAULT now64(3), node LowCardinality(String),
  source LowCardinality(String), kind LowCardinality(String), path String, generation String,
  offset UInt64, end_offset UInt64, raw_base64 String, terminated UInt8, fragment UInt8,
  archive UInt8, message String, format LowCardinality(String), fields_json String, normalized_json String,
@@ -47,6 +47,8 @@ for name,fields,kind,time_expr in [
  sql+=f"CREATE VIEW IF NOT EXISTS scdn.{name} AS SELECT\n "+',\n '.join(selections)+f"\nFROM scdn.logs FINAL WHERE kind='{kind}' AND normalized_json!='';\n"
 selections=["fromUnixTimestamp64Milli(JSONExtractInt(fields_json, 'time')) AS time",'node']+select_fields(samples,'fields_json')
 selections += ["JSONExtractRaw(fields_json, 'nginx_stats') AS nginx_stats", "fields_json AS raw_sample"]
+selections=["dateDiff('millisecond', fromUnixTimestamp64Milli(JSONExtractInt(fields_json, 'time')), received_at) AS source_clock_skew_ms"
+            if value.endswith(' AS source_clock_skew_ms') else value for value in selections]
 sql+='CREATE VIEW IF NOT EXISTS scdn.node_samples AS SELECT\n '+',\n '.join(selections)+"\nFROM scdn.logs FINAL WHERE kind='metrics' AND format='json';\n"
 sql+='''CREATE TABLE IF NOT EXISTS scdn.node_inventory
 (node String, address String, role String, enabled UInt8)
@@ -90,12 +92,16 @@ metric_properties.update(time={'type':'date','format':'epoch_millis'},
     packet_pps={'type':'object','dynamic':True},collection={'type':'object','dynamic':True})
 template['template']['mappings']['properties']['metrics']={'type':'object','dynamic':False,'properties':metric_properties}
 template['template']['mappings']['properties']['@timestamp']={'type':'date'}
+template['template']['mappings']['properties']['received_at']={'type':'date'}
 template['template']['settings']={'index.default_pipeline':'scdn-log-sync'}
 for mapping in [*properties.values(),*metric_properties.values()]:
  if mapping.get('type')=='keyword':mapping['ignore_above']=2048
 (ROOT/'schema/elasticsearch-template.json').write_bytes((json.dumps(template,indent=2)+'\n').encode())
 pipeline={'description':'Use original event time, with a safe ingestion-time fallback.',
  'processors':[
+  {'set':{'field':'received_at','value':'{{{_ingest.timestamp}}}'}},
+  {'script':{'if':"ctx.kind == 'metrics' && ctx.metrics != null && ctx.metrics.time instanceof Number",
+             'source':"ctx.metrics.source_clock_skew_ms = java.time.Instant.parse(ctx.received_at).toEpochMilli() - ((Number)ctx.metrics.time).longValue()"}},
   {'date':{'if':"ctx.kind == 'access' && ctx.normalized != null && ctx.normalized.time != null",'field':'normalized.time','target_field':'@timestamp','formats':['ISO8601','yyyy-MM-dd HH:mm:ss.SSS','UNIX_MS','UNIX'],'ignore_failure':True}},
   {'date':{'if':"ctx.kind == 'ban' && ctx.normalized != null && ctx.normalized.time_ms != null",'field':'normalized.time_ms','target_field':'@timestamp','formats':['UNIX_MS'],'ignore_failure':True}},
   {'date':{'if':"ctx.kind == 'metrics' && ctx.metrics != null && ctx.metrics.time != null",'field':'metrics.time','target_field':'@timestamp','formats':['UNIX_MS'],'ignore_failure':True}},

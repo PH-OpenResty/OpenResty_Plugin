@@ -1,7 +1,7 @@
 CREATE DATABASE IF NOT EXISTS scdn;
 CREATE TABLE IF NOT EXISTS scdn.logs
 (
- event_id FixedString(64), timestamp DateTime64(3, 'UTC'), node LowCardinality(String),
+ event_id FixedString(64), timestamp DateTime64(3, 'UTC'), received_at DateTime64(3, 'UTC') DEFAULT now64(3), node LowCardinality(String),
  source LowCardinality(String), kind LowCardinality(String), path String, generation String,
  offset UInt64, end_offset UInt64, raw_base64 String, terminated UInt8, fragment UInt8,
  archive UInt8, message String, format LowCardinality(String), fields_json String, normalized_json String,
@@ -83,7 +83,7 @@ CREATE VIEW IF NOT EXISTS scdn.node_samples AS SELECT
  JSONExtract(fields_json, 'api_websocket', 'Nullable(UInt64)') AS api_websocket,
  JSONExtract(fields_json, 'native_requests', 'Nullable(UInt64)') AS native_requests,
  JSONExtract(fields_json, 'native_bytes', 'Nullable(UInt64)') AS native_bytes,
- JSONExtract(fields_json, 'source_clock_skew_ms', 'Int64') AS source_clock_skew_ms,
+ dateDiff('millisecond', fromUnixTimestamp64Milli(JSONExtractInt(fields_json, 'time')), received_at) AS source_clock_skew_ms,
  JSONExtract(fields_json, 'kernel_drop_counter', 'Nullable(UInt64)') AS kernel_drop_counter,
  JSONExtract(fields_json, 'kernel_drop_delta', 'Nullable(UInt64)') AS kernel_drop_delta,
  JSONExtract(fields_json, 'kernel_drop_pps', 'Nullable(Float64)') AS kernel_drop_pps,
